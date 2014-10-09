@@ -56,7 +56,6 @@
 
     </properties>
     <modules>
-        <module>debezium-messages</module>
         <module>debezium</module>
     </modules>
     <developers>
