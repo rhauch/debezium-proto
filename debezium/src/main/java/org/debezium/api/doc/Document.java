@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -88,6 +90,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return true if there are no fields in this document, or false if there is at least one.
      */
     boolean isEmpty();
+    
+    /**
+     * Remove all fields from this document.
+     */
+    void clear();
 
     /**
      * Determine if this contains a field with the given name.
@@ -104,6 +111,123 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return true if this document contains all of the fields in the supplied document, or false otherwise
      */
     boolean hasAll(Document document);
+
+    /**
+     * Set the value at the given path resolved against this document, optionally adding any missing intermediary documents
+     * or arrays based upon the format of the path segments.
+     * @param path the path at which the value is to be set
+     * @param addIntermediaries true if any missing intermediary fields should be created, or false if any missing
+     * intermediary fields should be handled as an error via {@code invalid}
+     * @param value the value that should be set at the given path; may be null or a {@link Value#nullValue() null value}
+     * @param invalid the function that should be called if the supplied path cannot be resolved
+     * @return the {@code value} if successful or the {@link Optional#empty() empty (not present)} optional value if
+     * the path was invalid and could not be resolved
+     */
+    default Optional<Value> set( Path path, boolean addIntermediaries, Value value, Consumer<Path> invalid ) {
+        return find(path,(missingPath,missingIndex)->{
+            if ( (missingIndex+1) == missingPath.size() ) {
+                // This is the last segment ...
+                return Optional.ofNullable(value);
+            }
+            if ( !addIntermediaries ) {
+                // We're not supposed to add any missing intermediaries, so handle this invalid case ...
+                invalid.accept(missingPath);
+            }
+            // There is at least one segment after the missing segment, and it will tell us which type of value to create ...
+            String nextSegment = missingPath.segment(missingIndex+1);
+            if ( Path.Segments.isArrayIndex(nextSegment)) {
+                return Optional.of(Value.create(Array.create()));
+            } else {
+                return Optional.of(Value.create(Document.create()));
+            }
+        },invalid);
+    }
+    
+    /**
+     * Attempt to find the value at the given path
+     * @param path the path to find
+     * @param missingSegment function called when a segment in the path does not exist, and which should return a new value
+     * if one should be created or {@link Optional#empty()} if nothing should be created and {@code invalid}
+     * function should be called by this method
+     * @param invalid function called when the supplied path is invalid; in this case, this method also returns
+     * {@link Optional#empty()}
+     * @return the optional value at this path, which is {@link Optional#isPresent() present} if the value was found at that
+     * path or is {@link Optional#empty() empty (not present)} if there is no value at the path or if the path was not valid
+     */
+    default Optional<Value> find( Path path, BiFunction<Path,Integer,Optional<Value>> missingSegment, Consumer<Path> invalid ) {
+        if ( path == null ) return Optional.empty();
+        if ( path.isRoot() ) {
+            return Optional.of(Value.create(this));
+        }
+        if ( path.isSingle() ) {
+            // Look it up in this document ...
+            return Optional.of( get(path.lastSegment().get()) );
+        }
+        Value value = Value.create(this);
+        int i = 0;
+        for ( String segment : path ) {
+            ++i;
+            if ( value.isDocument() ) {
+                Value existingValue = value.asDocument().get(segment);
+                if ( existingValue == null ) {
+                    // It does not exist ...
+                    Optional<Value> newValue = missingSegment.apply(path,i);
+                    if ( newValue.isPresent() ) {
+                        // Add the new value (whatever it is) ...
+                        value = newValue.get();
+                        value.asDocument().set(segment,value);
+                    } else {
+                        return Optional.empty();
+                    }
+                } else {
+                    value = existingValue;
+                }
+            } else if ( value.isArray() ) {
+                Array array  = value.asArray();
+                if ( Path.Segments.isAfterLastIndex(segment)) {
+                    // This means "after the last index", so call it as missing ...
+                    Optional<Value> newValue = missingSegment.apply(path,i);
+                    if ( newValue.isPresent() ) {
+                        // Add the new value (whatever it is) ...
+                        value = newValue.get();
+                        array.add(value);
+                    } else {
+                        return Optional.empty();
+                    }
+                } else {
+                    Optional<Integer> index = Path.Segments.asInteger(segment);
+                    if ( index.isPresent() ) {
+                        // This is an index ...
+                        if ( array.has(index.get())) {
+                            value = array.get(index.get());
+                        } else if ( array.size() == index.get() ) {
+                            // We can add at this index ...
+                            Optional<Value> newValue = missingSegment.apply(path,i);
+                            if ( newValue.isPresent() ) {
+                                // Add the new value (whatever it is) ...
+                                array.add(newValue.get());
+                            } else {
+                                return Optional.empty();
+                            }
+                        } else {
+                            // The index is not valid (it's too big to be an existing or the next index)  ...
+                            invalid.accept(path.subpath(i));
+                            return Optional.empty();
+                        }
+                    } else {
+                        // This is not an array index but we're expecting it to be, so this is a bad path
+                        invalid.accept(path.subpath(i));
+                        return Optional.empty();
+                    }
+                }
+            } else {
+                // We're supposed to find the segment within this value, but it's not a document or array ...
+                invalid.accept(path.subpath(i));
+                return Optional.empty();
+            }
+        }
+        return Optional.of(value);
+    }
 
     /**
      * Gets the value in this document for the given field name.
@@ -406,7 +530,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * document at this field.
      * 
      * @param fieldName The name of the field
-     * @return The editable document field value; never null
+     * @return The editable document field value; null if the field exists but is not a document
      */
     default Document getOrCreateDocument(CharSequence fieldName) {
         Value value = get(fieldName);
@@ -471,6 +595,16 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return the value that was removed, or null if there was no such value
      */
     Value remove(CharSequence name);
+
+    /**
+     * If the supplied name is provided, then remove the field with the supplied name and return the value.
+     * 
+     * @param name The optional name of the field
+     * @return the value that was removed, or null if the field was not present or there was no such value
+     */
+    default Value remove(Optional<? extends CharSequence> name) {
+        return name.isPresent() ? remove(name.get()) : null;
+    }
 
     /**
      * Remove all fields from this document.

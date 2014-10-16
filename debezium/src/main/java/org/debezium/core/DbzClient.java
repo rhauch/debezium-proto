@@ -32,6 +32,7 @@ public final class DbzClient implements Debezium.Client {
     private final DbzConfiguration config;
     private final ProducerConfig producerConfig;
     private final DbzDatabases databases = new DbzDatabases();
+    private final DbzServices services = new DbzServices();
     private final String uniqueClientId = UUID.randomUUID().toString();
     private Producer<String, byte[]> producer;
     private DbzConsumers consumers;
@@ -48,6 +49,7 @@ public final class DbzClient implements Debezium.Client {
         ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads);
         executor = Executors.newCachedThreadPool(threadFactory);
         consumers = new DbzConsumers(config,executor);
+        services.initialize(uniqueClientId,producer,consumers);
         databases.initialize(uniqueClientId,producer,consumers);
         return this;
     }
@@ -84,6 +86,9 @@ public final class DbzClient implements Debezium.Client {
                     Thread.interrupted();
                 }
             }
+        }
+        if ( services != null ) {
+            services.shutdown();
         }
         if ( databases != null ) {
             databases.shutdown();

@@ -62,7 +62,7 @@ public final class BasicArray implements Array {
     public boolean isEmpty() {
         return values.isEmpty();
     }
-
+    
     @Override
     public int compareTo(Array that) {
         if (that == null)
@@ -85,6 +85,15 @@ public final class BasicArray implements Array {
     @Override
     public Iterator<Entry> iterator() {
         return Iterators.around(Sequences.infiniteIntegers(0), values, CONVERT_PAIR_TO_ENTRY);
+    }
+    
+    @Override
+    public Value remove(int index) {
+        if (isValidIndex(index)) {
+            // The index is in bounds ...
+            return values.remove(index);
+        }
+        return null;
     }
 
     @Override

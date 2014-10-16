@@ -67,6 +67,17 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
         return new BasicArray(values);
     }
 
+    static Array create( Iterable<?> values ) {
+        if ( values == null ) {
+            return create();
+        }
+        BasicArray array = new BasicArray();
+        for ( Object value : values ) {
+            array.add(Value.create(value));
+        }
+        return array;
+    }
+
     /**
      * Return the number of name-value fields in this object.
      * 
@@ -132,9 +143,16 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
         Value value = get(index);
         return value != null ? value.isNull() : true;
     }
+
+    /**
+     * Remove the specified entry from this array
+     * @param index the index
+     * @return the value in the removed entry, or null if there is no such entry
+     */
+    Value remove( int index );
     
     /**
-     * Remove all fields from this document.
+     * Remove all entries from this array.
      * @return this array to allow for chaining methods
      */
     Array removeAll();

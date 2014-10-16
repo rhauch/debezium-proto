@@ -7,14 +7,12 @@ package org.debezium.core;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import kafka.consumer.TopicFilter;
-import kafka.consumer.Whitelist;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 
@@ -45,52 +43,6 @@ import org.debezium.api.message.Patch;
  */
 final class DbzDatabases {
     
-    protected static final class Topic {
-        public static TopicFilter or( String...topics) {
-            StringJoiner joiner = new StringJoiner(",");
-            for ( String topic : topics ) {
-                joiner.add(topic);
-            }
-            return new Whitelist(joiner.toString());
-        }
-        public static final class Read {
-            
-            public static final String READ_DATABASES = "read-dbs-results";
-            public static final String DATABASE_CHANGES = "database-changes";
-            public static final String SCHEMA_CHANGES = "schema-changes";
-            
-            public static boolean isGetDatabaseNames(String topicName) {
-                return READ_DATABASES.equals(topicName);
-            }
-            
-            public static boolean isDatabaseChanges(String topicName) {
-                return DATABASE_CHANGES.equals(topicName);
-            }
-            
-            public static boolean isSchemaChanges(String topicName) {
-                return SCHEMA_CHANGES.equals(topicName);
-            }
-        }
-        public static final class Write {
-            public static final String READ_DATABASES = "read-dbs";
-            public static final String DATABASE_CHANGES = "databases";
-            public static final String SCHEMAS_CHANGES = "schemas";
-
-            public static boolean isGetDatabaseNames(String topicName) {
-                return READ_DATABASES.equals(topicName);
-            }
-            
-            public static boolean isDatabaseChanges(String topicName) {
-                return DATABASE_CHANGES.equals(topicName);
-            }
-            
-            public static boolean isSchemaChanges(String topicName) {
-                return SCHEMAS_CHANGES.equals(topicName);
-            }
-        }
-        
-    }
-    
     private static final Array EMPTY_ARRAY = Array.create();
     
     private final DocumentReader docReader = DocumentReader.defaultReader();
@@ -110,31 +62,34 @@ final class DbzDatabases {
         // Add a single-threaded consumer that will read the top-level topics for database & schema changes ...
         int numThreads = 1;
         String groupId = uniqueClientId + "-databases"; // unique so that all clients see all messages
-        TopicFilter topicFilter = Topic.or(Topic.Read.DATABASE_CHANGES,Topic.Read.SCHEMA_CHANGES,Topic.Read.READ_DATABASES);
+        TopicFilter topicFilter = Topic.anyOf(Topic.DATABASE_CHANGES.outputTopic(),
+                                              Topic.SCHEMA_CHANGES.outputTopic(),
+                                              Topic.DATABASES_LIST.outputTopic());
         consumers.subscribe(groupId, topicFilter, numThreads, (topic, partition, offset, key, message) -> {
             try {
                 // All topics use JSON documents for messages ...
                 Document msg = docReader.read(message);
-                if (Topic.Read.isGetDatabaseNames(topic)) {
+                if (Topic.DATABASES_LIST.isOutputTopic(topic)) {
                     // Make sure we have an active database for all of the database names ...
                     msg.getArray("databaseNames",EMPTY_ARRAY).streamValues().forEach((name)->{
                         addDatabase(Identifier.of(name.asString()),producer);
                     });
-                } else if (Topic.Read.isDatabaseChanges(topic)) {
+                } else if (Topic.DATABASE_CHANGES.isOutputTopic(topic)) {
                     Patch<DatabaseId> patch = Patch.forDatabase(msg);
                     
-                } else if (Topic.Read.isSchemaChanges(topic)) {
+                } else if (Topic.SCHEMA_CHANGES.isOutputTopic(topic)) {
                     Patch<EntityType> patch = Patch.forEntityType(msg);
                     
                 }
             } catch (IOException e) {
                 // Problem reading message ...
             }
+            return true;
         });
 
         // Produce a message to asynchronously get the names of all of the databases ...
         Document msg = Document.create("request","read");
-        send(producer,Topic.Write.READ_DATABASES,msg,(e)->log(e,"Unable to request database names from cluster"));
+        send(producer,Topic.DATABASES_LIST.inputTopic(),msg,(e)->log(e,"Unable to request database names from cluster"));
     }
     
     private <T> boolean send( Producer<String,byte[]> producer, String topic, Document msg, Consumer<? super IOException> errorHandler ) {

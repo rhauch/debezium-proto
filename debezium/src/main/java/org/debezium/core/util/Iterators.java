@@ -127,6 +127,27 @@ public class Iterators {
             }
         };
     }
+    public static <T> Iterator<T> with(T[] values) {
+        return new Iterator<T>() {
+            private int index = 0;
+            
+            @Override
+            public boolean hasNext() {
+                return index < values.length;
+            }
+            
+            @Override
+            public T next() {
+                try {
+                    if (index < values.length) return values[index];
+                    --index;
+                    throw new NoSuchElementException();
+                } finally {
+                    ++index;
+                }
+            }
+        };
+    }
     
     public static <T, U, V> Iterator<V> around(Iterable<? extends T> first,
             Iterable<? extends U> second,

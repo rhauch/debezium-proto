@@ -11,6 +11,7 @@ import java.util.concurrent.Executor;
 
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
+import kafka.consumer.ConsumerTimeoutException;
 import kafka.consumer.KafkaStream;
 import kafka.consumer.TopicFilter;
 import kafka.javaapi.consumer.ConsumerConnector;
@@ -27,7 +28,7 @@ final class DbzConsumers {
     
     @FunctionalInterface
     public static interface Consumer {
-        void consume( String topic, int partition, long offset, String key, byte[] message );
+        boolean consume( String topic, int partition, long offset, String key, byte[] message );
     }
 
     private final DbzConfiguration config;
@@ -43,6 +44,7 @@ final class DbzConsumers {
     
     void subscribe( String groupId, TopicFilter topicFilter, int numThreads, Consumer messageConsumer ) {
         Properties props = this.config.kafkaConsumerProperties(groupId);
+        boolean autoCommit = Boolean.valueOf(props.getOrDefault("auto.commit.enable","true").toString());
         ConsumerConfig config = new ConsumerConfig(props);
         ConsumerConnector connector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
         Decoder<String> keyDecoder = new StringDecoder(new VerifiableProperties());
@@ -54,9 +56,17 @@ final class DbzConsumers {
             // Submit a runnable that consumes the topics ...
             executor.execute(()->{
                 ConsumerIterator<String, byte[]> iter = stream.iterator();
-                while ( running && iter.hasNext() ) {
-                    MessageAndMetadata<String, byte[]> msg = iter.next();
-                    messageConsumer.consume(msg.topic(), msg.partition(), msg.offset(), msg.key(), msg.message());
+                boolean success = false;
+                while ( running ) {
+                    try {
+                        while ( iter.hasNext() ) {
+                            MessageAndMetadata<String, byte[]> msg = iter.next();
+                            success = messageConsumer.consume(msg.topic(), msg.partition(), msg.offset(), msg.key(), msg.message());
+                            if ( success && autoCommit ) connector.commitOffsets();
+                        }
+                    } catch ( ConsumerTimeoutException e) {
+                        // Keep going ...
+                    }
                 }
             });
         }

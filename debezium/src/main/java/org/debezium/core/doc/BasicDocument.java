@@ -70,6 +70,11 @@ public final class BasicDocument implements Document {
     }
 
     @Override
+    public void clear() {
+        fields.clear();
+    }
+    
+    @Override
     public boolean has(CharSequence fieldName) {
         return fields.containsKey(fieldName);
     }
