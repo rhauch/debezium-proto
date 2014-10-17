@@ -53,10 +53,12 @@ public final class JacksonWriter implements DocumentWriter {
     }
     
     @Override
-    public byte[] writeAsBytes(Document document) throws IOException {
+    public byte[] writeAsBytes(Document document) {
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
             writeDocument(document, factory.createGenerator(stream, JsonEncoding.UTF8));
             return stream.toByteArray();
+        } catch (IOException e ) {
+            throw new RuntimeException(e);
         }
     }
     

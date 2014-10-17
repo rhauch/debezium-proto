@@ -77,8 +77,8 @@ public class DatabaseTest {
                 // Any entity not in the results does not exist ...
             } else {
                 // Unable to read, so handle the error
-                Throwable t = outcome.cause();
-                assert t != null;
+                String reason = outcome.failureReason();
+                assert reason != null;
             }
         });
     }
@@ -99,8 +99,8 @@ public class DatabaseTest {
                 }
             } else {
                 // Unable to read, so handle the error
-                Throwable t = outcome.cause();
-                assert t != null;
+                String reason = outcome.failureReason();
+                assert reason != null;
             }
         });
     }
@@ -114,8 +114,8 @@ public class DatabaseTest {
                 assert entity != null;
             } else {
                 // Unable to read, so handle the error
-                Throwable t = outcome.cause();
-                assert t != null;
+                String reason = outcome.failureReason();
+                assert reason != null;
             }
         });
     }
@@ -132,7 +132,13 @@ public class DatabaseTest {
                         // We successfully changed this entity by applying our patch ...
                     } else {
                         // Our patch for this entity could not be applied ...
-                        switch (change.failureCode()) {
+                        switch (change.status()) {
+                            case OK:
+                                // This was actually a success ...
+                                break;
+                            case CLIENT_STOPPED:
+                                // The entity was removed by someone else, so we should delete it locally ...
+                                break;
                             case PREVIOUSLY_DELETED:
                                 // The entity was removed by someone else, so we should delete it locally ...
                                 break;
@@ -164,8 +170,8 @@ public class DatabaseTest {
                 // Unable to even submit the batch, so handle the error. Perhaps the system is not available, or
                 // our request was poorly formed (e.g., was empty). The best way to handle this is to do different
                 // things based upon the exception type ...
-                Throwable t = outcome.cause();
-                assert t != null;
+                String reason = outcome.failureReason();
+                assert reason != null;
             }
             latch.countDown();
         });
@@ -174,35 +180,35 @@ public class DatabaseTest {
         latch.await(5L, TimeUnit.SECONDS);
     }
     
-    @Test
-    public void shouldReadSchema() {
-        database.readSchema((outcome) -> {
-            if (outcome.succeeded()) {
-                for (EntityCollection collection : outcome.result()) {
-                    assert collection != null;
-                }
-            } else {
-                // Unable to read the schema, so handle the error
-                Throwable t = outcome.cause();
-                assert t != null;
-            }
-        });
-    }
-    
-    @Test
-    public void shouldReadSingleTypeFromSchema() {
-        database.readSchema(type, (outcome) -> {
-            if (outcome.succeeded()) {
-                EntityCollection collection = outcome.result();
-                if (collection != null) {
-                    // The collection exists, so do something with this ...
-            }
-        } else {
-            // Unable to read the schema, so handle the error
-                Throwable t = outcome.cause();
-                assert t != null;
-            }
-        });
-    }
+//    @Test
+//    public void shouldReadSchema() {
+//        database.readSchema((outcome) -> {
+//            if (outcome.succeeded()) {
+//                for (EntityCollection collection : outcome.result()) {
+//                    assert collection != null;
+//                }
+//            } else {
+//                // Unable to read the schema, so handle the error
+//                Throwable t = outcome.cause();
+//                assert t != null;
+//            }
+//        });
+//    }
+//
+//    @Test
+//    public void shouldReadSingleTypeFromSchema() {
+//        database.readSchema(type, (outcome) -> {
+//            if (outcome.succeeded()) {
+//                EntityCollection collection = outcome.result();
+//                if (collection != null) {
+//                    // The collection exists, so do something with this ...
+//            }
+//        } else {
+//            // Unable to read the schema, so handle the error
+//                Throwable t = outcome.cause();
+//                assert t != null;
+//            }
+//        });
+//    }
     
 }

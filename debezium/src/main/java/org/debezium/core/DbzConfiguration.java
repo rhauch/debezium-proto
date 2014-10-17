@@ -25,15 +25,19 @@ final class DbzConfiguration implements Debezium.Configuration {
     }
     
     /**
-     * Get the producer properties for this Kafka client.
+     * Get a copy of the producer properties for this Kafka client.
      * @return the producer properties; never null
      */
     Properties kafkaProducerProperties() {
-        return producerProperties;
+        return new Properties(producerProperties);
+    }
+    
+    Properties kafkaConsumerProperties() {
+        return new Properties(consumerProperties);
     }
     
     Properties kafkaConsumerProperties( String groupId ) {
-        Properties props = new Properties(consumerProperties);
+        Properties props = kafkaConsumerProperties();
         props.put("group.id",groupId);
         return props;
     }

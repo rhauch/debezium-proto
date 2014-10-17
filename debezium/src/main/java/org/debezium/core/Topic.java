@@ -11,7 +11,7 @@ import kafka.consumer.Blacklist;
 import kafka.consumer.TopicFilter;
 import kafka.consumer.Whitelist;
 
-final class Topic {
+public final class Topic {
 
     public static TopicFilter anyOf( String...topics) {
         StringJoiner joiner = new StringJoiner(",");
@@ -32,8 +32,9 @@ final class Topic {
     public static final DualTopic DATABASES_LIST = new DualTopic("read-dbs-requests","read-dbs-results");
     public static final DualTopic DATABASE_CHANGES = new DualTopic("database-changes","database-udpates");
     public static final DualTopic SCHEMA_CHANGES = new DualTopic("schema-changes","schema-udpates");
+    public static final DualTopic READ_SCHEMA = new DualTopic("schema-read","schema-read-results");
     
-    protected static final class DualTopic {
+    public static final class DualTopic {
         private final String outputTopic;
         private final String inputTopic;
         protected DualTopic( String inputTopic, String outputTopic ) {

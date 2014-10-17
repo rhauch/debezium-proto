@@ -5,49 +5,53 @@
  */
 package org.debezium.core;
 
-import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Consumer;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import kafka.consumer.TopicFilter;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
 
-import org.debezium.api.Database.ChangeCollections;
 import org.debezium.api.Database.ChangeEntities;
-import org.debezium.api.Database.ChangeFailureCode;
+import org.debezium.api.Database.ChangeSchemaComponents;
 import org.debezium.api.Database.Outcome;
 import org.debezium.api.Database.OutcomeHandler;
-import org.debezium.api.Database.ReadCollections;
 import org.debezium.api.Database.ReadEntities;
 import org.debezium.api.DatabaseId;
 import org.debezium.api.Entity;
-import org.debezium.api.EntityCollection;
 import org.debezium.api.EntityId;
 import org.debezium.api.EntityType;
 import org.debezium.api.Identifier;
+import org.debezium.api.SchemaComponentId;
 import org.debezium.api.doc.Array;
 import org.debezium.api.doc.Document;
-import org.debezium.api.doc.DocumentReader;
-import org.debezium.api.doc.DocumentWriter;
+import org.debezium.api.doc.Value;
 import org.debezium.api.message.Batch;
 import org.debezium.api.message.Patch;
-
+import org.debezium.core.DbzNode.Callable;
+import org.debezium.service.Service;
 
 /**
  * @author Randall Hauch
  *
  */
-final class DbzDatabases {
+final class DbzDatabases implements Service {
     
     private static final Array EMPTY_ARRAY = Array.create();
     
-    private final DocumentReader docReader = DocumentReader.defaultReader();
-    private final DocumentWriter docWriter = DocumentWriter.defaultWriter();
     private final ConcurrentMap<DatabaseId, ActiveDatabase> activeDatabases = new ConcurrentHashMap<>();
+    private final Lock databasesLock = new ReentrantLock();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private OutcomeHandlers<ChangeSchemaComponents> readSchemaHandlers;
+    private DbzNode node;
     
     DbzDatabases() {
     }
@@ -57,70 +61,126 @@ final class DbzDatabases {
         return db != null && db.isActive();
     }
     
-    void initialize(String uniqueClientId, Producer<String, byte[]> producer, DbzConsumers consumers) {
-
-        // Add a single-threaded consumer that will read the top-level topics for database & schema changes ...
-        int numThreads = 1;
-        String groupId = uniqueClientId + "-databases"; // unique so that all clients see all messages
-        TopicFilter topicFilter = Topic.anyOf(Topic.DATABASE_CHANGES.outputTopic(),
-                                              Topic.SCHEMA_CHANGES.outputTopic(),
-                                              Topic.DATABASES_LIST.outputTopic());
-        consumers.subscribe(groupId, topicFilter, numThreads, (topic, partition, offset, key, message) -> {
-            try {
-                // All topics use JSON documents for messages ...
-                Document msg = docReader.read(message);
-                if (Topic.DATABASES_LIST.isOutputTopic(topic)) {
-                    // Make sure we have an active database for all of the database names ...
-                    msg.getArray("databaseNames",EMPTY_ARRAY).streamValues().forEach((name)->{
-                        addDatabase(Identifier.of(name.asString()),producer);
-                    });
-                } else if (Topic.DATABASE_CHANGES.isOutputTopic(topic)) {
-                    Patch<DatabaseId> patch = Patch.forDatabase(msg);
-                    
-                } else if (Topic.SCHEMA_CHANGES.isOutputTopic(topic)) {
-                    Patch<EntityType> patch = Patch.forEntityType(msg);
-                    
-                }
-            } catch (IOException e) {
-                // Problem reading message ...
-            }
-            return true;
-        });
-
-        // Produce a message to asynchronously get the names of all of the databases ...
-        Document msg = Document.create("request","read");
-        send(producer,Topic.DATABASES_LIST.inputTopic(),msg,(e)->log(e,"Unable to request database names from cluster"));
-    }
-    
-    private <T> boolean send( Producer<String,byte[]> producer, String topic, Document msg, Consumer<? super IOException> errorHandler ) {
+    @Override
+    public void start(DbzNode node) {
+        Lock writeLock = this.lock.writeLock();
         try {
-            producer.send(new KeyedMessage<>(topic,docWriter.writeAsBytes(msg)));
-            return true;
-        } catch ( IOException e ) {
-            errorHandler.accept(e);
-            return false;
+            if (this.node == null) {
+                this.node = node;
+                this.readSchemaHandlers = new OutcomeHandlers<>(()->RequestId.create(node.id()));
+                // Add a single-threaded consumer that will read the top-level topics for database & schema changes ...
+                int numThreads = 1;
+                String groupId = "databases-" + node.id(); // unique so that all clients see all messages
+                TopicFilter topicFilter = Topic.anyOf(Topic.DATABASE_CHANGES.outputTopic(),
+                                                      Topic.SCHEMA_CHANGES.outputTopic(),
+                                                      Topic.DATABASES_LIST.outputTopic());
+                node.subscribe(groupId, topicFilter, numThreads, (topic, partition, offset, key, msg) -> {
+                    if (Topic.DATABASES_LIST.isOutputTopic(topic)) {
+                        setActiveDatabases(msg.getArray("databaseNames", EMPTY_ARRAY).streamValues());
+                    } else if (Topic.DATABASE_CHANGES.isOutputTopic(topic)) {
+                        Patch<DatabaseId> patch = Patch.forDatabase(msg);
+                        RequestId request = RequestId.from(msg.getString("requestId"));
+                        if (patch.isDeletion()) {
+                            
+                        }
+                    } else if (Topic.SCHEMA_CHANGES.isOutputTopic(topic)) {
+                        Patch<EntityType> patch = Patch.forEntityType(msg);
+                        
+                    } else if (Topic.READ_SCHEMA.isOutputTopic(topic)) {
+                        Patch<EntityType> patch = Patch.forEntityType(msg);
+                        
+                    }
+                    return true;
+                });
+                
+                // Produce a message to asynchronously get the names of all of the databases ...
+                Document msg = Document.create("request", "read");
+                node.send(Topic.DATABASES_LIST.inputTopic(), "", msg);
+            }
+        } finally {
+            writeLock.unlock();
         }
     }
     
-    private void log( Throwable t, String msg ) {
-        System.out.println(msg);
-        t.printStackTrace();
-    }
-    
-    private void addDatabase(DatabaseId id, Producer<String, byte[]> producer) {
-        if ( !activeDatabases.containsKey(id)) {
-            activeDatabases.putIfAbsent(id, new ActiveDatabase(id, producer));
+    @Override
+    public void stop() {
+        Lock writeLock = this.lock.writeLock();
+        try {
+            // Our registered consumers will simply terminate, so there's nothing to do except ...
+            activeDatabases.clear();
+            Logger logger = node.logger(getClass());
+            String reason = "Client has been shutdown and is not usable";
+            readSchemaHandlers.notifyAndRemoveAll(Outcome.Status.CLIENT_STOPPED, reason, (t) -> {
+                logger.error("Failed to handle error in handler: {0}", t.getMessage());
+            });
+            readSchemaHandlers = null;
+            node = null;
+        } finally {
+            writeLock.unlock();
         }
     }
     
-    void readSchema(ExecutionContext context, OutcomeHandler<ReadCollections> handler) {
+    private void ifRunning(Callable function) {
+        Lock readLock = this.lock.readLock();
+        try {
+            if (node == null) throw new IllegalStateException("Client has been shutdown and is not usable");
+            function.call();
+        } finally {
+            readLock.unlock();
+        }
     }
     
-    void readSchema(ExecutionContext context, EntityType type, OutcomeHandler<EntityCollection> handler) {
-        readSchema(context, adaptOutcome(handler, (collections) -> collections.get(type)));
+    private void setActiveDatabases(Stream<Value> databaseNames) {
+        try {
+            databasesLock.lock();
+            Set<DatabaseId> dbIds = new HashSet<>();
+            databaseNames.forEach((value) -> {
+                if (value.isString()) {
+                    DatabaseId dbId = Identifier.of(value.asString());
+                    activeDatabases.putIfAbsent(dbId, new ActiveDatabase(dbId));
+                    dbIds.add(dbId);
+                }
+            });
+            // Remove all extras ...
+            Iterator<DatabaseId> iter = activeDatabases.keySet().iterator();
+            while (iter.hasNext()) {
+                DatabaseId id = iter.next();
+                if (!dbIds.contains(id)) iter.remove();
+            }
+        } finally {
+            databasesLock.unlock();
+        }
     }
     
-    void changeSchema(ExecutionContext context, Batch<EntityType> request, OutcomeHandler<ChangeCollections> handler) {
+    private boolean addActiveDatabase(DatabaseId id) {
+        try {
+            databasesLock.lock();
+            return activeDatabases.putIfAbsent(id, new ActiveDatabase(id)) == null;
+        } finally {
+            databasesLock.unlock();
+        }
+    }
+    
+    private boolean removeActiveDatabase(DatabaseId id) {
+        try {
+            databasesLock.lock();
+            return activeDatabases.remove(id) != null;
+        } finally {
+            databasesLock.unlock();
+        }
+    }
+    
+    void readSchema(ExecutionContext context, OutcomeHandler<ChangeSchemaComponents> handler) {
+        if (handler != null) throw new IllegalArgumentException("A non-null handler is required to read the schema");
+        final long startTime = System.currentTimeMillis();
+        ifRunning(() -> {
+            RequestId requestId = readSchemaHandlers.register(handler);
+            Document request = Requests.readSchemaRequest(context, requestId, startTime);
+            node.send(Topic.READ_SCHEMA.inputTopic(), context.databaseId().asString(), request);
+        });
+    }
+    
+    void changeSchema(ExecutionContext context, Batch<? extends SchemaComponentId> request, OutcomeHandler<ChangeSchemaComponents> handler) {
     }
     
     void readEntities(ExecutionContext context, Iterable<EntityId> entityIds, OutcomeHandler<ReadEntities> handler) {
@@ -133,22 +193,18 @@ final class DbzDatabases {
     void changeEntities(ExecutionContext context, Batch<EntityId> request, OutcomeHandler<ChangeEntities> handler) {
     }
     
-    void loadData(ExecutionContext context) {
-        ActiveDatabase db = activeDatabases.get(context.databaseId());
-        String topics[] = { "databases", "schemas-" + context.databaseId() };
-        for (String topic : topics) {
-            for (int i = 0; i != 100; ++i) {
-                Document doc = Document.create("counter", i, "field2", "value2");
-                try {
-                    byte[] bytes = DocumentWriter.defaultWriter().writeAsBytes(doc);
-                    KeyedMessage<String, byte[]> msg = new KeyedMessage<>(topic, bytes);
-                    db.producer.send(msg);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
+//    void destroy(ExecutionContext context, OutcomeHandler<ChangeSchema> handler) {
+//        final long startTime = System.currentTimeMillis();
+//        ifRunning(() -> {
+//            DatabaseId dbId = context.databaseId();
+//            RequestId requestId = changeSchemaHandlers.register(handler);
+//            Document request = Patch.destroy(dbId).asDocument();
+//            request.setString("requestId", requestId.asString());
+//            request.setString("requestor", context.username());
+//            request.setNumber("requestedAt", startTime);
+//            node.send(Topic.DATABASE_CHANGES.inputTopic(), dbId.asString(), request);
+//        });
+//    }
     
     boolean disconnect(DatabaseConnection connection) {
         // Clean up any resources held for the given database connection ...
@@ -159,12 +215,15 @@ final class DbzDatabases {
     }
     
     private final class ActiveDatabase {
-        private final Producer<String, byte[]> producer;
         private final DatabaseId id;
+        private volatile Document schema;
         
-        protected ActiveDatabase(DatabaseId id, Producer<String, byte[]> producer) {
+        protected ActiveDatabase(DatabaseId id) {
             this.id = id;
-            this.producer = producer;
+        }
+        
+        void setSchema( Document document ) {
+            this.schema = document;
         }
         
         public boolean isActive() {
@@ -188,13 +247,13 @@ final class DbzDatabases {
                     }
                     
                     @Override
-                    public ChangeFailureCode failureCode() {
-                        return outcome.failureCode();
+                    public Outcome.Status status() {
+                        return outcome.status();
                     }
                     
                     @Override
-                    public Throwable cause() {
-                        return outcome.cause();
+                    public String failureReason() {
+                        return outcome.failureReason();
                     }
                     
                     @Override

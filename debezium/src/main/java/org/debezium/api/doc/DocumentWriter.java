@@ -22,10 +22,14 @@ public interface DocumentWriter {
         return JacksonWriter.INSTANCE;
     }
     
-    default byte[] writeAsBytes( Document document ) throws IOException {
+    default byte[] writeAsBytes( Document document ) {
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
             write(document, stream);
             return stream.toByteArray();
+        } catch ( IOException e ) {
+            // This really should never happen ...
+            e.printStackTrace();
+            return new byte[]{};
         }
     }
     

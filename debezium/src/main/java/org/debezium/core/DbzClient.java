@@ -5,15 +5,11 @@
  */
 package org.debezium.core;
 
-import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-
-import kafka.consumer.ConsumerConfig;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.ProducerConfig;
 
 import org.debezium.api.ConnectionFailedException;
 import org.debezium.api.Database;
@@ -30,27 +26,26 @@ import org.debezium.core.util.NamedThreadFactory;
 public final class DbzClient implements Debezium.Client {
 
     private final DbzConfiguration config;
-    private final ProducerConfig producerConfig;
-    private final DbzDatabases databases = new DbzDatabases();
-    private final DbzServices services = new DbzServices();
-    private final String uniqueClientId = UUID.randomUUID().toString();
-    private Producer<String, byte[]> producer;
-    private DbzConsumers consumers;
+    private final DbzNode node;
+    private final DbzDatabases databases;
     private ExecutorService executor;
     
     public DbzClient( Configuration config ) {
         this.config = (DbzConfiguration)config;
-        this.producerConfig = new ProducerConfig(this.config.kafkaProducerProperties());
+        this.node = new DbzNode(this.config.kafkaProducerProperties(),this.config.kafkaConsumerProperties(),()->executor());
+        this.databases = new DbzDatabases();
+        this.node.add(this.databases);
+    }
+    
+    private Executor executor() {
+        return this.executor;
     }
     
     public DbzClient start() {
-        producer = new Producer<String,byte[]>(producerConfig);
         boolean useDaemonThreads = false;    // they will keep the VM running if not shutdown properly
         ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads);
         executor = Executors.newCachedThreadPool(threadFactory);
-        consumers = new DbzConsumers(config,executor);
-        services.initialize(uniqueClientId,producer,consumers);
-        databases.initialize(uniqueClientId,producer,consumers);
+        node.start();
         return this;
     }
     
@@ -64,17 +59,8 @@ public final class DbzClient implements Debezium.Client {
     
     @Override
     public void shutdown( long timeout, TimeUnit unit ) {
-        if ( producer != null ) {
-            try {
-                producer.close();
-            } finally {
-                producer = null;
-            }
-        }
-        // Shutdown the consumers ...
-        if ( consumers != null ) {
-            consumers.shutdown();
-        }
+        // Shutdown the cluster node, which shuts down all services and the service manager ...
+        node.shutdown();
         if ( executor != null ) {
             try {
                 executor.shutdown();
@@ -87,15 +73,5 @@ public final class DbzClient implements Debezium.Client {
                 }
             }
         }
-        if ( services != null ) {
-            services.shutdown();
-        }
-        if ( databases != null ) {
-            databases.shutdown();
-        }
-    }
-    
-    protected ConsumerConfig createConsumerConfig( String groupId ) {
-        return new ConsumerConfig(config.kafkaConsumerProperties(groupId));
     }
 }

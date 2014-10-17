@@ -55,7 +55,7 @@ public class DebeziumClientTest implements Testing {
         Testing.print("Calling 'Database.loadData()' to preload a bunch of messages ...");
         Database database = client.connect(Identifier.of("firstDatabase") ,"jsmith");
         assertThat(database).isNotNull();
-        database.loadData();
+        //database.loadData();
         Testing.print("Completed ...");
     }
 }

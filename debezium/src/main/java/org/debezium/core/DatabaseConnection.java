@@ -7,9 +7,8 @@ package org.debezium.core;
 
 import org.debezium.api.Database;
 import org.debezium.api.Entity;
-import org.debezium.api.EntityCollection;
 import org.debezium.api.EntityId;
-import org.debezium.api.EntityType;
+import org.debezium.api.SchemaComponentId;
 import org.debezium.api.message.Batch;
 
 /**
@@ -36,20 +35,13 @@ final class DatabaseConnection implements Database {
     }
     
     @Override
-    public void readSchema(OutcomeHandler<ReadCollections> handler) {
+    public void readSchema(OutcomeHandler<ChangeSchemaComponents> handler) {
         ensureOpen();
         dbs.readSchema(context, handler);
     }
     
     @Override
-    public void readSchema(EntityType type, OutcomeHandler<EntityCollection> handler) {
-        ensureOpen();
-        dbs.readSchema(context, type, handler);
-    }
-    
-    @Override
-    public void changeSchema(Batch<EntityType> request, OutcomeHandler<ChangeCollections> handler) {
-        ensureOpen();
+    public void changeSchema(Batch<? extends SchemaComponentId> request, OutcomeHandler<ChangeSchemaComponents> handler) {
         dbs.changeSchema(context, request, handler);
     }
     
@@ -70,13 +62,6 @@ final class DatabaseConnection implements Database {
         ensureOpen();
         dbs.changeEntities(context, request, handler);
     }
-    
-    @Override
-    public void loadData() {
-        ensureOpen();
-        dbs.loadData(context);
-    }
-    
     
     @Override
     public synchronized void close() {

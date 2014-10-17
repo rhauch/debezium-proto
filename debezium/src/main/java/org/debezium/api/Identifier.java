@@ -22,47 +22,47 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
     
     public static final String DEFAULT_ZONE = "default";
 
-    static DatabaseId of( String databaseName ) {
-        return new DatabaseId(databaseName);
+    static DatabaseId of( CharSequence databaseName ) {
+        return new DatabaseId(databaseName.toString());
     }
     
-    static EntityType of( String database, String entityType ) {
+    static EntityType of( CharSequence database, CharSequence entityType ) {
         return of( of(database), entityType);
     }
     
-    static EntityType of( DatabaseId database, String entityType ) {
-        return new EntityType( database, entityType);
+    static EntityType of( DatabaseId database, CharSequence entityType ) {
+        return new EntityType( database, entityType.toString());
     }
     
-    static EntityId of( String database, String entityType, String entityId ) {
+    static EntityId of( CharSequence database, CharSequence entityType, CharSequence entityId ) {
         return of( of(database), entityType, entityId);
     }
     
-    static EntityId of( String database, String entityType, String entityId, String zoneId ) {
+    static EntityId of( CharSequence database, CharSequence entityType, CharSequence entityId, CharSequence zoneId ) {
         return of( of(database), entityType, entityId, zoneId);
     }
     
-    static EntityId of( DatabaseId database, String entityType, String entityId ) {
+    static EntityId of( DatabaseId database, CharSequence entityType, CharSequence entityId ) {
         return of( of( database, entityType), entityId);
     }
     
-    static EntityId of( DatabaseId database, String entityType, String entityId, String zoneId ) {
+    static EntityId of( DatabaseId database, CharSequence entityType, CharSequence entityId, CharSequence zoneId ) {
         return of( of( database, entityType), entityId, zoneId);
     }
     
-    static EntityId of( EntityType entityType, String entityId ) {
+    static EntityId of( EntityType entityType, CharSequence entityId ) {
         return of( entityType, entityId, DEFAULT_ZONE);
     }
     
-    static EntityId of( EntityType entityType, String entityId, String zoneId ) {
-        return new EntityId( entityType, entityId, zoneId);
+    static EntityId of( EntityType entityType, CharSequence entityId, CharSequence zoneId ) {
+        return new EntityId( entityType, entityId.toString(), zoneId.toString());
     }
     
-    static EntityId newEntity( String database, String entityType ) {
-        return newEntity( of(database), entityType);
+    static EntityId newEntity( CharSequence database, CharSequence entityType ) {
+        return newEntity( of(database), entityType.toString());
     }
     
-    static EntityId newEntity( DatabaseId database, String entityType ) {
+    static EntityId newEntity( DatabaseId database, CharSequence entityType ) {
         return newEntity( of( database, entityType));
     }
     
@@ -70,8 +70,8 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
         return newEntity(entityType,DEFAULT_ZONE);
     }
 
-    static EntityId newEntity( EntityType entityType, String zoneId ) {
-        return new EntityId( entityType, UUID.randomUUID().toString(), zoneId);
+    static EntityId newEntity( EntityType entityType, CharSequence zoneId ) {
+        return new EntityId( entityType, UUID.randomUUID().toString(), zoneId.toString());
     }
 
     default String asString() {
@@ -87,11 +87,11 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
         return id.asString();
     }
     
-    static Identifier parse( String idString ) {
+    static Identifier parse( CharSequence idString ) {
         if ( idString == null ) {
             throw new IllegalArgumentException("The identifier string may not be null");
         }
-        String[] parts = idString.split("/");
+        String[] parts = idString.toString().split("/");
         if ( parts.length == 1 ) return of(parts[0]);
         if ( parts.length == 2 ) return of(parts[0],parts[1]);
         return of(parts[0],parts[1],parts[2]);

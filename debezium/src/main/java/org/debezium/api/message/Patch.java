@@ -771,6 +771,14 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         });
     }
     
+    public Optional<Value> createdValue() {
+        if ( isCreation() ) {
+            Add addOp = (Add) ops.get(0);
+            return Optional.of(addOp.value());
+        }
+        return Optional.empty();
+    }
+    
     public boolean isDeletion() {
         if (ops.size() != 1) return false;
         return ops.stream().anyMatch((operation) -> {

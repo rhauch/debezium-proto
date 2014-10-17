@@ -16,20 +16,16 @@ import org.debezium.api.message.Patch;
  */
 public interface Database extends Closeable {
     
-    void loadData();
-
     void changeEntities( Batch<EntityId> request, OutcomeHandler<ChangeEntities> handler );
 
     void readEntities( Iterable<EntityId> entityIds, OutcomeHandler<ReadEntities> handler);
 
     void readEntity( EntityId entityId, OutcomeHandler<Entity> handler);
 
-    void readSchema( OutcomeHandler<ReadCollections> handler);
+    void readSchema( OutcomeHandler<ChangeSchemaComponents> handler );
 
-    void readSchema( EntityType type, OutcomeHandler<EntityCollection> handler);
+    void changeSchema( Batch<? extends SchemaComponentId> request, OutcomeHandler<ChangeSchemaComponents> handler );
 
-    void changeSchema( Batch<EntityType> request, OutcomeHandler<ChangeCollections> handler );
-    
     @Override
     void close();
     
@@ -40,10 +36,12 @@ public interface Database extends Closeable {
     }
     
     public static interface Outcome<T> {
+        public static enum Status { OK, TIMEOUT, RECIPIENT_FAILURE, CLIENT_STOPPED }
+        
         default boolean failed() { return !succeeded(); }
-        default boolean succeeded() { return cause() == null; }
-        ChangeFailureCode failureCode();
-        Throwable cause();
+        default boolean succeeded() { return status() != Status.OK; }
+        Status status();
+        String failureReason();
         T result();
     }
     
@@ -64,19 +62,26 @@ public interface Database extends Closeable {
         boolean isEmpty();
     }
     
-    public static interface ChangeCollections extends Iterable<ChangeCollection> {
+    public static interface ChangeSchemaComponents extends Iterable<ChangeCollection> {
         int size();
         boolean isEmpty();
     }
     
     public static interface ChangeIdentified<IdType extends Identifier,TargetType extends Identified<IdType>> {
+        public static enum Status {
+            OK, PREVIOUSLY_DELETED, PRECONDITIONS_NOT_SATISFIED, SCHEMA_NOT_SATISFIED, OPERATION_FAILED, CLIENT_STOPPED;
+        }
+
         IdType id();
         boolean succeeded();
         boolean failed();
         String failureReason();
-        ChangeFailureCode failureCode();
+        Status status();
         Patch<IdType> failedPatch();
         TargetType unmodifiedTarget();
+    }
+    
+    public static interface ChangeSchemaComponent extends ChangeIdentified<SchemaComponentId,SchemaComponent<SchemaComponentId>> {
     }
     
     public static interface ChangeEntity extends ChangeIdentified<EntityId,Entity> {
@@ -85,12 +90,5 @@ public interface Database extends Closeable {
     public static interface ChangeCollection extends ChangeIdentified<EntityType,EntityCollection> {
     }
     
-    public enum OutcomeFailureCode {
-        TIMEOUT, RECIPIENT_FAILURE;
-    }
-    
-    public enum ChangeFailureCode {
-        PREVIOUSLY_DELETED, PRECONDITIONS_NOT_SATISFIED, SCHEMA_NOT_SATISFIED, OPERATION_FAILED;
-    }
     
 }

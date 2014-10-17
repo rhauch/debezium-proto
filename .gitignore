@@ -4,6 +4,7 @@ activemq-data/
 *.ipr
 *.iws
 .metadata/
+.recommenders/
 .classpath
 .project
 .settings/

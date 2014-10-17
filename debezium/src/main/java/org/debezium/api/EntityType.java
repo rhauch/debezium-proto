@@ -17,7 +17,7 @@ import org.debezium.core.util.Iterators;
  * The identifier of a type of entity.
  * @author Randall Hauch
  */
-public final class EntityType implements Identifier {
+public final class EntityType implements SchemaComponentId {
     
     private final DatabaseId db;
     private final String entityTypeName;
