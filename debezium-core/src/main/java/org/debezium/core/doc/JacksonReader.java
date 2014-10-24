@@ -1,0 +1,198 @@
+/*
+ * Copyright 2014 Red Hat, Inc. and/or its affiliates.
+ *
+ * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+ */
+package org.debezium.core.doc;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.net.URL;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+
+/**
+ * @author Randall Hauch
+ *
+ */
+final class JacksonReader implements DocumentReader {
+
+    public static final JacksonReader INSTANCE = new JacksonReader();
+    
+    private static final JsonFactory factory;
+    
+    static {
+        factory = new JsonFactory();
+        factory.enable(JsonParser.Feature.ALLOW_COMMENTS);
+    }
+    
+    @Override
+    public Document read(InputStream jsonStream) throws IOException {
+        return parse(factory.createParser(jsonStream));
+    }
+    
+    @Override
+    public Document read(Reader jsonReader) throws IOException {
+        return parse(factory.createParser(jsonReader));
+    }
+    
+    @Override
+    public Document read(String json) throws IOException {
+        return parse(factory.createParser(json));
+    }
+    
+    @Override
+    public Document read(File jsonFile) throws IOException {
+        return parse(factory.createParser(jsonFile));
+    }
+    
+    @Override
+    public Document read(URL jsonUrl) throws IOException {
+        return parse(factory.createParser(jsonUrl));
+    }
+    
+    @Override
+    public Document read(byte[] rawBytes) throws IOException {
+        return parse(factory.createParser(rawBytes));
+    }
+    
+    private Document parse( JsonParser parser ) throws IOException {
+        try {
+            return parseDocument(parser);
+        } finally {
+            parser.close();
+        }
+    }
+    
+    private Document parseDocument( JsonParser parser ) throws IOException {
+        // Iterate over the fields in the top-level document ...
+        BasicDocument doc = new BasicDocument();
+        while ( parser.nextToken() != JsonToken.END_OBJECT ) {
+            String fieldName = parser.getCurrentName();
+            switch (parser.nextToken()) {
+                case START_OBJECT:
+                    doc.setDocument(fieldName, parseDocument(parser));
+                    break;
+                case START_ARRAY:
+                    doc.setArray(fieldName, parseArray(parser));
+                    break;
+                case VALUE_STRING:
+                    doc.setString(fieldName, parser.getValueAsString());
+                    break;
+                case VALUE_TRUE:
+                    doc.setBoolean(fieldName, true);
+                    break;
+                case VALUE_FALSE:
+                    doc.setBoolean(fieldName, false);
+                    break;
+                case VALUE_NULL:
+                    doc.setNull(fieldName);
+                    break;
+                case VALUE_NUMBER_FLOAT:
+                case VALUE_NUMBER_INT:
+                    switch (parser.getNumberType() ) {
+                        case FLOAT:
+                            doc.setNumber(fieldName,parser.getFloatValue());
+                            break;
+                        case DOUBLE:
+                            doc.setNumber(fieldName, parser.getDoubleValue());
+                            break;
+                        case BIG_DECIMAL:
+                            doc.setNumber(fieldName, parser.getDecimalValue());
+                            break;
+                        case INT:
+                            doc.setNumber(fieldName, parser.getIntValue());
+                            break;
+                        case LONG:
+                            doc.setNumber(fieldName, parser.getLongValue());
+                            break;
+                        case BIG_INTEGER:
+                            doc.setNumber(fieldName, parser.getBigIntegerValue());
+                            break;
+                    }
+                    break;
+                case VALUE_EMBEDDED_OBJECT:
+                    // disregard this, since it's an extension ...
+                    break;
+                case NOT_AVAILABLE:
+                    throw new JsonParseException("Non-blocking parsers are not supported",parser.getCurrentLocation());
+                case FIELD_NAME:
+                    throw new JsonParseException("Not expecting a FIELD_NAME token",parser.getCurrentLocation());
+                case END_ARRAY:
+                    throw new JsonParseException("Not expecting an END_ARRAY token",parser.getCurrentLocation());
+                case END_OBJECT:
+                    throw new JsonParseException("Not expecting an END_OBJECT token",parser.getCurrentLocation());
+            }
+            
+        }
+        return doc;
+    }
+    
+    private Array parseArray( JsonParser parser ) throws IOException {
+        // Iterate over the fields in the top-level document ...
+        BasicArray array = new BasicArray();
+        while ( parser.nextToken() != JsonToken.END_ARRAY ) {
+            switch (parser.nextToken()) {
+                case START_OBJECT:
+                    array.add(parseDocument(parser));
+                    break;
+                case START_ARRAY:
+                    array.add(parseArray(parser));
+                    break;
+                case VALUE_STRING:
+                    array.add(parser.getValueAsString());
+                    break;
+                case VALUE_TRUE:
+                    array.add(true);
+                    break;
+                case VALUE_FALSE:
+                    array.add(false);
+                    break;
+                case VALUE_NULL:
+                    array.addNull();
+                    break;
+                case VALUE_NUMBER_FLOAT:
+                case VALUE_NUMBER_INT:
+                    switch (parser.getNumberType() ) {
+                        case FLOAT:
+                            array.add(parser.getFloatValue());
+                            break;
+                        case DOUBLE:
+                            array.add(parser.getDoubleValue());
+                            break;
+                        case BIG_DECIMAL:
+                            array.add(parser.getDecimalValue());
+                            break;
+                        case INT:
+                            array.add(parser.getIntValue());
+                            break;
+                        case LONG:
+                            array.add(parser.getLongValue());
+                            break;
+                        case BIG_INTEGER:
+                            array.add(parser.getBigIntegerValue());
+                            break;
+                    }
+                    break;
+                case VALUE_EMBEDDED_OBJECT:
+                    // disregard this, since it's an extension ...
+                    break;
+                case NOT_AVAILABLE:
+                    throw new JsonParseException("Non-blocking parsers are not supported",parser.getCurrentLocation());
+                case FIELD_NAME:
+                    throw new JsonParseException("Not expecting a FIELD_NAME token",parser.getCurrentLocation());
+                case END_ARRAY:
+                    throw new JsonParseException("Not expecting an END_ARRAY token",parser.getCurrentLocation());
+                case END_OBJECT:
+                    throw new JsonParseException("Not expecting an END_OBJECT token",parser.getCurrentLocation());
+            }
+            
+        }
+        return array;
+    }
+}
