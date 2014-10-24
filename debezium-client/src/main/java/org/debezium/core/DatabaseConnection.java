@@ -6,9 +6,9 @@
 package org.debezium.core;
 
 import org.debezium.api.Database;
-import org.debezium.core.id.Entity;
-import org.debezium.core.id.EntityId;
-import org.debezium.core.id.SchemaComponentId;
+import org.debezium.core.component.Entity;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.SchemaComponentId;
 import org.debezium.core.message.Batch;
 
 /**

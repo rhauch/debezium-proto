@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.Identifier;
+import org.debezium.core.component.ZoneId;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
-import org.debezium.core.id.DatabaseId;
-import org.debezium.core.id.EntityId;
-import org.debezium.core.id.Identifier;
-import org.debezium.core.id.ZoneId;
 import org.debezium.core.message.Patch.Editor;
 import org.debezium.core.util.Iterators;
 

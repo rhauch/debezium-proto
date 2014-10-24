@@ -13,11 +13,11 @@ import kafka.consumer.TopicFilter;
 
 import org.debezium.core.DbzNode;
 import org.debezium.core.Topic;
+import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityType;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
-import org.debezium.core.id.DatabaseId;
-import org.debezium.core.id.EntityType;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Add;
 

@@ -7,31 +7,39 @@ package org.debezium.services;
 
 import org.apache.samza.system.IncomingMessageEnvelope;
 import org.apache.samza.system.OutgoingMessageEnvelope;
-import org.apache.samza.system.SystemStream;
 import org.apache.samza.task.MessageCollector;
 import org.apache.samza.task.StreamTask;
 import org.apache.samza.task.TaskCoordinator;
+import org.debezium.core.annotation.NotThreadSafe;
+import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
-import org.debezium.core.id.EntityId;
-import org.debezium.core.id.Identifier;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Patch;
-import org.debezium.core.message.Topics;
 
 /**
- * A service (or task in Samza parlance) that simply extracts all of the {@link Patch patches} from a {@link Batch batch} request
- * and forwards each patch as a separate request in the output stream.
+ * A service (or task in Samza parlance) to extract all of the {@link Patch patches} from a {@link Batch batch} request
+ * and forward each patch as a separate request in the output stream.
+ * <p>
+ * This service consumes the "{@link Streams#entityBatches entity-batches}" topic, where each incoming message is a
+ * {@link Batch batch} containing one or more {@link Patch patches} on entities in the same database.
+ * <p>
+ * This service produces a message for each patch on the "{@link Streams#entityPatches entity-patches}" topic.
+ * <p>
+ * This service produces messages on the "{@link Streams#entityPatches entity-patches}" topic.
  * 
  * @author Randall Hauch
  */
+@NotThreadSafe
 public class EntityBatchService implements StreamTask {
-    
-    private static final SystemStream OUTPUT = new SystemStream("kafka", Topics.ENTITY_PATCHES);
     
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
-        EntityId id = Identifier.parseEntityId(env.getKey());
+        String idStr = (String) env.getKey();
+        EntityId id = Identifier.parseEntityId(idStr);
+        DatabaseId dbId = id.databaseId();
         Document batchRequest = (Document) env.getMessage();
         
         // Construct the batch from the request ...
@@ -42,7 +50,7 @@ public class EntityBatchService implements StreamTask {
         batch.forEach((patch)->{
             // Construct the response message and fire it off ...
             Document patchRequest = Message.createPatchRequest(batchRequest, patch);
-            collector.send(new OutgoingMessageEnvelope(OUTPUT, patchRequest));
+            collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), idStr, patchRequest));
         });
     }
 }

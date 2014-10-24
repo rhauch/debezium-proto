@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.core.id;
+package org.debezium.core.component;
 
 import java.util.Iterator;
 import java.util.StringJoiner;
@@ -38,6 +38,14 @@ public final class EntityId implements Identifier {
     
     public String id() {
         return id;
+    }
+    
+    public DatabaseId databaseId() {
+        return zoneId.databaseId();
+    }
+    
+    public EntityType type() {
+        return zoneId.type();
     }
     
     @Override

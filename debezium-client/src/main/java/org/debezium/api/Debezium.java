@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.debezium.core.DbzClient;
 import org.debezium.core.DbzConfigurator;
-import org.debezium.core.id.DatabaseId;
+import org.debezium.core.component.DatabaseId;
 
 /**
  * @author Randall Hauch

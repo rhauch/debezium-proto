@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.debezium.KafkaTestCluster;
 import org.debezium.Testing;
-import org.debezium.core.id.Identifier;
+import org.debezium.core.component.Identifier;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;

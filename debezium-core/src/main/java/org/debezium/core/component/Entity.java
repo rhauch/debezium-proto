@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.core.id;
+package org.debezium.core.component;
 
 import org.debezium.core.doc.Document;
 
@@ -11,22 +11,22 @@ import org.debezium.core.doc.Document;
  * @author Randall Hauch
  *
  */
-public final class EntityCollection implements Identified<EntityType> {
+public final class Entity implements Identified<EntityId> {
     
-    public static EntityCollection with( EntityType id, Document doc ) {
-        return new EntityCollection(id,doc);
+    public static Entity with( EntityId id, Document doc ) {
+        return new Entity(id,doc);
     }
     
-    private final EntityType id;
+    private final EntityId id;
     private final Document doc;
     
-    protected EntityCollection( EntityType id, Document doc ) {
+    protected Entity( EntityId id, Document doc ) {
         this.id = id;
         this.doc = doc;
     }
     
     @Override
-    public EntityType id() {
+    public EntityId id() {
         return id;
     }
     

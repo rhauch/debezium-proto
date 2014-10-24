@@ -5,7 +5,7 @@
  */
 package org.debezium.core;
 
-import org.debezium.core.id.DatabaseId;
+import org.debezium.core.component.DatabaseId;
 
 /**
  * @author Randall Hauch

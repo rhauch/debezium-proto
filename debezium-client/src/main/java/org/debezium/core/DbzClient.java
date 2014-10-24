@@ -15,7 +15,7 @@ import org.debezium.api.ConnectionFailedException;
 import org.debezium.api.Database;
 import org.debezium.api.Debezium;
 import org.debezium.api.Debezium.Configuration;
-import org.debezium.core.id.DatabaseId;
+import org.debezium.core.component.DatabaseId;
 import org.debezium.core.util.NamedThreadFactory;
 
 

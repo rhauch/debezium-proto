@@ -6,6 +6,7 @@
 package org.debezium.core.message;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
@@ -17,6 +18,8 @@ import org.debezium.core.util.Collect;
  *
  */
 public final class Message {
+    
+    private static final AtomicLong REQUEST_NUMBER = new AtomicLong();
     
     public static final class Field {
         public static final String CLIENT_ID = "clientid";
@@ -92,6 +95,22 @@ public final class Message {
         return patchRequest;
     }
     
+    public static void addHeaders( Document doc, String clientId ) {
+        addHeaders(doc,clientId,REQUEST_NUMBER.incrementAndGet(),null,System.currentTimeMillis());
+    }
+    
+    public static void addHeaders( Document doc, String clientId, long request, String user ) {
+        addHeaders(doc,clientId,request,user,System.currentTimeMillis());
+    }
+    
+    public static void addHeaders( Document doc, String clientId, long request, String user, long timestamp ) {
+        assert clientId != null;
+        doc.setString(Field.CLIENT_ID, clientId);
+        doc.setNumber(Field.REQUEST, request);
+        if ( user != null ) doc.setString(Field.USER, user);
+        if ( timestamp > 0L) doc.setNumber(Field.BEGUN,timestamp);
+    }
+    
     /**
      * Copy into the target document all of the header fields in the source document.
      * @param source the document with the header fields to be copied; may not be null
@@ -127,12 +146,37 @@ public final class Message {
         }
     }
     
+    public static String getClient( Document message ) {
+        return message.getString(Field.CLIENT_ID);
+    }
+    
+    public static boolean isFromClient( Document message, String clientId ) {
+        Value value = message.get(Field.CLIENT_ID);
+        return value != null && value.isString() && value.asString().equals(clientId);
+    }
+    
     public static void setAfter( Document message, Document representation ) {
         message.setDocument(Field.AFTER, representation);
     }
     
     public static void setBefore( Document message, Document representation ) {
         message.setDocument(Field.BEFORE, representation);
+    }
+    
+    public static Document getAfter( Document message ) {
+        return message.setDocument(Field.AFTER);
+    }
+    
+    public static Document getBefore( Document message ) {
+        return message.setDocument(Field.BEFORE);
+    }
+    
+    public static boolean includeAfter( Document message ) {
+        return message.getBoolean(Field.INCLUDE_AFTER,false);
+    }
+    
+    public static boolean includeBefore( Document message ) {
+        return message.getBoolean(Field.INCLUDE_BEFORE,false);
     }
     
     private Message() {

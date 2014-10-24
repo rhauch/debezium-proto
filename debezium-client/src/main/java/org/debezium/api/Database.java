@@ -7,14 +7,14 @@ package org.debezium.api;
 
 import java.io.Closeable;
 
-import org.debezium.core.id.Entity;
-import org.debezium.core.id.EntityCollection;
-import org.debezium.core.id.EntityId;
-import org.debezium.core.id.EntityType;
-import org.debezium.core.id.Identified;
-import org.debezium.core.id.Identifier;
-import org.debezium.core.id.SchemaComponent;
-import org.debezium.core.id.SchemaComponentId;
+import org.debezium.core.component.Entity;
+import org.debezium.core.component.EntityCollection;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.EntityType;
+import org.debezium.core.component.Identified;
+import org.debezium.core.component.Identifier;
+import org.debezium.core.component.SchemaComponent;
+import org.debezium.core.component.SchemaComponentId;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
 

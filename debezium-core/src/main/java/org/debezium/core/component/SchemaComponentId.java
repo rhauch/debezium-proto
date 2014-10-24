@@ -3,18 +3,16 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.core.id;
-
-import org.debezium.core.doc.Document;
+package org.debezium.core.component;
 
 /**
- * @param <IdType> the type of identifier
  * @author Randall Hauch
+ *
  */
-public interface Identified<IdType extends Identifier> {
+public interface SchemaComponentId extends Identifier {
     
-    IdType id();
+    public enum ComponentType { ENTITY_TYPE }
     
-    Document document();
-
+    ComponentType type();
+    
 }
