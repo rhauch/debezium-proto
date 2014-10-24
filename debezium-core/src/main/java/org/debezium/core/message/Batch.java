@@ -195,11 +195,11 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     
     /**
      * Determine if this batch is a request to read one or more targets. In other words, this batch must contain at least
-     * one patch, and all patches must be {@link Patch#isEmpty() empty}.
+     * one patch, and every patch must be a {@link Patch#isReadRequest() read request}.
      * @return true if this batch contains only read requests, or false otherwise
      */
     public boolean isReadRequest() {
-        return !patches.isEmpty() || patches.stream().allMatch((patch)->patch.isEmpty());
+        return !patches.isEmpty() || patches.stream().allMatch((patch)->patch.isReadRequest());
     }
 
     /**

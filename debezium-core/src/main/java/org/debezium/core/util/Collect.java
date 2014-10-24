@@ -7,26 +7,27 @@ package org.debezium.core.util;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
  * A set of utilities for more easily creating various kinds of collections.
  */
-public class CollectionFactory {
+public class Collect {
 
     public static <T> Set<T> unmodifiableSet( @SuppressWarnings( "unchecked" ) T... values ) {
         return unmodifiableSet(Arrays.asList(values));
     }
 
     public static <T> Set<T> unmodifiableSet( Collection<T> values ) {
-        return java.util.Collections.unmodifiableSet(new HashSet<T>(values));
+        return Collections.unmodifiableSet(new HashSet<T>(values));
     }
 
     public static <T> Set<T> unmodifiableSet( Set<T> values ) {
-        return java.util.Collections.unmodifiableSet(values);
+        return Collections.unmodifiableSet(values);
     }
 
-    private CollectionFactory() {
+    private Collect() {
     }
 }

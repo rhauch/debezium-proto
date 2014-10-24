@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Red Hat, Inc. and/or its affiliates.
- *
+ * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
 package org.debezium.core.doc;
@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -20,23 +21,23 @@ import java.util.stream.StreamSupport;
  *
  */
 public interface Document extends Iterable<Document.Field>, Comparable<Document> {
-
+    
     static interface Field extends Comparable<Field> {
-
+        
         /**
          * Get the name of the field
          * 
          * @return the field's name; never null
          */
         CharSequence getName();
-
+        
         /**
          * Get the value of the field.
          * 
          * @return the field's value; may be null
          */
         Value getValue();
-
+        
         @Override
         default int compareTo(Field that) {
             if (that == null) return 1;
@@ -46,41 +47,43 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
     }
     
-    static Field field( String name, Value value ) {
-        return new BasicField(name,value);
+    static Field field(String name, Value value) {
+        return new BasicField(name, value);
     }
-
-    static Field field( String name, Object value ) {
-        return new BasicField(name,Value.create(value));
+    
+    static Field field(String name, Object value) {
+        return new BasicField(name, Value.create(value));
     }
-
+    
     static Document create() {
         return new BasicDocument();
     }
-
+    
     static Document create(CharSequence fieldName, Object value) {
         return new BasicDocument().set(fieldName, value);
     }
-
+    
     static Document create(CharSequence fieldName1, Object value1, CharSequence fieldName2, Object value2) {
         return new BasicDocument().set(fieldName1, value1).set(fieldName2, value2);
     }
-
-    static Document create(CharSequence fieldName1, Object value1, CharSequence fieldName2, Object value2, CharSequence fieldName3, Object value3) {
+    
+    static Document create(CharSequence fieldName1, Object value1, CharSequence fieldName2, Object value2, CharSequence fieldName3,
+                           Object value3) {
         return new BasicDocument().set(fieldName1, value1).set(fieldName2, value2).set(fieldName3, value3);
     }
-
-    static Document create(CharSequence fieldName1, Object value1, CharSequence fieldName2, Object value2, CharSequence fieldName3, Object value3, CharSequence fieldName4, Object value4) {
+    
+    static Document create(CharSequence fieldName1, Object value1, CharSequence fieldName2, Object value2, CharSequence fieldName3,
+                           Object value3, CharSequence fieldName4, Object value4) {
         return new BasicDocument().set(fieldName1, value1).set(fieldName2, value2).set(fieldName3, value3).set(fieldName4, value4);
     }
-
+    
     /**
      * Return the number of name-value fields in this object.
      * 
      * @return the number of name-value fields; never negative
      */
     int size();
-
+    
     /**
      * Return whether this document contains no fields and is therefore empty.
      * 
@@ -92,7 +95,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * Remove all fields from this document.
      */
     void clear();
-
+    
     /**
      * Determine if this contains a field with the given name.
      * 
@@ -100,7 +103,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return true if the field exists, or false otherwise
      */
     boolean has(CharSequence fieldName);
-
+    
     /**
      * Checks if this object contains all of the fields in the supplied document.
      * 
@@ -108,83 +111,86 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return true if this document contains all of the fields in the supplied document, or false otherwise
      */
     boolean hasAll(Document document);
-
+    
     /**
      * Set the value at the given path resolved against this document, optionally adding any missing intermediary documents
      * or arrays based upon the format of the path segments.
+     * 
      * @param path the path at which the value is to be set
      * @param addIntermediaries true if any missing intermediary fields should be created, or false if any missing
-     * intermediary fields should be handled as an error via {@code invalid}
+     *            intermediary fields should be handled as an error via {@code invalid}
      * @param value the value that should be set at the given path; may be null or a {@link Value#nullValue() null value}
      * @param invalid the function that should be called if the supplied path cannot be resolved
      * @return the {@code value} if successful or the {@link Optional#empty() empty (not present)} optional value if
-     * the path was invalid and could not be resolved
+     *         the path was invalid and could not be resolved
      */
-    default Optional<Value> set( Path path, boolean addIntermediaries, Value value, Consumer<Path> invalid ) {
-        return find(path,(missingPath,missingIndex)->{
-            if ( (missingIndex+1) == missingPath.size() ) {
+    default Optional<Value> set(Path path, boolean addIntermediaries, Value value, Consumer<Path> invalid) {
+        return find(path, (missingPath, missingIndex) -> {
+            if ((missingIndex + 1) == missingPath.size()) {
                 // This is the last segment ...
-                return Optional.ofNullable(value);
-            }
-            if ( !addIntermediaries ) {
-                // We're not supposed to add any missing intermediaries, so handle this invalid case ...
-                invalid.accept(missingPath);
-            }
-            // There is at least one segment after the missing segment, and it will tell us which type of value to create ...
-            String nextSegment = missingPath.segment(missingIndex+1);
-            if ( Path.Segments.isArrayIndex(nextSegment)) {
-                return Optional.of(Value.create(Array.create()));
-            } else {
-                return Optional.of(Value.create(Document.create()));
-            }
-        },invalid);
+                    return Optional.ofNullable(value);
+                }
+                if (!addIntermediaries) {
+                    // We're not supposed to add any missing intermediaries, so handle this invalid case ...
+                    invalid.accept(missingPath);
+                }
+                // There is at least one segment after the missing segment, and it will tell us which type of value to create ...
+                String nextSegment = missingPath.segment(missingIndex + 1);
+                if (Path.Segments.isArrayIndex(nextSegment)) {
+                    return Optional.of(Value.create(Array.create()));
+                } else {
+                    return Optional.of(Value.create(Document.create()));
+                }
+            }, invalid);
     }
     
     /**
      * Attempt to find the value at the given path
+     * 
      * @param path the path to find
      * @param missingSegment function called when a segment in the path does not exist, and which should return a new value
-     * if one should be created or {@link Optional#empty()} if nothing should be created and {@code invalid}
-     * function should be called by this method
+     *            if one should be created or {@link Optional#empty()} if nothing should be created and {@code invalid} function
+     *            should be called by this method
      * @param invalid function called when the supplied path is invalid; in this case, this method also returns
-     * {@link Optional#empty()}
+     *            {@link Optional#empty()}
      * @return the optional value at this path, which is {@link Optional#isPresent() present} if the value was found at that
-     * path or is {@link Optional#empty() empty (not present)} if there is no value at the path or if the path was not valid
+     *         path or is {@link Optional#empty() empty (not present)} if there is no value at the path or if the path was not
+     *         valid
      */
-    default Optional<Value> find( Path path, BiFunction<Path,Integer,Optional<Value>> missingSegment, Consumer<Path> invalid ) {
-        if ( path == null ) return Optional.empty();
-        if ( path.isRoot() ) {
+    default Optional<Value> find(Path path, BiFunction<Path, Integer, Optional<Value>> missingSegment, Consumer<Path> invalid) {
+        if (path == null) return Optional.empty();
+        if (path.isRoot()) {
             return Optional.of(Value.create(this));
         }
-        if ( path.isSingle() ) {
+        if (path.isSingle()) {
             // Look it up in this document ...
-            return Optional.of( get(path.lastSegment().get()) );
+            return Optional.of(get(path.lastSegment().get()));
         }
         Value value = Value.create(this);
         int i = 0;
-        for ( String segment : path ) {
+        for (String segment : path) {
             ++i;
-            if ( value.isDocument() ) {
+            if (value.isDocument()) {
                 Value existingValue = value.asDocument().get(segment);
-                if ( existingValue == null ) {
+                if (existingValue == null) {
                     // It does not exist ...
-                    Optional<Value> newValue = missingSegment.apply(path,i);
-                    if ( newValue.isPresent() ) {
+                    Optional<Value> newValue = missingSegment.apply(path, i);
+                    if (newValue.isPresent()) {
                         // Add the new value (whatever it is) ...
                         value = newValue.get();
-                        value.asDocument().set(segment,value);
+                        value.asDocument().set(segment, value);
                     } else {
                         return Optional.empty();
                     }
                 } else {
                     value = existingValue;
                 }
-            } else if ( value.isArray() ) {
-                Array array  = value.asArray();
-                if ( Path.Segments.isAfterLastIndex(segment)) {
+            } else if (value.isArray()) {
+                Array array = value.asArray();
+                if (Path.Segments.isAfterLastIndex(segment)) {
                     // This means "after the last index", so call it as missing ...
-                    Optional<Value> newValue = missingSegment.apply(path,i);
-                    if ( newValue.isPresent() ) {
+                    Optional<Value> newValue = missingSegment.apply(path, i);
+                    if (newValue.isPresent()) {
                         // Add the new value (whatever it is) ...
                         value = newValue.get();
                         array.add(value);
@@ -193,21 +199,21 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
                     }
                 } else {
                     Optional<Integer> index = Path.Segments.asInteger(segment);
-                    if ( index.isPresent() ) {
+                    if (index.isPresent()) {
                         // This is an index ...
-                        if ( array.has(index.get())) {
+                        if (array.has(index.get())) {
                             value = array.get(index.get());
-                        } else if ( array.size() == index.get() ) {
+                        } else if (array.size() == index.get()) {
                             // We can add at this index ...
-                            Optional<Value> newValue = missingSegment.apply(path,i);
-                            if ( newValue.isPresent() ) {
+                            Optional<Value> newValue = missingSegment.apply(path, i);
+                            if (newValue.isPresent()) {
                                 // Add the new value (whatever it is) ...
                                 array.add(newValue.get());
                             } else {
                                 return Optional.empty();
                             }
                         } else {
-                            // The index is not valid (it's too big to be an existing or the next index)  ...
+                            // The index is not valid (it's too big to be an existing or the next index) ...
                             invalid.accept(path.subpath(i));
                             return Optional.empty();
                         }
@@ -225,7 +231,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
         return Optional.of(value);
     }
-
+    
     /**
      * Gets the value in this document for the given field name.
      * 
@@ -235,7 +241,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default Value get(CharSequence fieldName) {
         return get(fieldName, null);
     }
-
+    
     /**
      * Gets the value in this document for the given field name.
      * 
@@ -244,7 +250,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return The field value, if found, or , or <code>defaultValue</code> if there is no such field
      */
     Value get(CharSequence fieldName, Comparable<?> defaultValue);
-
+    
     /**
      * Get the boolean value in this document for the given field name.
      * 
@@ -255,7 +261,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isBoolean() ? value.asBoolean() : null;
     }
-
+    
     /**
      * Get the boolean value in this document for the given field name.
      * 
@@ -265,11 +271,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         boolean
      */
     default boolean getBoolean(CharSequence fieldName,
-            boolean defaultValue) {
+                               boolean defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isBoolean() ? value.asBoolean().booleanValue() : defaultValue;
     }
-
+    
     /**
      * Get the integer value in this document for the given field name.
      * 
@@ -280,7 +286,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isInteger() ? value.asInteger() : null;
     }
-
+    
     /**
      * Get the integer value in this document for the given field name.
      * 
@@ -290,11 +296,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         integer
      */
     default int getInteger(CharSequence fieldName,
-            int defaultValue) {
+                           int defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isInteger() ? value.asInteger().intValue() : defaultValue;
     }
-
+    
     /**
      * Get the integer value in this document for the given field name.
      * 
@@ -305,7 +311,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isLong() ? value.asLong() : null;
     }
-
+    
     /**
      * Get the long value in this document for the given field name.
      * 
@@ -315,11 +321,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         value
      */
     default long getLong(CharSequence fieldName,
-            long defaultValue) {
+                         long defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isLong() ? value.asLong().longValue() : defaultValue;
     }
-
+    
     /**
      * Get the double value in this document for the given field name.
      * 
@@ -330,7 +336,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isDouble() ? value.asDouble() : null;
     }
-
+    
     /**
      * Get the double value in this document for the given field name.
      * 
@@ -340,11 +346,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         double
      */
     default double getDouble(CharSequence fieldName,
-            double defaultValue) {
+                             double defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isDouble() ? value.asDouble().doubleValue() : defaultValue;
     }
-
+    
     /**
      * Get the double value in this document for the given field name.
      * 
@@ -355,7 +361,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isFloat() ? value.asFloat() : null;
     }
-
+    
     /**
      * Get the float value in this document for the given field name.
      * 
@@ -365,11 +371,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         double
      */
     default float getFloat(CharSequence fieldName,
-            float defaultValue) {
+                           float defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isFloat() ? value.asFloat().floatValue() : defaultValue;
     }
-
+    
     /**
      * Get the number value in this document for the given field name.
      * 
@@ -379,7 +385,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default Number getNumber(CharSequence fieldName) {
         return getNumber(fieldName, null);
     }
-
+    
     /**
      * Get the number value in this document for the given field name.
      * 
@@ -389,11 +395,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         number
      */
     default Number getNumber(CharSequence fieldName,
-            Number defaultValue) {
+                             Number defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isNumber() ? value.asNumber() : defaultValue;
     }
-
+    
     /**
      * Get the big integer value in this document for the given field name.
      * 
@@ -403,7 +409,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default BigInteger getBigInteger(CharSequence fieldName) {
         return getBigInteger(fieldName, null);
     }
-
+    
     /**
      * Get the big integer value in this document for the given field name.
      * 
@@ -415,7 +421,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isBigInteger() ? value.asBigInteger() : defaultValue;
     }
-
+    
     /**
      * Get the big decimal value in this document for the given field name.
      * 
@@ -425,7 +431,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default BigDecimal getBigDecimal(CharSequence fieldName) {
         return getBigDecimal(fieldName, null);
     }
-
+    
     /**
      * Get the big decimal value in this document for the given field name.
      * 
@@ -437,7 +443,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isBigDecimal() ? value.asBigDecimal() : defaultValue;
     }
-
+    
     /**
      * Get the string value in this document for the given field name.
      * 
@@ -447,7 +453,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default String getString(CharSequence fieldName) {
         return getString(fieldName, null);
     }
-
+    
     /**
      * Get the string value in this document for the given field name.
      * 
@@ -457,11 +463,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         string
      */
     default String getString(CharSequence fieldName,
-            String defaultValue) {
+                             String defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isString() ? value.asString() : defaultValue;
     }
-
+    
     /**
      * Get the Base64 encoded binary value in this document for the given field name.
      * 
@@ -472,7 +478,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isBinary() ? value.asBytes() : null;
     }
-
+    
     /**
      * Get the array value in this document for the given field name.
      * 
@@ -480,21 +486,22 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return The array field value (as a list), if found, or null if there is no such field or if the value is not an array
      */
     default Array getArray(CharSequence fieldName) {
-        return getArray(fieldName,null);
+        return getArray(fieldName, null);
     }
-
+    
     /**
      * Get the array value in this document for the given field name.
      * 
      * @param fieldName The name of the field
      * @param defaultValue the default array that should be returned if there is no such field
-     * @return The array field value (as a list), if found, or the default value if there is no such field or if the value is not an array
+     * @return The array field value (as a list), if found, or the default value if there is no such field or if the value is not
+     *         an array
      */
-    default Array getArray(CharSequence fieldName, Array defaultValue ) {
+    default Array getArray(CharSequence fieldName, Array defaultValue) {
         Value value = get(fieldName);
         return value != null && value.isArray() ? value.asArray() : defaultValue;
     }
-
+    
     /**
      * Get the existing array value in this document for the given field name, or create a new array if there is no existing array
      * at this field.
@@ -510,7 +517,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
         return value.isArray() ? value.asArray() : null;
     }
-
+    
     /**
      * Get the document value in this document for the given field name.
      * 
@@ -521,7 +528,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isDocument() ? value.asDocument() : null;
     }
-
+    
     /**
      * Get the existing document value in this document for the given field name, or create a new document if there is no existing
      * document at this field.
@@ -537,7 +544,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
         return value.isDocument() ? value.asDocument() : null;
     }
-
+    
     /**
      * Determine whether this object has a field with the given the name and the value is null. This is equivalent to calling:
      * 
@@ -553,9 +560,10 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value != null && value.isNull();
     }
-
+    
     /**
-     * Determine whether this object has a field with the given the name and the value is null, or if this object has no field with
+     * Determine whether this object has a field with the given the name and the value is null, or if this object has no field
+     * with
      * the given name. This is equivalent to calling:
      * 
      * <pre>
@@ -570,21 +578,21 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         Value value = get(fieldName);
         return value == null || value.isNull();
     }
-
+    
     /**
      * Returns this object's fields' names
      * 
      * @return The names of the fields in this object
      */
     Iterable<CharSequence> keySet();
-
+    
     /**
      * Obtain a clone of this document.
      * 
      * @return the clone of this document; never null
      */
     Document clone();
-
+    
     /**
      * Remove the field with the supplied name, and return the value.
      * 
@@ -592,7 +600,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return the value that was removed, or null if there was no such value
      */
     Value remove(CharSequence name);
-
+    
     /**
      * If the supplied name is provided, then remove the field with the supplied name and return the value.
      * 
@@ -602,47 +610,60 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default Value remove(Optional<? extends CharSequence> name) {
         return name.isPresent() ? remove(name.get()) : null;
     }
-
+    
     /**
      * Remove all fields from this document.
      * 
      * @return This document, to allow for chaining methods
      */
     Document removeAll();
-
+    
     /**
      * Sets on this object all name/value pairs from the supplied object. If the supplied object is null, this method does
      * nothing.
      * 
-     * @param fields the name/value pairs to be set on this object
+     * @param fields the name/value pairs to be set on this object; may not be null
      * @return This document, to allow for chaining methods
      */
     default Document putAll(Iterator<Field> fields) {
-        if (fields != null) {
-            while ( fields.hasNext() ) {
-                Field field = fields.next();
-                set(field.getName(), field.getValue());
-            }
+        while (fields.hasNext()) {
+            Field field = fields.next();
+            setValue(field.getName(), field.getValue());
         }
         return this;
     }
-
+    
     /**
      * Sets on this object all name/value pairs from the supplied object. If the supplied object is null, this method does
      * nothing.
      * 
-     * @param fields the name/value pairs to be set on this object
+     * @param fields the name/value pairs to be set on this object; may not be null
      * @return This document, to allow for chaining methods
      */
     default Document putAll(Iterable<Field> fields) {
-        if (fields != null) {
-            for (Field field : fields) {
-                set(field.getName(), field.getValue());
+        for (Field field : fields) {
+            setValue(field.getName(), field.getValue());
+        }
+        return this;
+    }
+    
+    /**
+     * Attempts to copy all of the acceptable fields from the source and set on this document, overwriting any existing
+     * values.
+     * 
+     * @param fields the name/value pairs to be set on this object; may not be null
+     * @param acceptableFieldNames the predicate to determine which fields from the source should be copied; may not be null
+     * @return This document, to allow for chaining methods
+     */
+    default Document putAll(Iterable<Field> fields, Predicate<CharSequence> acceptableFieldNames) {
+        for (Field field : fields) {
+            if ( acceptableFieldNames.test(field.getName())) {
+                setValue(field.getName(), field.getValue());
             }
         }
         return this;
     }
-
+    
     /**
      * Sets on this object all key/value pairs from the supplied map. If the supplied map is null, this method does nothing.
      * 
@@ -657,7 +678,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
         return this;
     }
-
+    
     /**
      * Returns a sequential {@code Stream} with this array as its source.
      *
@@ -666,7 +687,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default Stream<Field> stream() {
         return StreamSupport.stream(spliterator(), false);
     }
-
+    
     /**
      * Transform all of the field values using the supplied {@link BiFunction transformer function}.
      * 
@@ -684,7 +705,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         }
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to be a binary value. The value will be encoded as Base64.
      * 
@@ -692,21 +713,22 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @param value the new value
      * @return This document, to allow for chaining methods
      */
-    default Document set(CharSequence name,
-            Object value) {
+    default Document set(CharSequence name, Object value) {
         if (value instanceof Value) {
-            setValue(name, (Value)value);
+            setValue(name, (Value) value);
             return this;
         }
         Value wrapped = Value.create(value);
         set(name, wrapped);
         return this;
-
+        
     }
-
+    
     /**
-     * Set the value for the field with the given name to be a null value. The {@link #isNull(CharSequence)} methods can be used to
-     * determine if a field has been set to null, or {@link #isNullOrMissing(CharSequence)} if the field has not be set or if it has
+     * Set the value for the field with the given name to be a null value. The {@link #isNull(CharSequence)} methods can be used
+     * to
+     * determine if a field has been set to null, or {@link #isNullOrMissing(CharSequence)} if the field has not be set or if it
+     * has
      * been set to null.
      * 
      * @param name The name of the field
@@ -718,7 +740,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         setValue(name, Value.nullValue());
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied boolean value.
      * 
@@ -727,11 +749,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setBoolean(CharSequence name,
-            boolean value) {
+                                boolean value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied integer value.
      * 
@@ -740,11 +762,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            int value) {
+                               int value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied long value.
      * 
@@ -753,11 +775,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            long value) {
+                               long value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied float value.
      * 
@@ -766,11 +788,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            float value) {
+                               float value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied double value.
      * 
@@ -779,11 +801,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            double value) {
+                               double value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied big integer value.
      * 
@@ -792,11 +814,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            BigInteger value) {
+                               BigInteger value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied big integer value.
      * 
@@ -805,11 +827,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setNumber(CharSequence name,
-            BigDecimal value) {
+                               BigDecimal value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to the supplied string value.
      * 
@@ -818,11 +840,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setString(CharSequence name,
-            String value) {
+                               String value) {
         setValue(name, Value.create(value));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to be a binary value. The value will be encoded as Base64.
      * 
@@ -831,11 +853,11 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     default Document setBinary(CharSequence name,
-            byte[] data) {
+                               byte[] data) {
         setValue(name, Value.create(data));
         return this;
     }
-
+    
     /**
      * Set the value for the field with the given name to be a binary value. The value will be encoded as Base64.
      * 
@@ -844,8 +866,8 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return This document, to allow for chaining methods
      */
     Document setValue(CharSequence name,
-            Value value);
-
+                      Value value);
+    
     /**
      * Set the value for the field with the given name to be a new, empty Document.
      * 
@@ -855,7 +877,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     default Document setDocument(CharSequence name) {
         return setDocument(name, Document.create());
     }
-
+    
     /**
      * Set the value for the field with the given name to be the supplied Document.
      * 
@@ -865,12 +887,12 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         instance as the supplied <code>document</code>.
      */
     default Document setDocument(CharSequence name,
-            Document document) {
+                                 Document document) {
         if (document == null) document = Document.create();
         setValue(name, Value.create(document));
         return document;
     }
-
+    
     /**
      * Set the value for the field with the given name to be a new, empty array.
      * 
@@ -878,9 +900,9 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @return The array that was just created; never null
      */
     default Array setArray(CharSequence name) {
-        return setArray(name,Array.create());
+        return setArray(name, Array.create());
     }
-
+    
     /**
      * Set the value for the field with the given name to be the supplied array.
      * 
@@ -890,12 +912,12 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         instance as the supplied <code>array</code>.
      */
     default Array setArray(CharSequence name,
-            Array array) {
+                           Array array) {
         if (array == null) array = Array.create();
         setValue(name, Value.create(array));
         return array;
     }
-
+    
     /**
      * Set the value for the field with the given name to be the supplied array.
      * 
@@ -905,7 +927,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      *         instance as the supplied <code>array</code>.
      */
     default Array setArray(CharSequence name,
-            Object... values) {
-        return setArray(name,Value.create(Array.create(values)));
+                           Object... values) {
+        return setArray(name, Value.create(Array.create(values)));
     }
 }

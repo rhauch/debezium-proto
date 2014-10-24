@@ -91,6 +91,12 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
          * @return the document; never null
          */
         Document asDocument();
+        
+        /**
+         * Get a failure description for this operation.
+         * @return the failure description; never null
+         */
+        String failureDescription();
     }
     
     /**
@@ -386,6 +392,10 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return edit(target).add("/", Value.create(value)).end();
     }
     
+    public static <T extends Identifier> Patch<T> read(T target) {
+        return edit(target).end();
+    }
+    
     /**
      * Create an editor for the target with the given identifier. The resulting editor will create the {@link Patch} when {@link Editor#end()} is called.
      * 
@@ -482,6 +492,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         }
         
         @Override
+        public String failureDescription() {
+            return "Unable to add the value " + value + " at '" + path + "'";
+        }
+        
+        @Override
         public Boolean apply(Document doc, Consumer<Path> invalid) {
             return doc.set(Path.parse(this.path), true, value(),invalid).isPresent();
         }
@@ -502,6 +517,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         @Override
         public String toString() {
             return "[ remove @ '" + path + "' ]";
+        }
+        
+        @Override
+        public String failureDescription() {
+            return "Unable to remove the value at '" + path + "'";
         }
         
         @Override
@@ -562,6 +582,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         }
         
         @Override
+        public String failureDescription() {
+            return "Failed to find required value " + value + " at '" + path + "'";
+        }
+        
+        @Override
         public Document asDocument() {
             return Document.create("op", action().lowercase(), "path", path(), "value", requiredValue());
         }
@@ -602,6 +627,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         }
         
         @Override
+        public String failureDescription() {
+            return "Unable to replace the value at '" + path + "' with " + value;
+        }
+        
+        @Override
         public Document asDocument() {
             return Document.create("op", action().lowercase(), "path", path(), "value", value());
         }
@@ -635,6 +665,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         @Override
         public String toString() {
             return "[ copy @ '" + fromPath + "' to " + toPath + " ]";
+        }
+        
+        @Override
+        public String failureDescription() {
+            return "Unable to copy the value from '" + fromPath + "' to '" + toPath + "'";
         }
         
         @Override
@@ -681,6 +716,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         @Override
         public String toString() {
             return "[ move @ '" + fromPath + "' to " + toPath + " ]";
+        }
+        
+        @Override
+        public String failureDescription() {
+            return "Unable to move the value from '" + fromPath + "' to '" + toPath + "'";
         }
         
         @Override
@@ -739,6 +779,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         }
         
         @Override
+        public String failureDescription() {
+            return "Unable to increment by " + value + " the value at '" + path + "'";
+        }
+        
+        @Override
         public Document asDocument() {
             return Document.create("op", action().lowercase(), "path", path(), "value", value());
         }
@@ -790,6 +835,10 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     
     public boolean isEmpty() {
         return ops.isEmpty();
+    }
+    
+    public boolean isReadRequest() {
+        return isEmpty();
     }
     
     public boolean isCreation() {

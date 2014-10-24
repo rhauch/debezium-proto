@@ -219,12 +219,8 @@ final class ComparableValue implements Value {
 
     @Override
     public Value clone() {
-        if (isArray()) {
-            return new ComparableValue(asArray().clone());
-        }
-        if (isDocument()) { // or array
-            return new ComparableValue(asDocument().clone());
-        }
+        if (isArray()) return new ComparableValue(asArray().clone());
+        if (isDocument()) return new ComparableValue(asDocument().clone());
         // All other values are immutable ...
         return this;
     }

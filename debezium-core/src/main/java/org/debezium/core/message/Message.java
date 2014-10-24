@@ -7,9 +7,10 @@ package org.debezium.core.message;
 
 import java.util.Set;
 
+import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
-import org.debezium.core.util.CollectionFactory;
+import org.debezium.core.util.Collect;
 
 /**
  * @author Randall Hauch
@@ -38,7 +39,26 @@ public final class Message {
         public static final String AFTER = "after";
     }
     
-    private static final Set<String> HEADER_FIELD_NAMES = CollectionFactory.unmodifiableSet(Field.CLIENT_ID,
+    public static enum Status {
+        SUCCESS(1), DOES_NOT_EXIST(2), PATCH_FAILED(3);
+        private final int code;
+        private Status( int code ) {
+            this.code = code;
+        }
+        public int code() {
+            return this.code;
+        }
+        public static Status fromCode( int code ) {
+            switch(code) {
+                case 1: return SUCCESS;
+                case 2: return DOES_NOT_EXIST;
+                case 3: return PATCH_FAILED;
+            }
+            return null;
+        }
+    }
+    
+    private static final Set<String> HEADER_FIELD_NAMES = Collect.unmodifiableSet(Field.CLIENT_ID,
                                                                                             Field.REQUEST,
                                                                                             Field.USER,
                                                                                             Field.PARTS,
@@ -46,11 +66,73 @@ public final class Message {
                                                                                             Field.INCLUDE_BEFORE,
                                                                                             Field.INCLUDE_AFTER);
     
+    /**
+     * Create a new response message from the supplied request. The response will contain all of the {@link #HEADER_FIELD_NAMES header fields}
+     * from the original request and a {@link Status#SUCCESS success status}.
+     * @param request the original request for which the response document should be created.
+     * @return the incomplete response document; never null
+     */
+    public static Document createResponseFrom( Document request ) {
+        Document response = Document.create();
+        Message.copyHeaders(request, response);
+        Message.setStatus(response, Status.SUCCESS);
+        return response;
+    }
+    
+    /**
+     * Create a new response message from the supplied request. The response will contain all of the {@link #HEADER_FIELD_NAMES header fields}
+     * from the original request and a {@link Status#SUCCESS success status}.
+     * @param batchRequest the original batch request from which the patch request document should be created.
+     * @param patch the patch; may not be null
+     * @return the incomplete response document; never null
+     */
+    public static Document createPatchRequest( Document batchRequest, Patch<?> patch ) {
+        Document patchRequest = patch.asDocument();
+        Message.copyHeaders(batchRequest, patchRequest);
+        return patchRequest;
+    }
+    
+    /**
+     * Copy into the target document all of the header fields in the source document.
+     * @param source the document with the header fields to be copied; may not be null
+     * @param target the document into which copies of the header fields from the {@code source} document should be placed; may not be null
+     */
     public static void copyHeaders(Document source, Document target) {
-        HEADER_FIELD_NAMES.forEach((name)->{
-            Value value = source.get(name);
-            if ( value != null ) target.set(name,value);
-        });
+        target.putAll(source, (name)-> HEADER_FIELD_NAMES.contains(name.toString()));
+    }
+    
+    public static void setStatus( Document message, Status status ) {
+        message.setNumber(Field.STATUS,status.code());
+    }
+    
+    public static boolean isStatus( Document message, Status status ) {
+        Integer value = message.getInteger(Field.STATUS);
+        return value != null && value.intValue() == status.code();
+    }
+    
+    public static boolean isSuccess( Document message ) {
+        return isStatus(message,Status.SUCCESS);
+    }
+    
+    public static void addFailureReason( Document message, String reason ) {
+        Value value = message.get(Field.ERROR);
+        if ( value == null ) {
+            message.setString(Field.ERROR,reason);
+        } else if ( value.isArray() ) {
+            value.asArray().add(reason);
+        } else if ( value.isString() ) {
+            message.setArray(Field.ERROR, Array.create(value.asString(),reason));
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+    
+    public static void setAfter( Document message, Document representation ) {
+        message.setDocument(Field.AFTER, representation);
+    }
+    
+    public static void setBefore( Document message, Document representation ) {
+        message.setDocument(Field.BEFORE, representation);
     }
     
     private Message() {

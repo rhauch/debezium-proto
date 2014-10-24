@@ -120,7 +120,7 @@ final class BasicDocument implements Document {
 
     @Override
     public Document setValue(CharSequence name, Value value) {
-        this.fields.put(name, value != null ? value : Value.nullValue());
+        this.fields.put(name, value != null ? value.clone() : Value.nullValue());
         return this;
     }
     

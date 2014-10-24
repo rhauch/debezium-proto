@@ -59,7 +59,7 @@
     <modules>
         <module>debezium-core</module>
         <module>debezium-client</module>
-        <module>debezium-service-schema-store</module>
+        <module>debezium-services</module>
     </modules>
     <developers>
         <developer>
@@ -201,7 +201,7 @@
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
-                <artifactId>debezium-service-schema-store</artifactId>
+                <artifactId>debezium-services</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

@@ -3,13 +3,15 @@
  * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debeziume.service.schema.store;
+package org.debezium.services;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.samza.config.Config;
 import org.apache.samza.storage.kv.KeyValueStore;
 import org.apache.samza.system.IncomingMessageEnvelope;
+import org.apache.samza.system.OutgoingMessageEnvelope;
+import org.apache.samza.system.SystemStream;
 import org.apache.samza.task.InitableTask;
 import org.apache.samza.task.MessageCollector;
 import org.apache.samza.task.StreamTask;
@@ -21,12 +23,15 @@ import org.debezium.core.id.EntityType;
 import org.debezium.core.id.Identifier;
 import org.debezium.core.id.SchemaComponentId;
 import org.debezium.core.message.Batch;
+import org.debezium.core.message.Message;
+import org.debezium.core.message.Message.Status;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Operation;
+import org.debezium.core.message.Topics;
 
 /**
- * A service (or task in Samza parlance) that is responsible for locally storing schema definitions. Multiple instances of this
- * service do not share storage: each is entirely responsible for the data on the incoming partitions.
+ * A service (or task in Samza parlance) that is responsible for locally storing schema definitions in a share-nothing approach.
+ * Multiple instances of this service do not share storage: each is entirely responsible for the data on the incoming partitions.
  * <p>
  * Each incoming message is a {@link Batch batch} containing one or more {@link Patch patches} on components within the schema.
  * <p>
@@ -37,14 +42,17 @@ import org.debezium.core.message.Patch.Operation;
  * @author Randall Hauch
  *
  */
-public class SchemaStoreService implements StreamTask, InitableTask {
+public class SchemaStorageService implements StreamTask, InitableTask {
+    
+    private static final SystemStream UNCHANGED_OUTPUT = new SystemStream("kafka",Topics.RESPONSES);
+    private static final SystemStream CHANGE_OUTPUT = new SystemStream("kafka",Topics.SCHEMA_UPDATES);
     
     private KeyValueStore<String, Document> store;
 
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
-      this.store = (KeyValueStore<String, Document>) context.getStore("wikipedia-stats");
+      this.store = (KeyValueStore<String, Document>) context.getStore("schema-store");
     }
 
     @Override
@@ -57,20 +65,26 @@ public class SchemaStoreService implements StreamTask, InitableTask {
         assert batch.appliesTo(dbId);
         final String key = dbId.asString();
 
+        // Construct the response message ...
+        Document response = Message.createResponseFrom(request);
+
         // Look up the schema in the store ...
         Document existingSchema = store.get(key);
-        final Document schema = existingSchema != null ? existingSchema : Document.create();
         
         if ( batch.isReadRequest() ) {
-            
+            // This is a request to only read the schema, so just send it off to the correct output stream ...
+            if ( existingSchema == null ) {
+                // The schema did not exist ...
+                Message.setStatus(response, Status.DOES_NOT_EXIST);
+                Message.addFailureReason(response, "Database '" + dbId + "' does not exist.");
+            } else {
+                Message.setAfter(response, existingSchema);
+            }
+            collector.send(new OutgoingMessageEnvelope(UNCHANGED_OUTPUT, response));
         }
         
-        // Construct the response message ...
-        Document response = Document.create();
-        response.putAll(dbId.fields());
-        response.setBoolean("success", true);
-
         // Apply each patch ...
+        final Document schema = existingSchema != null ? existingSchema : Document.create();
         AtomicBoolean modified = new AtomicBoolean(false);
         batch.forEach((patch)->{
             SchemaComponentId componentId = patch.target();
@@ -84,16 +98,21 @@ public class SchemaStoreService implements StreamTask, InitableTask {
             }
         });
         
-        if ( modified.get() && response.getBoolean("success") ) {
+        if ( modified.get() && Message.isSuccess(response) ) {
             // The changes were successful and we modified the schema, so store the changes ...
             store.put(key, schema);
+
+            // Output the result ...
+            collector.send(new OutgoingMessageEnvelope(CHANGE_OUTPUT, response));
+        } else {
+            // Output the failed attempt ...
+            collector.send(new OutgoingMessageEnvelope(UNCHANGED_OUTPUT, response));
         }
-        
-        // Output the result ...
     }
     
     private void record( Operation failedOperation, Document response ) {
-        response.setBoolean("success", false);
+        Message.addFailureReason(response, failedOperation.failureDescription());
+        Message.setStatus(response, Status.PATCH_FAILED);
     }
     
 }
