@@ -20,10 +20,13 @@ import org.debezium.core.message.Patch;
 @NotThreadSafe
 public class LearningEntityTypeModel {
     
+    private Document model;
+    
     /**
      * @param model the starting representation of the entity type
      */
     public LearningEntityTypeModel( Document model ) {
+        this.model = model;
     }
 
     /**

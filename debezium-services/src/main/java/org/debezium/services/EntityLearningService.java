@@ -39,7 +39,7 @@ import org.debezium.services.learn.LearningEntityTypeModel;
  * <li>A completed patch on a single entity.</li>
  * </ol>
  * <p>
- * This service produces messages describing learned changes to the schemas on the "{@link Streams#schemaBatches schema-batches}"
+ * This service produces messages describing learned changes to the schemas on the "{@link Streams#schemaPatches schema-patches}"
  * topic.
  * <p>
  * <p>
@@ -63,22 +63,22 @@ public class EntityLearningService implements StreamTask, InitableTask {
     public void init(Config config, TaskContext context) {
         this.entityTypesCache = (KeyValueStore<String, Document>) context.getStore("schema-learning-cache");
         // Load the models from the cache ...
-        entityTypesCache.all().forEachRemaining((entry)->{
+        entityTypesCache.all().forEachRemaining((entry) -> {
             EntityType type = Identifier.parseEntityType(entry.getKey());
-            updateModel(type,entry.getValue());
+            updateModel(type, entry.getValue());
         });
     }
     
-    private void updateModel( EntityType type, Document representation ) {
+    private void updateModel(EntityType type, Document representation) {
         LearningEntityTypeModel model = new LearningEntityTypeModel(representation);
-        models.put(type,model);
+        models.put(type, model);
     }
     
-    private LearningEntityTypeModel modelFor( EntityType type ) {
+    private LearningEntityTypeModel modelFor(EntityType type) {
         LearningEntityTypeModel model = models.get(type);
-        if ( model == null ) {
+        if (model == null) {
             model = new LearningEntityTypeModel(Document.create());
-            models.put(type,model);
+            models.put(type, model);
         }
         return model;
     }
@@ -91,18 +91,21 @@ public class EntityLearningService implements StreamTask, InitableTask {
         
         // Most messages will be entity changes, so look for that first ...
         if (id instanceof EntityId) {
-            EntityId entityId = (EntityId)id;
+            EntityId entityId = (EntityId) id;
             EntityType type = entityId.type();
             Patch<EntityId> patch = Patch.from(msg);
             LearningEntityTypeModel model = modelFor(type);
             Document entityRepresentation = Message.getAfter(msg);
-            model.update(patch, entityRepresentation, (entityPatch)->{
-                // Send the patch for this entity type into the appropriate output stream ...
+            // Try to update the model with the patch. The function is called when the model's representation changed and
+            // we have to send a schema patch. Note that the schema patch will come back to us via a message with an EntityType
+            // identifier (handled below), in which case we simply overwrite the model. We do this because other changes
+            // might have snuck in, and we want to get all changes to the schema's entity type.
+            model.update(patch, entityRepresentation, (entityTypePatch) -> {
                 DatabaseId dbId = type.databaseId();
                 String dbIdStr = dbId.asString();
-                Document entityUpdateRequest = entityPatch.asDocument();
-                Message.addHeaders(entityUpdateRequest, CLIENT_ID);
-                collector.send(new OutgoingMessageEnvelope(Streams.schemaBatches(dbId), dbIdStr, dbIdStr, entityUpdateRequest));
+                Document entityTypePatchRequest = entityTypePatch.asDocument();
+                Message.addHeaders(entityTypePatchRequest, CLIENT_ID);
+                collector.send(new OutgoingMessageEnvelope(Streams.schemaPatches(dbId), dbIdStr, dbIdStr, entityTypePatchRequest));
             });
         } else if (id instanceof EntityType) {
             // This is a message describing that the entity type has been changed (by someone other than us),
@@ -110,7 +113,7 @@ public class EntityLearningService implements StreamTask, InitableTask {
             EntityType type = (EntityType) id;
             Document representation = Message.getAfter(msg);
             entityTypesCache.put(type.asString(), representation);
-            updateModel(type,representation);
+            updateModel(type, representation);
         }
     }
 }

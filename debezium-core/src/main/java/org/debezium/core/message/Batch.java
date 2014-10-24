@@ -171,7 +171,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     public Iterator<Patch<IdType>> iterator() {
         return Iterators.readOnly(patches.iterator());
     }
-    public int operationCount() {
+    public int patchCount() {
         return patches.size();
     }
     

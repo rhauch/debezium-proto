@@ -5,6 +5,8 @@
  */
 package org.debezium.services;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.samza.system.IncomingMessageEnvelope;
 import org.apache.samza.system.OutgoingMessageEnvelope;
 import org.apache.samza.task.MessageCollector;
@@ -47,9 +49,12 @@ public class EntityBatchService implements StreamTask {
         assert batch.appliesTo(id);
 
         // Fire off a separate request for each patch ...
+        int parts = batch.patchCount();
+        AtomicInteger partCounter = new AtomicInteger(0);
         batch.forEach((patch)->{
             // Construct the response message and fire it off ...
             Document patchRequest = Message.createPatchRequest(batchRequest, patch);
+            Message.setParts(patchRequest,partCounter.incrementAndGet(),parts);
             collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), idStr, patchRequest));
         });
     }

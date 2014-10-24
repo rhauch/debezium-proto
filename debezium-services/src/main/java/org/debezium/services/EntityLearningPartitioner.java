@@ -17,21 +17,26 @@ import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.component.Schema;
-import org.debezium.core.component.SchemaComponentId;
 import org.debezium.core.doc.Document;
-import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
-import org.debezium.core.message.Patch;
 
 /**
  * A service (or task in Samza parlance) responsible for re-partitioning the changes to entities and schemas onto a single
  * topic (partitioned by entity type) that the {@link EntityLearningService} can consume.
  * <p>
- * This service consumes the "{@link Streams#entityUpdates entity-updates}" topic, where each incoming message is a
- * successfully-applied {@link Patch patch} for a single entity. It also consumes the "{@link Streams#schemaUpdates
- * schema-updates}" topic, where each incoming message is a successfully-updated schema (some of which might have originated from
- * this service instance, whereas others originated from {@link Patch patch} for a single entity. <em>Note: the
- * schema updates should be prioritized higher than the entity updates.</em>
+ * This service consumes two streams:
+ * <ol>
+ * <li>The "{@link Streams#entityUpdates entity-updates}" topic (partitioned by entity type) that contains the successfully
+ * applied patch and the updated entity representation; each messages for which {@link Message#isLearningEnabled(Document)
+ * learning is enabled} is simply copied as-is onto the "{@link Streams#schemaLearning schema-learning}" topic (partitioned by
+ * entity type).</li>
+ * <li>The "{@link Streams#schemaUpdates schema-updates}" topic (partitioned by database ID) that contains the successfully
+ * applied patch and updated schema representation; each patch message is disected into a separate read-requests for each entity
+ * type, and placed onto the "{@link Streams#schemaLearning schema-learning}" topic (partitioned by entity type).</li>
+ * </ol>
+ * <p>
+ * <em>Note: to ensure that the schema changes are accepted as quickly as possible, the schema updates should be prioritized
+ * higher than the entity updates.</em>
  * <p>
  * This service forwards these messages on to the "{@link Streams#schemaLearning schema-learning}" topic, partitioned by entity
  * type. Entity updates are forwarded as-is, but each updated schema component is sent separately as a completed patch request.
@@ -54,42 +59,32 @@ public class EntityLearningPartitioner implements StreamTask {
     private void processSchemaUpdate(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator)
             throws Exception {
         DatabaseId dbId = Identifier.parseDatabaseId(env.getKey());
-        Document update = (Document) env.getMessage();
-        if (Message.isFromClient(update, EntityLearningService.CLIENT_ID)) {
-            // This schema change came from the learning service, so we can disregard it ...
-            // TODO: Unless it was a failed attempt, although they won't come through this topic!!
-            return;
+        Document message = (Document) env.getMessage();
+        Document schema = Message.getAfter(message);
+        assert schema != null;
+        
+        if (Schema.isLearningEnabled(schema)) {
+            // Send each entity type within the schema via a separate read message onto the output stream,
+            // partitioned by entity type...
+            Schema.onEachEntityType(schema, dbId, (type, typeDoc) -> {
+                Document typeMessage = Message.createResponseFromRequest(message);
+                Message.setAfter(message, typeDoc);
+                collector.send(new OutgoingMessageEnvelope(Streams.schemaLearning(dbId), type, type, typeMessage));
+            });
         }
-        
-        // Get the complete updated schema representation ...
-        Document schema = Message.getAfter(update);
-        
-        // Process each patch within the batch ...
-        Batch<? extends SchemaComponentId> batch = Batch.from(update);
-        batch.forEach((patch) -> {
-            // Create a new request message for the patch ...
-            Document patchRequest = Message.createPatchRequest(update, patch);
-            
-            // Get the representation of the component from the schema ...
-            SchemaComponentId componentId = patch.target();
-            if (componentId instanceof EntityType) {
-                Document representation = Schema.getOrCreateComponent(componentId, schema);
-                Message.setAfter(patchRequest, representation);
-                
-                // Send the request to the output stream, partitioned by the entity type ...
-                collector.send(new OutgoingMessageEnvelope(Streams.schemaLearning(dbId), componentId, componentId, patchRequest));
-            }
-        });
     }
     
     private void processEntityUpdate(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator)
             throws Exception {
-        EntityId entityId = Identifier.parseEntityId(env.getKey());
-        DatabaseId dbId = entityId.databaseId();
-        EntityType type = entityId.type();
-        
-        // Send the request to the output stream, partitioned by the entity type ...
-        collector.send(new OutgoingMessageEnvelope(Streams.schemaLearning(dbId), type, entityId, env.getMessage()));
+        Document message = (Document) env.getMessage();
+        if (Message.isLearningEnabled(message)) {
+            EntityId entityId = Identifier.parseEntityId(env.getKey());
+            DatabaseId dbId = entityId.databaseId();
+            EntityType type = entityId.type();
+            
+            // Send the patch response to the output stream, partitioned by the entity type ...
+            collector.send(new OutgoingMessageEnvelope(Streams.schemaLearning(dbId), type, entityId, message));
+        }
     }
     
 }

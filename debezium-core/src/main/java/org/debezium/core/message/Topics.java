@@ -11,12 +11,13 @@ package org.debezium.core.message;
  */
 public class Topics {
 
-    public static final String SCHEMA_BATCHES = "schema-batches";
+    public static final String SCHEMA_PATCHES = "schema-batches";
     public static final String SCHEMA_UPDATES = "schema-updates";
     public static final String ENTITY_BATCHES = "entity-batches";
     public static final String ENTITY_PATCHES = "entity-patches";
     public static final String ENTITY_UPDATES = "entity-updates";
-    public static final String RESPONSES = "responses";
+    public static final String PARTIAL_RESPONSES = "partial-responses";
+    public static final String COMPLETE_RESPONSES = "complete-responses";
     
     private Topics() {
     }
