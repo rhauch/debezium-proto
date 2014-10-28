@@ -75,12 +75,17 @@ final class Paths {
         public String segment(int index ) {
             throw new IllegalArgumentException("Invalid segment index: " + index);
         }
+        @Override
+        public Path append(Path relPath) {
+            return relPath;
+        }
     }
     
     static final class SingleSegmentPath implements Path {
         private final Optional<String> segment;
         protected SingleSegmentPath( String segment ) {
-            this.segment = Optional.of(segment);
+            assert segment != null;
+            this.segment = Optional.of(segment);    // wrap because we're always giving it away
         }
         @Override
         public Optional<Path> parent() {
@@ -115,6 +120,19 @@ final class Paths {
         public String segment(int index) {
             if ( index >= size() || index < 0 ) throw new IllegalArgumentException("Invalid segment index: " + index);
             return segment.get();
+        }
+        @Override
+        public Path append(Path relPath) {
+            if ( relPath.isRoot() ) return this;
+            String[] segments = new String[1+relPath.size()];
+            segments[0] = segment.get();
+            if ( relPath.isSingle() ) {
+                segments[1] = relPath.segment(0);
+            } else {
+                MultiSegmentPath other = (MultiSegmentPath)relPath;
+                System.arraycopy(other.segments, 0, segments, 1, other.segments.length);
+            }
+            return new MultiSegmentPath(segments);
         }
     }
 
@@ -163,6 +181,19 @@ final class Paths {
         public String segment(int index) {
             if ( index >= size() || index < 0 ) throw new IllegalArgumentException("Invalid segment index: " + index);
             return segments[index];
+        }
+        @Override
+        public Path append(Path relPath) {
+            if ( relPath.isRoot() ) return this;
+            String[] segments = new String[size()+relPath.size()];
+            System.arraycopy(this.segments, 0, segments, 1, this.segments.length);
+            if ( relPath.isSingle() ) {
+                segments[this.size()] = relPath.segment(0);
+            } else {
+                MultiSegmentPath other = (MultiSegmentPath)relPath;
+                System.arraycopy(other.segments, 0, segments, 1, other.segments.length);
+            }
+            return new MultiSegmentPath(segments);
         }
     }
     

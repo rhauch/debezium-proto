@@ -43,10 +43,12 @@ import org.debezium.core.message.Patch.Operation;
 public class SchemaStorageService implements StreamTask, InitableTask {
     
     private KeyValueStore<String, Document> store;
+    private boolean sendResponseUponUpdate = false;
     
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
+        this.sendResponseUponUpdate = config.getBoolean("task.send.response.with.update", sendResponseUponUpdate);
         this.store = (KeyValueStore<String, Document>) context.getStore("schema-store");
     }
     
@@ -72,7 +74,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 // The entity did not exist ...
                 Message.setStatus(response, Status.DOES_NOT_EXIST);
                 Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
-                sendNonModification(response, dbIdStr, collector);
+                sendResponse(response, dbIdStr, collector);
             }
             // Otherwise it was a creation, so create it ...
             schema = Document.create();
@@ -80,7 +82,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
             // We're reading an existing schema ...
             assert schema != null;
             Message.setAfter(response, schema);
-            sendNonModification(response, dbIdStr, collector);
+            sendResponse(response, dbIdStr, collector);
         }
         
         // Apply the patch ...
@@ -91,13 +93,16 @@ public class SchemaStorageService implements StreamTask, InitableTask {
             
             // Output the result ...
             collector.send(new OutgoingMessageEnvelope(Streams.entityUpdates(dbId), dbIdStr, dbIdStr, response));
+
+            // And (depending upon the config) also send the response to the partial responses stream ...
+            if ( sendResponseUponUpdate ) sendResponse(response,dbIdStr, collector);
         }
         
         // Otherwise the patch failed, so just output it as unchanged ...
-        sendNonModification(response, dbIdStr, collector);
+        sendResponse(response, dbIdStr, collector);
     }
     
-    private void sendNonModification(Document response, String idStr, MessageCollector collector) {
+    private void sendResponse(Document response, String idStr, MessageCollector collector) {
         String clientId = Message.getClient(response);
         collector.send(new OutgoingMessageEnvelope(Streams.partialResponses(), clientId, idStr, response));
     }

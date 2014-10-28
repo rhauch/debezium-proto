@@ -38,15 +38,16 @@ public class ResponseAccumulatorService implements StreamTask, InitableTask {
     
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
-        Document response = (Document) env.getMessage();
         String responseId = (String) env.getKey();
+        Document response = (Document) env.getMessage();
         String clientId = Message.getClient(response);
         if (Message.getParts(response) == 1) {
             // This is the only message in the batch, so forward it on directly ...
             collector.send(new OutgoingMessageEnvelope(Streams.completeResponses(), clientId, responseId, response));
+            return;
         }
         
-        // Otherwise, there are more than 1 part to the batch ...
+        // Otherwise, there is more than 1 part to the batch ...
         String responseKey = clientId + "/" + Message.getRequest(response);
         Document aggregateResponse = cache.get(responseKey);
         boolean done = false;
@@ -59,12 +60,12 @@ public class ResponseAccumulatorService implements StreamTask, InitableTask {
         }
         
         if (done) {
-            // Send the message ...
+            // FIRST send the message ...
             collector.send(new OutgoingMessageEnvelope(Streams.completeResponses(), clientId, responseId, aggregateResponse));
-            // And THEN remove from the cache ...
+            // And only if that is successful THEN remove from the cache ...
             this.cache.delete(responseKey);
         } else {
-            // Update the cache ...
+            // Update the cache with the updated but still incomplete aggregate response ...
             this.cache.put(responseKey, aggregateResponse);
         }
     }

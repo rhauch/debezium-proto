@@ -69,20 +69,6 @@ public class EntityLearningService implements StreamTask, InitableTask {
         });
     }
     
-    private void updateModel(EntityType type, Document representation) {
-        LearningEntityTypeModel model = new LearningEntityTypeModel(representation);
-        models.put(type, model);
-    }
-    
-    private LearningEntityTypeModel modelFor(EntityType type) {
-        LearningEntityTypeModel model = models.get(type);
-        if (model == null) {
-            model = new LearningEntityTypeModel(Document.create());
-            models.put(type, model);
-        }
-        return model;
-    }
-    
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
         String idStr = (String) env.getKey();
@@ -97,10 +83,13 @@ public class EntityLearningService implements StreamTask, InitableTask {
             LearningEntityTypeModel model = modelFor(type);
             Document entityRepresentation = Message.getAfter(msg);
             // Try to update the model with the patch. The function is called when the model's representation changed and
-            // we have to send a schema patch. Note that the schema patch will come back to us via a message with an EntityType
-            // identifier (handled below), in which case we simply overwrite the model. We do this because other changes
-            // might have snuck in, and we want to get all changes to the schema's entity type.
-            model.update(patch, entityRepresentation, (entityTypePatch) -> {
+            // we have to send a schema patch. Note that we keep the (updated) model, but do not update the entityTypesCache and
+            // instead wait until the schema patch comes back to us via a message with an EntityType identifier (handled below),
+            // in which case we simply overwrite the model. We do this because users may have already manually changed the
+            // entity type, but those have to get totally ordered via the stream. IOW, by doing it this way, changes to the
+            // entity type - whether from us or from clients - will be ordered and handled correctly, and we always update
+            // the model and cache based upon those properly ordered changes.
+            model.adapt(patch, entityRepresentation, (entityTypePatch) -> {
                 DatabaseId dbId = type.databaseId();
                 String dbIdStr = dbId.asString();
                 Document entityTypePatchRequest = entityTypePatch.asDocument();
@@ -115,5 +104,21 @@ public class EntityLearningService implements StreamTask, InitableTask {
             entityTypesCache.put(type.asString(), representation);
             updateModel(type, representation);
         }
+    }
+
+    private void updateModel(EntityType type, Document representation) {
+        LearningEntityTypeModel model = new LearningEntityTypeModel(type,representation);
+        models.put(type, model);
+    }
+    
+    private LearningEntityTypeModel modelFor(EntityType type) {
+        LearningEntityTypeModel model = models.get(type);
+        if (model == null) {
+            // We're seeing this entity type for the first time, so it must be new ...
+            Document representation = Document.create();
+            model = new LearningEntityTypeModel(type,representation);
+            models.put(type, model);
+        }
+        return model;
     }
 }

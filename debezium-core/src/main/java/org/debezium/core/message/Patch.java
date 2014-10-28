@@ -379,9 +379,16 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         /**
          * Complete the editing of the identified object.
          * 
-         * @return the return object; never null
+         * @return the patch containing the operations; never null, although the patch may be empty
          */
         P end();
+        
+        /**
+         * Complete the editing of the identified object if and only if there is at least one operation.
+         * 
+         * @return the patch containing the 1+ operations, or null if there are no operations and the patch would be ineffective
+         */
+        Optional<P> endIfChanged();
     }
     
     public static <T extends Identifier> Patch<T> destroy(T target) {
@@ -453,6 +460,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
             @Override
             public Patch<T> end() {
                 return new Patch<T>(id, ops);
+            }
+            
+            @Override
+            public Optional<Patch<T>> endIfChanged() {
+                return ops.isEmpty() ? Optional.empty() : Optional.of(end());
             }
             
             @Override

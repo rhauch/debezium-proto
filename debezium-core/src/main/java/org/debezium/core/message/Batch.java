@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -118,6 +119,15 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
                 patches.add(patchEditor.end());
                 patchEditor = null;
                 return BatchBuilder.this;
+            }
+            @Override
+            public Optional<Builder<T>> endIfChanged() {
+                Optional<Patch<T>> patch = patchEditor.endIfChanged();
+                patch.ifPresent((p)->{
+                    patches.add(p);
+                    patchEditor = null;
+                });
+                return Optional.of(BatchBuilder.this);
             }
 
             @Override

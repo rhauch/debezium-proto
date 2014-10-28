@@ -59,9 +59,19 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
         return new BasicArray(vals);
     }
 
-    static Array create( Value ... values ) {
+    static Array create( Value[] values ) {
         if ( values == null || values.length == 0 ) {
             return create();
+        }
+        return new BasicArray(values);
+    }
+
+    static Array create( Value firstValue, Value secondValue, Value ... additionalValues ) {
+        Value[] values = new Value[additionalValues.length+2];
+        values[0] = Value.create(firstValue);
+        values[1] = Value.create(secondValue);
+        for ( int i=0;i!=additionalValues.length; ++i ) {
+            values[i+2] = Value.create(additionalValues[i]);
         }
         return new BasicArray(values);
     }

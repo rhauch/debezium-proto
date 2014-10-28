@@ -70,4 +70,10 @@ public interface Path extends Iterable<String> {
     Path subpath( int length );
     
     String segment(int index );
+    
+    default Path append( String relPath ) {
+        return append(Path.parse(relPath));
+    }
+    
+    Path append( Path relPath );
 }

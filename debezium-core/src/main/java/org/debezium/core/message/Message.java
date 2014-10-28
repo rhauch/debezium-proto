@@ -33,6 +33,7 @@ public final class Message {
         public static final String PART = "part";
         public static final String PARTS = "parts";
         public static final String BEGUN = "begun";
+        public static final String ENDED = "ended";
         public static final String LEARNING = "learning";
         public static final String PATCHES = "patches";
         public static final String INCLUDE_AFTER = "includeAfter";
@@ -106,6 +107,7 @@ public final class Message {
         complete.setNumber(Field.REQUEST, partialResponse.getLong(Field.REQUEST));
         complete.setString(Field.USER, partialResponse.getString(Field.USER));
         complete.setNumber(Field.PARTS, partialResponse.getInteger(Field.PARTS));
+        complete.setNumber(Field.BEGUN, System.currentTimeMillis());
         Document responses = complete.getOrCreateDocument(Field.RESPONSES);
         Value part = partialResponse.get(Field.PART);
         assert part != null;
@@ -115,28 +117,32 @@ public final class Message {
     }
     
     /**
-     * Add to the aggregate response message from the supplied partial response.
+     * Add the supplied partial response to the given aggregate response message.
      * 
      * @param aggregateResponse the aggregate response document; may not be null
      * @param partialResponse the partial response to be added to the aggregate response; may not be null
      * @return true if the aggregate response is complete and has all of the partial responses, or false otherwise
      */
     public static boolean addToAggregateResponse(Document aggregateResponse, Document partialResponse) {
-        Document complete = Document.create();
         // Set only some of the headers ...
         assert aggregateResponse.getString(Field.CLIENT_ID).equals(partialResponse.getString(Field.CLIENT_ID));
         assert aggregateResponse.getLong(Field.REQUEST) == partialResponse.getLong(Field.REQUEST);
         assert aggregateResponse.getString(Field.USER).equals(partialResponse.getString(Field.USER));
         assert aggregateResponse.getInteger(Field.PARTS) == partialResponse.getInteger(Field.PARTS);
         int parts = aggregateResponse.getInteger(Field.PARTS);
-        Document responses = complete.getDocument(Field.RESPONSES);
+        Document responses = aggregateResponse.getDocument(Field.RESPONSES);
         assert responses != null;
         Value part = partialResponse.get(Field.PART);
         assert part != null;
         assert part.isInteger();
         assert !responses.has(part.convert().asString());
         responses.setDocument(part.convert().asString(), partialResponse);
-        return parts >= responses.size();
+        if ( parts >= responses.size()) {
+            // The aggregate is complete ...
+            aggregateResponse.setNumber(Field.ENDED, System.currentTimeMillis());
+            return true;
+        }
+        return false;
     }
     
     /**
