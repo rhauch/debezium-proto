@@ -122,30 +122,76 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      * @param value the value that should be set at the given path; may be null or a {@link Value#nullValue() null value}
      * @param invalid the function that should be called if the supplied path cannot be resolved
      * @return the {@code value} if successful or the {@link Optional#empty() empty (not present)} optional value if
-     *         the path was invalid and could not be resolved
+     *         the path was invalid and could not be resolved (and {@code invalid} is invoked)
      */
     default Optional<Value> set(Path path, boolean addIntermediaries, Value value, Consumer<Path> invalid) {
-        return find(path, (missingPath, missingIndex) -> {
-            if ((missingIndex + 1) == missingPath.size()) {
-                // This is the last segment ...
-                    return Optional.ofNullable(value);
-                }
-                if (!addIntermediaries) {
-                    // We're not supposed to add any missing intermediaries, so handle this invalid case ...
-                    invalid.accept(missingPath);
-                }
-                // There is at least one segment after the missing segment, and it will tell us which type of value to create ...
-                String nextSegment = missingPath.segment(missingIndex + 1);
+        if (path == null) return Optional.empty();
+        if (path.isRoot()) {
+            // This is an invalid path, since we don't know what to do with the value given just a root path ...
+            invalid.accept(path);
+            return Optional.empty();
+        }
+        if (path.isSingle()) {
+            // Perform a simple set ...
+            set(path.lastSegment().get(), value);
+            return Optional.of(value);
+        }
+        // Otherwise, we need to find the parent that will contain the value ...
+        Path parentPath = path.parent().get();
+        Optional<Value> parent = Optional.empty();
+        if ( !addIntermediaries ) {
+            // Any missing intermediaries is considered invalid ...
+            parent = find(parentPath, (missingPath,missingIndex)->{
+                invalid.accept(missingPath);    // invoke the invalid handler
+                return Optional.empty();
+            },invalid);
+        } else {
+            // Create any missing intermediaries using the segment after the missing segment to determine which
+            // type of intermediate value to add ...
+            parent = find(parentPath, (missingPath,missingIndex)->{
+                String nextSegment = path.segment(missingIndex+1);  // can always find next segment 'path' (not 'parentPath')...
                 if (Path.Segments.isArrayIndex(nextSegment)) {
                     return Optional.of(Value.create(Array.create()));
                 } else {
                     return Optional.of(Value.create(Document.create()));
                 }
-            }, invalid);
+            },invalid);
+        }
+        if ( !parent.isPresent() ) return Optional.empty();
+        String lastSegment = path.lastSegment().get();
+        Value parentValue = parent.get();
+        if ( parentValue.isDocument() ) {
+            parentValue.asDocument().set(lastSegment,value);
+        } else if ( parentValue.isArray() ) {
+            Array array = parentValue.asArray();
+            if (Path.Segments.isAfterLastIndex(lastSegment)) {
+                array.add(value);
+            } else {
+                int index = Path.Segments.asInteger(lastSegment).get();
+                array.setValue(index,value);
+            }
+        } else {
+            // The parent is not a document or array ...
+            invalid.accept(path);
+            return Optional.empty();
+        }
+        return Optional.of(value);
     }
     
     /**
-     * Attempt to find the value at the given path
+     * Attempt to find the value at the given path.
+     * 
+     * @param path the path to find
+     * @return the optional value at this path, which is {@link Optional#isPresent() present} if the value was found at that
+     *         path or is {@link Optional#empty() empty (not present)} if there is no value at the path or if the path was not
+     *         valid
+     */
+    default Optional<Value> find( Path path ) {
+        return find(path, (missingPath,missingIndex)->Optional.empty(), (invalidPath)->{});
+    }
+    
+    /**
+     * Attempt to find the value at the given path, optionally creating missing segments.
      * 
      * @param path the path to find
      * @param missingSegment function called when a segment in the path does not exist, and which should return a new value
@@ -162,23 +208,19 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         if (path.isRoot()) {
             return Optional.of(Value.create(this));
         }
-        if (path.isSingle()) {
-            // Look it up in this document ...
-            return Optional.of(get(path.lastSegment().get()));
-        }
         Value value = Value.create(this);
         int i = 0;
         for (String segment : path) {
-            ++i;
             if (value.isDocument()) {
                 Value existingValue = value.asDocument().get(segment);
-                if (existingValue == null) {
+                if (Value.isNull(existingValue)) {
                     // It does not exist ...
                     Optional<Value> newValue = missingSegment.apply(path, i);
                     if (newValue.isPresent()) {
                         // Add the new value (whatever it is) ...
-                        value = newValue.get();
-                        value.asDocument().set(segment, value);
+                        Document doc = value.asDocument();
+                        doc.set(segment, newValue.get());
+                        value = doc.get(segment);
                     } else {
                         return Optional.empty();
                     }
@@ -228,6 +270,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
                 invalid.accept(path.subpath(i));
                 return Optional.empty();
             }
+            ++i;
         }
         return Optional.of(value);
     }
@@ -511,11 +554,10 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      */
     default Array getOrCreateArray(CharSequence fieldName) {
         Value value = get(fieldName);
-        if (value == null) {
-            value = Value.create(Array.create());
-            set(fieldName, value);
+        if (value == null || value.isNull()) {
+            return setArray(fieldName, (Array) null);
         }
-        return value.isArray() ? value.asArray() : null;
+        return value.asArray();
     }
     
     /**
@@ -538,11 +580,10 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      */
     default Document getOrCreateDocument(CharSequence fieldName) {
         Value value = get(fieldName);
-        if (value == null) {
-            value = Value.create(Document.create());
-            set(fieldName, value);
+        if (value == null || value.isNull()) {
+            return setDocument(fieldName, (Document) null);
         }
-        return value.isDocument() ? value.asDocument() : null;
+        return value.asDocument();
     }
     
     /**
@@ -657,7 +698,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      */
     default Document putAll(Iterable<Field> fields, Predicate<CharSequence> acceptableFieldNames) {
         for (Field field : fields) {
-            if ( acceptableFieldNames.test(field.getName())) {
+            if (acceptableFieldNames.test(field.getName())) {
                 setValue(field.getName(), field.getValue());
             }
         }
@@ -719,7 +760,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
             return this;
         }
         Value wrapped = Value.create(value);
-        set(name, wrapped);
+        setValue(name, wrapped);
         return this;
         
     }
@@ -890,7 +931,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
                                  Document document) {
         if (document == null) document = Document.create();
         setValue(name, Value.create(document));
-        return document;
+        return getDocument(name);
     }
     
     /**
@@ -915,7 +956,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
                            Array array) {
         if (array == null) array = Array.create();
         setValue(name, Value.create(array));
-        return array;
+        return getArray(name);
     }
     
     /**

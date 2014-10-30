@@ -6,6 +6,7 @@
 package org.debezium.core.message;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -74,7 +75,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     
     protected static final class BatchBuilder<T extends Identifier> implements Builder<T> {
         
-        protected List<Patch<T>> patches = new LinkedList<>();
+        protected List<Patch<T>> patches;
         private final PatchEditor editor = new PatchEditor();
         @Override
         public Patch.Editor<Builder<T>> create(T target) {
@@ -94,7 +95,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
         @Override
         public Batch<T> build() {
             try {
-            return new Batch<T>(patches);
+                return new Batch<T>(patches);
             } finally {
                 patches = null;
             }
@@ -174,7 +175,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     
     private final List<Patch<IdType>> patches;
     protected Batch( List<Patch<IdType>> patches ) {
-        this.patches = patches;
+        this.patches = patches != null ? patches : Collections.emptyList();
     }
     
     @Override
@@ -183,6 +184,10 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     }
     public int patchCount() {
         return patches.size();
+    }
+    
+    public Patch<IdType> patch( int index ) {
+        return patches.get(index);
     }
     
     public Stream<Patch<IdType>> stream() {

@@ -42,13 +42,15 @@ import org.debezium.core.message.Patch.Operation;
 @NotThreadSafe
 public class SchemaStorageService implements StreamTask, InitableTask {
     
+    public static final String SEND_RESPONSE_WITH_UDATE = "task.send.response.with.update";
+    
     private KeyValueStore<String, Document> store;
     private boolean sendResponseUponUpdate = false;
     
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
-        this.sendResponseUponUpdate = config.getBoolean("task.send.response.with.update", sendResponseUponUpdate);
+        this.sendResponseUponUpdate = config.getBoolean(SEND_RESPONSE_WITH_UDATE, sendResponseUponUpdate);
         this.store = (KeyValueStore<String, Document>) context.getStore("schema-store");
     }
     
@@ -83,6 +85,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
             assert schema != null;
             Message.setAfter(response, schema);
             sendResponse(response, dbIdStr, collector);
+            return;
         }
         
         // Apply the patch ...
@@ -92,14 +95,14 @@ public class SchemaStorageService implements StreamTask, InitableTask {
             Message.setAfter(response, schema);
             
             // Output the result ...
-            collector.send(new OutgoingMessageEnvelope(Streams.entityUpdates(dbId), dbIdStr, dbIdStr, response));
+            collector.send(new OutgoingMessageEnvelope(Streams.schemaUpdates(dbId), dbIdStr, dbIdStr, response));
 
             // And (depending upon the config) also send the response to the partial responses stream ...
             if ( sendResponseUponUpdate ) sendResponse(response,dbIdStr, collector);
+        } else {
+            // Otherwise the patch failed, so just output it as unchanged ...
+            sendResponse(response, dbIdStr, collector);
         }
-        
-        // Otherwise the patch failed, so just output it as unchanged ...
-        sendResponse(response, dbIdStr, collector);
     }
     
     private void sendResponse(Document response, String idStr, MessageCollector collector) {

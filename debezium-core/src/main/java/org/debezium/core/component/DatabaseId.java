@@ -64,7 +64,7 @@ public final class DatabaseId implements Identifier {
 
     @Override
     public Iterator<Field> fields() {
-        return Iterators.with(Document.field("database",id));
+        return Iterators.with(Document.field(DATABASE_FIELD_NAME,id));
     }
     
     @Override

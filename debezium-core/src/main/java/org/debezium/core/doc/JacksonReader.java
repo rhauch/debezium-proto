@@ -31,6 +31,9 @@ final class JacksonReader implements DocumentReader {
         factory.enable(JsonParser.Feature.ALLOW_COMMENTS);
     }
     
+    private JacksonReader() {
+    }
+    
     @Override
     public Document read(InputStream jsonStream) throws IOException {
         return parse(factory.createParser(jsonStream));
@@ -63,20 +66,32 @@ final class JacksonReader implements DocumentReader {
     
     private Document parse( JsonParser parser ) throws IOException {
         try {
-            return parseDocument(parser);
+            return parseDocument(parser,false);
         } finally {
             parser.close();
         }
     }
-    
-    private Document parseDocument( JsonParser parser ) throws IOException {
+
+    private Document parseDocument( JsonParser parser, boolean nested ) throws IOException {
         // Iterate over the fields in the top-level document ...
         BasicDocument doc = new BasicDocument();
-        while ( parser.nextToken() != JsonToken.END_OBJECT ) {
-            String fieldName = parser.getCurrentName();
-            switch (parser.nextToken()) {
+        JsonToken token = null;
+        if ( !nested ) {
+            // We expect the START_OBJECT token ...
+            token = parser.nextToken();
+            if (!nested && token != JsonToken.START_OBJECT) {
+                throw new IOException("Expected data to start with an Object, but was " + token);
+            }
+        }
+        String fieldName = null;
+        token = parser.nextToken();
+        while ( token != JsonToken.END_OBJECT ) {
+            switch (token) {
+                case FIELD_NAME:
+                    fieldName = parser.getCurrentName();
+                    break;
                 case START_OBJECT:
-                    doc.setDocument(fieldName, parseDocument(parser));
+                    doc.setDocument(fieldName, parseDocument(parser,true));
                     break;
                 case START_ARRAY:
                     doc.setArray(fieldName, parseArray(parser));
@@ -121,14 +136,12 @@ final class JacksonReader implements DocumentReader {
                     break;
                 case NOT_AVAILABLE:
                     throw new JsonParseException("Non-blocking parsers are not supported",parser.getCurrentLocation());
-                case FIELD_NAME:
-                    throw new JsonParseException("Not expecting a FIELD_NAME token",parser.getCurrentLocation());
                 case END_ARRAY:
                     throw new JsonParseException("Not expecting an END_ARRAY token",parser.getCurrentLocation());
                 case END_OBJECT:
                     throw new JsonParseException("Not expecting an END_OBJECT token",parser.getCurrentLocation());
             }
-            
+            token = parser.nextToken();
         }
         return doc;
     }
@@ -139,7 +152,7 @@ final class JacksonReader implements DocumentReader {
         while ( parser.nextToken() != JsonToken.END_ARRAY ) {
             switch (parser.nextToken()) {
                 case START_OBJECT:
-                    array.add(parseDocument(parser));
+                    array.add(parseDocument(parser,true));
                     break;
                 case START_ARRAY:
                     array.add(parseArray(parser));

@@ -204,6 +204,14 @@
                 <artifactId>debezium-services</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!-- Debezium test artifacts -->
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-core</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
 
         </dependencies>
     </dependencyManagement>

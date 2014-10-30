@@ -26,7 +26,7 @@ public final class Message {
         public static final String CLIENT_ID = "clientid";
         public static final String REQUEST = "request";
         public static final String USER = "user";
-        public static final String DATABASE_ID = "dbid";
+        public static final String DATABASE_ID = "db";
         public static final String COLLECTION = "collection";
         public static final String ZONE_ID = "zone";
         public static final String ENTITY = "entity";
@@ -108,11 +108,14 @@ public final class Message {
         complete.setString(Field.USER, partialResponse.getString(Field.USER));
         complete.setNumber(Field.PARTS, partialResponse.getInteger(Field.PARTS));
         complete.setNumber(Field.BEGUN, System.currentTimeMillis());
-        Document responses = complete.getOrCreateDocument(Field.RESPONSES);
+        complete.setNull(Field.ENDED);
+        int parts = complete.getInteger(Field.PARTS);
+        Array responses = complete.setArray(Field.RESPONSES, Array.createWithNulls(parts));
         Value part = partialResponse.get(Field.PART);
         assert part != null;
         assert part.isInteger();
-        responses.setDocument(part.convert().asString(), partialResponse);
+        int index = part.asInteger().intValue() - 1;
+        responses.setDocument(index, partialResponse);
         return complete;
     }
     
@@ -126,18 +129,17 @@ public final class Message {
     public static boolean addToAggregateResponse(Document aggregateResponse, Document partialResponse) {
         // Set only some of the headers ...
         assert aggregateResponse.getString(Field.CLIENT_ID).equals(partialResponse.getString(Field.CLIENT_ID));
-        assert aggregateResponse.getLong(Field.REQUEST) == partialResponse.getLong(Field.REQUEST);
+        assert aggregateResponse.getLong(Field.REQUEST).equals(partialResponse.getLong(Field.REQUEST));
         assert aggregateResponse.getString(Field.USER).equals(partialResponse.getString(Field.USER));
-        assert aggregateResponse.getInteger(Field.PARTS) == partialResponse.getInteger(Field.PARTS);
-        int parts = aggregateResponse.getInteger(Field.PARTS);
-        Document responses = aggregateResponse.getDocument(Field.RESPONSES);
+        assert aggregateResponse.getInteger(Field.PARTS).equals(partialResponse.getInteger(Field.PARTS));
+        Array responses = aggregateResponse.getArray(Field.RESPONSES);
         assert responses != null;
         Value part = partialResponse.get(Field.PART);
         assert part != null;
         assert part.isInteger();
-        assert !responses.has(part.convert().asString());
-        responses.setDocument(part.convert().asString(), partialResponse);
-        if ( parts >= responses.size()) {
+        int index = part.asInteger().intValue() - 1;
+        responses.setDocument(index, partialResponse);
+        if (responses.streamValues().allMatch((value) -> !value.isNull())) {
             // The aggregate is complete ...
             aggregateResponse.setNumber(Field.ENDED, System.currentTimeMillis());
             return true;
@@ -154,25 +156,27 @@ public final class Message {
      * @param function the consumer function that should be called for each partial response document; may not be null
      */
     public static void forEachPartialResponse(Document response, PartialResponseHandler function) {
-        Document responses = response.getDocument(Field.RESPONSES);
+        Array responses = response.getArray(Field.RESPONSES);
         if (responses != null) {
             // It is a partial response ...
-            responses.forEach((field) -> handlePartialResponse(function,field.getValue().asDocument()));
+            responses.streamValues().forEach((value) -> handlePartialResponse(function, value.asDocument()));
         } else {
             // Must not be an aggregate response ...
-            handlePartialResponse(function,response);
+            handlePartialResponse(function, response);
         }
     }
     
-    private static void handlePartialResponse(PartialResponseHandler function, Document partialResponse ) {
-        Identifier id = Identifier.parse(partialResponse);
+    private static void handlePartialResponse(PartialResponseHandler function, Document partialResponse) {
+        Identifier id = getId(partialResponse);
         long request = getRequest(partialResponse);
         assert id != null;
-        function.accept(id,request,partialResponse);
+        int part = getPart(partialResponse);
+        function.accept(id, part, request, partialResponse);
     }
-
+    
     /**
      * A functional interface used to process each partial response in an aggregate response document.
+     * 
      * @see Message#forEachPartialResponse(Document, PartialResponseHandler)
      * @author Randall Hauch
      */
@@ -180,11 +184,13 @@ public final class Message {
     public static interface PartialResponseHandler {
         /**
          * Accept the partial response document with the given identifier, request number, and partial response document.
+         * 
          * @param id the target identifier of the partial response; never null
+         * @param partialNumber the 1-based number signifying which partial in the aggregate is provided
          * @param request the client-specific request number of the aggregate request
          * @param response the partial response document; never null
          */
-        void accept( Identifier id, long request, Document response );
+        void accept(Identifier id, int partialNumber, long request, Document response);
     }
     
     /**
@@ -195,10 +201,28 @@ public final class Message {
      * @param patch the patch; may not be null
      * @return the incomplete response document; never null
      */
-    public static Document createPatchRequest(Document batchRequest, Patch<?> patch) {
+    public static Document createPatchRequest(Document batchRequest, Patch<? extends Identifier> patch) {
         Document patchRequest = patch.asDocument();
-        Message.copyHeaders(batchRequest, patchRequest);
+        copyHeaders(batchRequest, patchRequest);
+        addId(batchRequest, patch.target());
         return patchRequest;
+    }
+    
+    public static Identifier getId(Document doc) {
+        if (doc == null) return null;
+        String databaseId = doc.getString(Field.DATABASE_ID);
+        if (databaseId == null) return null;
+        String entityType = doc.getString(Field.COLLECTION);
+        if (entityType == null) return Identifier.of(databaseId);
+        String zoneId = doc.getString(Field.ZONE_ID);
+        if (zoneId == null) return Identifier.of(databaseId, entityType);
+        String id = doc.getString(Field.ENTITY);
+        if (id == null) return Identifier.zone(databaseId, entityType, zoneId);
+        return Identifier.of(databaseId, entityType, id, zoneId);
+    }
+    
+    public static void addId(Document doc, Identifier id) {
+        id.fields().forEachRemaining((field) -> doc.set(field.getName(), field.getValue()));
     }
     
     public static void addHeaders(Document doc, String clientId) {
@@ -307,6 +331,10 @@ public final class Message {
     
     public static int getParts(Document message) {
         return message.getInteger(Field.PARTS, 1);
+    }
+    
+    public static int getPart(Document message) {
+        return message.getInteger(Field.PART, 1);
     }
     
     public static void setParts(Document message, int part, int parts) {

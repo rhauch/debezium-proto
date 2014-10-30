@@ -85,8 +85,8 @@ public final class EntityType implements SchemaComponentId {
     
     @Override
     public Iterator<Field> fields() {
-        return Iterators.with(Document.field("database", db.asString()),
-                              Document.field("entityType", entityTypeName));
+        return Iterators.with(Document.field(DATABASE_FIELD_NAME, db.asString()),
+                              Document.field(ENTITY_TYPE_FIELD_NAME, entityTypeName));
     }
     
     @Override

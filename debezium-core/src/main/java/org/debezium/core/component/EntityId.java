@@ -89,10 +89,10 @@ public final class EntityId implements Identifier {
     
     @Override
     public Iterator<Field> fields() {
-        return Iterators.with(Document.field("database", zoneId.type().databaseId().asString()),
-                              Document.field("entityType", zoneId.type().entityTypeName()),
-                              Document.field("zone", zoneId.zoneId()),
-                              Document.field("id", id));
+        return Iterators.with(Document.field(DATABASE_FIELD_NAME, zoneId.type().databaseId().asString()),
+                              Document.field(ENTITY_TYPE_FIELD_NAME, zoneId.type().entityTypeName()),
+                              Document.field(ZONE_FIELD_NAME, zoneId.zoneId()),
+                              Document.field(ENTITY_FIELD_NAME, id));
     }
     
     @Override

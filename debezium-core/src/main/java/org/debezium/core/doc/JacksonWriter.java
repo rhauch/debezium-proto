@@ -14,6 +14,7 @@ import java.io.Writer;
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 
 /**
  * @author Randall Hauch
@@ -21,48 +22,69 @@ import com.fasterxml.jackson.core.JsonGenerator;
  */
 final class JacksonWriter implements DocumentWriter {
     
-    public static final JacksonWriter INSTANCE = new JacksonWriter();
+    public static final JacksonWriter INSTANCE = new JacksonWriter(false);
+    public static final JacksonWriter PRETTY_WRITER = new JacksonWriter(true);
     
     private static final JsonFactory factory;
     
     static {
         factory = new JsonFactory();
-        // factory.enable(JsonGenerator.Feature.ALLOW_COMMENTS);
+    }
+
+    private final boolean pretty;
+    private JacksonWriter( boolean pretty ) {
+        this.pretty = pretty;
     }
     
     @Override
     public void write(Document document, OutputStream jsonStream) throws IOException {
-        writeDocument(document, factory.createGenerator(jsonStream));
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(jsonStream) ) {
+            configure(jsonGenerator);
+            writeDocument(document, jsonGenerator);
+        }
     }
     
     @Override
     public void write(Document document, Writer jsonWriter) throws IOException {
-        writeDocument(document, factory.createGenerator(jsonWriter));
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(jsonWriter) ) {
+            configure(jsonGenerator);
+            writeDocument(document, jsonGenerator);
+        }
     }
     
     @Override
     public String write(Document document) throws IOException {
         StringWriter writer = new StringWriter();
-        writeDocument(document, factory.createGenerator(writer));
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(writer) ) {
+            configure(jsonGenerator);
+            writeDocument(document,jsonGenerator);
+        }
         return writer.getBuffer().toString();
     }
     
     @Override
     public byte[] writeAsBytes(Document document) {
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
-            writeDocument(document, factory.createGenerator(stream, JsonEncoding.UTF8));
+            try (JsonGenerator jsonGenerator = factory.createGenerator(stream, JsonEncoding.UTF8)) {
+                configure(jsonGenerator);
+                writeDocument(document, jsonGenerator);
+            }
             return stream.toByteArray();
         } catch (IOException e ) {
             throw new RuntimeException(e);
         }
     }
     
-    protected static void writeDocument(Document document, JsonGenerator generator) throws IOException {
+    protected void configure( JsonGenerator generator ) {
+        if ( pretty ) generator.setPrettyPrinter(new DefaultPrettyPrinter());
+    }
+    
+    protected void writeDocument(Document document, JsonGenerator generator) throws IOException {
         generator.writeStartObject();
         try {
             document.stream().forEach((field) -> {
                 try {
-                    generator.writeFieldName(field.toString());
+                    generator.writeFieldName(field.getName().toString());
                     writeValue(field.getValue(), generator);
                 } catch (IOException e) {
                     throw new WritingError(e);
@@ -71,12 +93,10 @@ final class JacksonWriter implements DocumentWriter {
             generator.writeEndObject();
         } catch (WritingError e) {
             throw e.wrapped();
-        } finally {
-            generator.close();
         }
     }
     
-    protected static void writeArray(Array array, JsonGenerator generator) throws IOException {
+    protected void writeArray(Array array, JsonGenerator generator) throws IOException {
         generator.writeStartArray();
         try {
             array.streamValues().forEach((value) -> {
@@ -92,7 +112,7 @@ final class JacksonWriter implements DocumentWriter {
         }
     }
     
-    protected static void writeValue(Value value, JsonGenerator generator) throws IOException {
+    protected void writeValue(Value value, JsonGenerator generator) throws IOException {
         switch (value.getType()) {
             case NULL:
                 generator.writeNull();
@@ -110,13 +130,13 @@ final class JacksonWriter implements DocumentWriter {
                 generator.writeNumber(value.asInteger());
                 break;
             case LONG:
-                generator.writeNumber(value.asInteger());
+                generator.writeNumber(value.asLong());
                 break;
             case FLOAT:
-                generator.writeNumber(value.asInteger());
+                generator.writeNumber(value.asFloat());
                 break;
             case DOUBLE:
-                generator.writeNumber(value.asInteger());
+                generator.writeNumber(value.asDouble());
                 break;
             case BIG_INTEGER:
                 generator.writeNumber(value.asBigInteger());
@@ -126,8 +146,10 @@ final class JacksonWriter implements DocumentWriter {
                 break;
             case DOCUMENT:
                 writeDocument(value.asDocument(), generator);
+                break;
             case ARRAY:
                 writeArray(value.asArray(), generator);
+                break;
         }
     }
     

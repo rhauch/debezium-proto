@@ -9,8 +9,8 @@ import java.util.Iterator;
 import java.util.StringJoiner;
 import java.util.UUID;
 
-import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Document.Field;
+import org.debezium.core.message.Message;
 import org.debezium.core.util.Stringifiable;
 
 
@@ -19,6 +19,11 @@ import org.debezium.core.util.Stringifiable;
  * @author Randall Hauch
  */
 public interface Identifier extends Stringifiable, Comparable<Identifier> {
+    
+    public static final String DATABASE_FIELD_NAME = Message.Field.DATABASE_ID;
+    public static final String ENTITY_TYPE_FIELD_NAME = Message.Field.COLLECTION;
+    public static final String ZONE_FIELD_NAME = Message.Field.ZONE_ID;
+    public static final String ENTITY_FIELD_NAME = Message.Field.ENTITY;
     
     public static final String DEFAULT_ZONE = "default";
     
@@ -55,7 +60,11 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
     }
     
     static EntityId of( EntityType entityType, CharSequence entityId, CharSequence zoneId ) {
-        return new EntityId(new ZoneId( entityType, zoneId.toString()),entityId.toString());
+        return of(new ZoneId( entityType, zoneId.toString()),entityId);
+    }
+    
+    static EntityId of( ZoneId zone, CharSequence entityId ) {
+        return new EntityId(zone,entityId.toString());
     }
     
     static EntityId newEntity( CharSequence database, CharSequence entityType ) {
@@ -74,6 +83,18 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
         return new EntityId(new ZoneId( entityType, zoneId.toString()),UUID.randomUUID().toString());
     }
 
+    static ZoneId zone( CharSequence database, CharSequence entityType, CharSequence zoneId ) {
+        return new ZoneId( of(database, entityType), zoneId.toString());
+    }
+    
+    static ZoneId zone( DatabaseId database, CharSequence entityType, CharSequence zoneId ) {
+        return new ZoneId( of(database, entityType), zoneId.toString());
+    }
+    
+    static ZoneId zone( EntityType entityType, CharSequence zoneId ) {
+        return new ZoneId( entityType, zoneId.toString());
+    }
+    
     default String asString() {
         StringJoiner joiner = new StringJoiner("/");
         asString(joiner);
@@ -132,19 +153,6 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
         return of(parts[0],parts[1],parts[3],parts[2]);
     }
     
-    static Identifier parse( Document doc ) {
-        if ( doc == null ) return null;
-        String databaseId = doc.getString("database");
-        if ( databaseId == null ) return null;
-        String entityType = doc.getString("entityType");
-        if ( entityType == null ) return of(databaseId);
-        String zoneId = doc.getString("zoneId");
-        if ( zoneId == null ) return of(databaseId,entityType);
-        String id = doc.getString("id");
-        if ( id == null ) return new ZoneId(of(databaseId,entityType),zoneId);
-        return of(databaseId,entityType,id,zoneId);
-    }
-
     Iterator<Field> fields();
     
     default boolean isIn( Identifier id ) {

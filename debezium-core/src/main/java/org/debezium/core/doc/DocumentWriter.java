@@ -20,6 +20,10 @@ public interface DocumentWriter {
         return JacksonWriter.INSTANCE;
     }
     
+    static DocumentWriter prettyWriter() {
+        return JacksonWriter.PRETTY_WRITER;
+    }
+    
     default byte[] writeAsBytes( Document document ) {
         try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
             write(document, stream);

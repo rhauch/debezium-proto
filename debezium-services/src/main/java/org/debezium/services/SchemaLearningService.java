@@ -32,7 +32,7 @@ import org.debezium.services.learn.LearningEntityTypeModel;
  * A service (or task in Samza parlance) responsible for monitoring incoming changes to entities and updating the schemas.
  * <p>
  * This service consumes the "{@link Streams#schemaLearning schema-learning}" topic, which is partitioned by entity type by the
- * {@link EntityLearningPartitioner} service. Each incoming message is one of two types:
+ * {@link SchemaLearningPartitioner} service. Each incoming message is one of two types:
  * <ol>
  * <li>A completed patch on a single entity type, containing the entity type representation in the "{@link Field#AFTER after}"
  * field; or</li>
@@ -51,9 +51,9 @@ import org.debezium.services.learn.LearningEntityTypeModel;
  *
  */
 @NotThreadSafe
-public class EntityLearningService implements StreamTask, InitableTask {
+public class SchemaLearningService implements StreamTask, InitableTask {
     
-    public static final String CLIENT_ID = EntityLearningService.class.getSimpleName();
+    public static final String CLIENT_ID = SchemaLearningService.class.getSimpleName();
     
     private KeyValueStore<String, Document> entityTypesCache;
     private Map<EntityType, LearningEntityTypeModel> models = new HashMap<>();

@@ -6,8 +6,8 @@
 package org.debezium.core.doc;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -27,7 +27,7 @@ final class BasicDocument implements Document {
         }
     };
 
-    private final Map<CharSequence, Value> fields = new HashMap<>();
+    private final Map<CharSequence, Value> fields = new LinkedHashMap<>();
 
     BasicDocument() {
     }
@@ -98,7 +98,7 @@ final class BasicDocument implements Document {
 
     @Override
     public Document putAll(Iterable<Field> object) {
-        for (Field field : this) {
+        for (Field field : object) {
             Value value = field.getValue().clone();
             this.setValue(field.getName(), value);
         }
@@ -150,7 +150,7 @@ final class BasicDocument implements Document {
     @Override
     public String toString() {
         try {
-            return DocumentWriter.defaultWriter().write(this);
+            return DocumentWriter.prettyWriter().write(this);
         } catch ( IOException e ) {
             throw new RuntimeException(e);
         }

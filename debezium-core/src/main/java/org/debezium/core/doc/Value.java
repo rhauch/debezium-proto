@@ -17,6 +17,10 @@ public interface Value extends Comparable<Value> {
     static enum Type {
         NULL, STRING, BOOLEAN, BINARY, INTEGER, LONG, FLOAT, DOUBLE, BIG_INTEGER, DECIMAL, DOCUMENT, ARRAY;
     }
+    
+    static boolean isNull( Value value ) {
+        return value == null || value.isNull();
+    }
 
     static boolean isValid(Object value) {
         return value == null || value instanceof Value ||

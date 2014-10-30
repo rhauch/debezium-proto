@@ -530,7 +530,29 @@ public class Schema {
      * @return the field editor; never null
      */
     public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField) {
-        return new BasicFieldEditor(patch, pathToField);
+        return new BasicFieldEditor(patch, pathToField, false);
+    }
+    
+    /**
+     * Obtain an editor that will create a new field definition with the given name.
+     * 
+     * @param patch the patch editor for modifying the entity type representation; may not be null
+     * @param fieldName the name of the field; may not be null
+     * @return the field editor; never null
+     */
+    public static FieldEditor createField(Editor<Patch<EntityType>> patch, String fieldName) {
+        return createField(patch, Path.parse(fieldName));
+    }
+    
+    /**
+     * Obtain an editor that will create a new field definition with the given name.
+     * 
+     * @param patch the patch editor for modifying the entity type representation; may not be null
+     * @param pathToField the path to the field definition within the entity type representation; may not be null
+     * @return the field editor; never null
+     */
+    public static FieldEditor createField(Editor<Patch<EntityType>> patch, Path pathToField) {
+        return new BasicFieldEditor(patch, pathToField, true);
     }
     
     protected static class BasicFieldViewer implements FieldViewer {
@@ -635,52 +657,56 @@ public class Schema {
     protected static class BasicFieldEditor implements FieldEditor {
         private final Patch.Editor<?> patch;
         private final Path pathPrefix;
+        private final boolean isNew;
         
-        protected BasicFieldEditor(Patch.Editor<?> patch, Path pathPrefix) {
+        protected BasicFieldEditor(Patch.Editor<?> patch, Path pathPrefix, boolean isNew) {
             this.patch = patch;
-            this.pathPrefix = pathPrefix != null ? Path.root() : pathPrefix;
+            this.pathPrefix = pathPrefix == null ? Path.root() : pathPrefix;
+            this.isNew = isNew;
         }
         
         @Override
         public FieldEditor type(FieldType type) {
             patch.replace(pathFor("type"), Value.create(type.toString()));
-            // None of these changes the array constraints, since that's orthogonal to the type ...
-            switch (type) {
-                case STRING:
-                    // Remove all but the string constraints ...
-                    numberConstraints().clear();
-                    locationConstraints().clear();
-                    break;
-                case UUID:
-                case BOOLEAN:
-                    // Remove all constraints ...
-                    stringConstraints().clear();
-                    numberConstraints().clear();
-                    locationConstraints().clear();
-                    break;
-                case DECIMAL:
-                case DOUBLE:
-                case FLOAT:
-                case INTEGER:
-                case LONG:
-                case BIG_INTEGER:
-                case NUMBER:
-                case TIMESTAMP:
-                    // Remove all but the number constraints ...
-                    stringConstraints().clear();
-                    locationConstraints().clear();
-                    break;
-                case LOCATION:
-                    // Remove all but the location constraints ...
-                    stringConstraints().clear();
-                    numberConstraints().clear();
-                    break;
-                case BINARY:
-                    // Remove all constraints ...
-                    stringConstraints().clear();
-                    numberConstraints().clear();
-                    locationConstraints().clear();
-                    break;
+            if ( !isNew ) {
+                // None of these changes the array constraints, since that's orthogonal to the type ...
+                switch (type) {
+                    case STRING:
+                        // Remove all but the string constraints ...
+                        numberConstraints().clear();
+                        locationConstraints().clear();
+                        break;
+                    case UUID:
+                    case BOOLEAN:
+                        // Remove all constraints ...
+                        stringConstraints().clear();
+                        numberConstraints().clear();
+                        locationConstraints().clear();
+                        break;
+                    case DECIMAL:
+                    case DOUBLE:
+                    case FLOAT:
+                    case INTEGER:
+                    case LONG:
+                    case BIG_INTEGER:
+                    case NUMBER:
+                    case TIMESTAMP:
+                        // Remove all but the number constraints ...
+                        stringConstraints().clear();
+                        locationConstraints().clear();
+                        break;
+                    case LOCATION:
+                        // Remove all but the location constraints ...
+                        stringConstraints().clear();
+                        numberConstraints().clear();
+                        break;
+                    case BINARY:
+                        // Remove all constraints ...
+                        stringConstraints().clear();
+                        numberConstraints().clear();
+                        locationConstraints().clear();
+                        break;
+                }
             }
             return this;
         }
@@ -857,7 +883,7 @@ public class Schema {
         }
         
         private String pathFor(String relPath) {
-            return pathPrefix.append("description").toString();
+            return pathPrefix.append(relPath).toString();
         }
     }
     

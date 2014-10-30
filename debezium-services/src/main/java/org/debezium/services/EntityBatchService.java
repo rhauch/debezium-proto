@@ -15,7 +15,6 @@ import org.apache.samza.task.TaskCoordinator;
 import org.debezium.core.annotation.NotThreadSafe;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
-import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
@@ -25,8 +24,8 @@ import org.debezium.core.message.Patch;
  * A service (or task in Samza parlance) to extract all of the {@link Patch patches} from a {@link Batch batch} request
  * and forward each patch as a separate request in the output stream.
  * <p>
- * This service consumes the "{@link Streams#entityBatches entity-batches}" topic, where each incoming message is a
- * {@link Batch batch} containing one or more {@link Patch patches} on entities in the same database.
+ * This service consumes the "{@link Streams#entityBatches entity-batches}" topic, where each incoming message is a {@link Batch
+ * batch} containing one or more {@link Patch patches} on entities in the same database.
  * <p>
  * This service produces a message for each patch on the "{@link Streams#entityPatches entity-patches}" topic.
  * <p>
@@ -39,23 +38,28 @@ public class EntityBatchService implements StreamTask {
     
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
-        String idStr = (String) env.getKey();
-        EntityId id = Identifier.parseEntityId(idStr);
-        DatabaseId dbId = id.databaseId();
+        // The key is a random request number ...
         Document batchRequest = (Document) env.getMessage();
         
         // Construct the batch from the request ...
         Batch<EntityId> batch = Batch.from(batchRequest);
-        assert batch.appliesTo(id);
-
+        
         // Fire off a separate request for each patch ...
         int parts = batch.patchCount();
         AtomicInteger partCounter = new AtomicInteger(0);
-        batch.forEach((patch)->{
+        batch.forEach((patch) -> {
             // Construct the response message and fire it off ...
             Document patchRequest = Message.createPatchRequest(batchRequest, patch);
-            Message.setParts(patchRequest,partCounter.incrementAndGet(),parts);
-            collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), idStr, patchRequest));
+            
+            // Set the headers and the request parts ...
+            Message.copyHeaders(batchRequest, patchRequest);
+            Message.setParts(patchRequest, partCounter.incrementAndGet(), parts);
+            
+            // Send the message for this patch ...
+            EntityId entityId = patch.target();
+            DatabaseId dbId = entityId.databaseId();
+            String msgId = entityId.asString();
+            collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), msgId, patchRequest));
         });
     }
 }

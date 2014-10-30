@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 
 import org.debezium.core.util.Iterators;
 import org.debezium.core.util.Joiner;
+import org.debezium.core.util.Strings;
 
 /**
  * @author Randall Hauch
@@ -20,8 +21,10 @@ import org.debezium.core.util.Joiner;
 final class Paths {
     
     static Path parse( String path, boolean resolveJsonPointerEscapes ) {
+        // Remove leading and trailing whitespace and '/' characters ...
+        path = Strings.trim(path,(c)->c < ' ' || c == '/');
+        if ( path.length() == 0 ) return RootPath.INSTANCE;
         String[] segments = path.split("/");
-        if (segments.length == 0 ) return RootPath.INSTANCE;
         if (segments.length == 1 ) return new SingleSegmentPath(parseSegment(segments[0],resolveJsonPointerEscapes));
         if ( resolveJsonPointerEscapes ) {
             for ( int i=0; i!=segments.length; ++i ) segments[i] = parseSegment(segments[i],true);
@@ -38,9 +41,9 @@ final class Paths {
 
     static final class RootPath implements Path {
         
+        public static final Path INSTANCE = new RootPath();
         public static final Optional<Path> OPTIONAL_OF_ROOT = Optional.of(RootPath.INSTANCE);
         
-        public static final Path INSTANCE = new RootPath();
         private RootPath() {
         }
         @Override

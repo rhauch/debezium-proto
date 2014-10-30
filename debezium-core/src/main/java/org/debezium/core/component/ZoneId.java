@@ -91,9 +91,9 @@ public final class ZoneId implements Identifier {
     
     @Override
     public Iterator<Field> fields() {
-        return Iterators.with(Document.field("database", type.databaseId().asString()),
-                              Document.field("entityType", type.entityTypeName()),
-                              Document.field("zone", zoneId));
+        return Iterators.with(Document.field(DATABASE_FIELD_NAME, type.databaseId().asString()),
+                              Document.field(ENTITY_TYPE_FIELD_NAME, type.entityTypeName()),
+                              Document.field(ZONE_FIELD_NAME, zoneId));
     }
     
     @Override

@@ -22,7 +22,7 @@ import org.debezium.core.message.Message;
 
 /**
  * A service (or task in Samza parlance) responsible for re-partitioning the changes to entities and schemas onto a single
- * topic (partitioned by entity type) that the {@link EntityLearningService} can consume.
+ * topic (partitioned by entity type) that the {@link SchemaLearningService} can consume.
  * <p>
  * This service consumes two streams:
  * <ol>
@@ -44,7 +44,7 @@ import org.debezium.core.message.Message;
  * @author Randall Hauch
  */
 @NotThreadSafe
-public class EntityLearningPartitioner implements StreamTask {
+public class SchemaLearningPartitioner implements StreamTask {
     
     @Override
     public void process(IncomingMessageEnvelope envelope, MessageCollector collector, TaskCoordinator coordinator) throws Exception {

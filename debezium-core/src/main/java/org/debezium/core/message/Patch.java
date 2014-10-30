@@ -8,6 +8,7 @@ package org.debezium.core.message;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -406,14 +407,13 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     /**
      * Create an editor for the target with the given identifier. The resulting editor will create the {@link Patch} when {@link Editor#end()} is called.
      * 
-     * @param target the identifier of the target
+     * @param id the identifier of the target
      * @return the editor that can create the patch; never null
      * @param <T> the type of identifier (or target) that should be edit
      */
-    public static <T extends Identifier> Editor<Patch<T>> edit(T target) {
+    public static <T extends Identifier> Editor<Patch<T>> edit(T id) {
         return new Editor<Patch<T>>() {
-            private T id;
-            private List<Operation> ops;
+            private List<Operation> ops = new LinkedList<>();
             
             @Override
             public Editor<Patch<T>> add(String path, Value value) {
@@ -650,8 +650,7 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         
         @Override
         public Boolean apply(Document doc, Consumer<Path> invalid) {
-            Path path = Path.parse(this.path);
-            return doc.set(path, true, value(), invalid).isPresent();
+            return doc.set(Path.parse(this.path), true, value(), invalid).isPresent();
         }
     }
     
@@ -856,7 +855,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     public boolean isCreation() {
         if (ops.size() != 1) return false;
         return ops.stream().anyMatch((operation) -> {
-            return operation instanceof Add && ((Add) operation).path().equals("/");
+            if ( operation instanceof Add ) {
+                Add add = (Add)operation;
+                return add.path().equals("/") && add.value().isDocument();
+            }
+            return false;
         });
     }
     
@@ -899,7 +902,7 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <IdType extends Identifier> Patch<IdType> from(Document doc) {
-        Identifier id = Identifier.parse(doc);
+        Identifier id = Message.getId(doc);
         if (id == null) return null;
         Array ops = doc.getArray("ops");
         List<Operation> operations = new ArrayList<>(ops.size());
@@ -940,6 +943,15 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
      * @return true if any of the operations modified the document, or false if the document is unchanged
      */
     public boolean apply(Document document, Consumer<Operation> failed ) {
+        if ( isEmpty() ) return false;
+        if ( isCreation() ) {
+            document.putAll(((Add)ops.get(0)).value().asDocument());
+            Message.addId(document, id);
+            return true;
+        }
+        if ( isDeletion() ) {
+            return false;
+        }
         AtomicBoolean modified = new AtomicBoolean(false);
         ops.stream().forEach((op) -> {
             if ( op.apply(document,(invalidPath)->failed.accept(op)) ) {

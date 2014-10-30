@@ -48,6 +48,14 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
         return new BasicArray();
     }
     
+    static Array createWithNulls( int number ) {
+        Value[] vals = new Value[number];
+        for ( int i=0; i!=number; ++i ) {
+            vals[i] = Value.nullValue();
+        }
+        return new BasicArray(vals);
+    }
+    
     static Array create( Object ... values ) {
         if ( values == null || values.length == 0 ) {
             return create();
