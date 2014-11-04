@@ -39,6 +39,11 @@
             <classifier>test</classifier>
         </dependency>
         <dependency>
+            <groupId>org.debezium</groupId>
+            <artifactId>debezium-core</artifactId>
+            <type>test-jar</type>
+        </dependency>
+        <dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-test</artifactId>
         </dependency>

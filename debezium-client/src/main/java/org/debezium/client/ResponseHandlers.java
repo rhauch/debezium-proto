@@ -41,6 +41,10 @@ import org.debezium.core.doc.Value;
  */
 final class ResponseHandlers extends Service {
     
+    public static int DEFAULT_PARTITION_COUNT = 10;
+    public static int DEFAULT_MAX_BACKLOG = 10;
+    public static int DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS = 300;
+    
     public static Handlers with(Consumer<Document> successHandler, Callable completionHandler,
                                 BiConsumer<Outcome.Status, String> failureHandler) {
         return new Handlers(successHandler, completionHandler, failureHandler);
@@ -135,7 +139,9 @@ final class ResponseHandlers extends Service {
                     while (run.get()) {
                         try {
                             Document doc = queue.poll(1, TimeUnit.SECONDS);
-                            if (doc != null) consumer.accept(doc);
+                            if (doc != null) {
+                                consumer.accept(doc);
+                            }
                         } catch (InterruptedException e) {
                             Thread.interrupted(); // clear the flag for this thread ...
                             break;
@@ -168,17 +174,19 @@ final class ResponseHandlers extends Service {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private volatile long maxRegistrationAgeInSeconds;
     
-    ResponseHandlers(Supplier<RequestId> requestIdSupplier) {
+    ResponseHandlers() {
         this.requestIdSupplier = requestIdSupplier;
     }
     
     @Override
     protected void onStart(DbzNode node) {
         this.clientId = node.id();
+        this.requestIdSupplier = () -> RequestId.create(clientId);
         // Create the partitions ...
-        int numPartitions = node.getConfig("response.partitions", Value.create(10)).convert().asInteger();
-        int maxBacklog = node.getConfig("response.max.backlog", Value.create(10)).convert().asInteger();
-        maxRegistrationAgeInSeconds = node.getConfig("response.max.registration.age.seconds", Value.create(300)).convert().asLong();
+        int numPartitions = node.getConfig("response.partitions", Value.create(DEFAULT_PARTITION_COUNT)).convert().asInteger();
+        int maxBacklog = node.getConfig("response.max.backlog", Value.create(DEFAULT_MAX_BACKLOG)).convert().asInteger();
+        maxRegistrationAgeInSeconds = node.getConfig("response.max.registration.age.seconds",
+                                                     Value.create(DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS)).convert().asLong();
         threads = new CountDownLatch(numPartitions);
         IntStream.range(0, numPartitions).forEach(i -> {
             partitions.add(new Partition(maxBacklog, this::processResponse, this::partitionStopped));
@@ -249,26 +257,29 @@ final class ResponseHandlers extends Service {
                                         BiConsumer<Outcome.Status, String> failureHandler) {
         return register(context, parts, with(successHandler, completionHandler, failureHandler));
     }
-
+    
     /**
      * Submit a request and wait for the response.
+     * 
      * @param context the context in which the handler operates; may not be null
-     * @param parts the number of responses expected in the request; must be positive
      * @param timeout the number of seconds to wait for the response; must be positive
      * @param unit the time unit to wait for the response; may not be null
      * @param submitter the function that submits the request using the supplied request ID; may not be null
-     * @param successHandler the function to be called upon success of each part of the request and which produces the result; may be null
+     * @param successHandler the function to be called upon success of each part of the request and which produces the result; may
+     *            be null
      * @param failureHandler the function to be called upon failure of the request; may be null
      * @return the result of the {@code successHandler} function, or not present if the {@code failureHandler} was called
      */
-    public <R> Optional<R> requestAndWait(ExecutionContext context, int parts, long timeout, TimeUnit unit, Consumer<RequestId> submitter,
+    public <R> Optional<R> requestAndWait(ExecutionContext context, long timeout, TimeUnit unit, Consumer<RequestId> submitter,
                                           Function<Document, R> successHandler, BiConsumer<Outcome.Status, String> failureHandler) {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<R> result = new AtomicReference<>();
-        Consumer<Document> success = (doc) -> result.set(successHandler.apply(doc));
-        RequestId requestId = register(context, parts, with(success, latch::countDown, failureHandler)).orElseThrow(DebeziumClientException::new);
-        submitter.accept(requestId);
+        RequestId requestId = register(context, 1, with(doc -> result.set(successHandler.apply(doc)),
+                                                        latch::countDown,
+                                                        failureHandler)).orElseThrow(DebeziumClientException::new);
+        // At this point, the handlers are registered, so any/all failures must be sent to the `failureHandler` ...
         try {
+            submitter.accept(requestId);
             if (latch.await(timeout, unit)) {
                 return Optional.ofNullable(result.get());
             }
@@ -276,6 +287,8 @@ final class ResponseHandlers extends Service {
         } catch (InterruptedException e) {
             Thread.interrupted();
             failureHandler.accept(Outcome.Status.TIMEOUT, "Interrupted while waiting for results");
+        } catch (RuntimeException e ) {
+            failureHandler.accept(Outcome.Status.COMMUNICATION_ERROR, e.getMessage());
         }
         return Optional.empty();
     }
@@ -374,5 +387,9 @@ final class ResponseHandlers extends Service {
         } finally {
             lock.writeLock().unlock();
         }
+    }
+    
+    protected boolean isEmpty() {
+        return threads.getCount() == 0;
     }
 }

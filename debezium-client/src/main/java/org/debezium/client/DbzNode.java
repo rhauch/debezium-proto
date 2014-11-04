@@ -120,7 +120,7 @@ final class DbzNode {
             try {
                 this.startLock.writeLock().lock();
                 if (this.node.get() == null) {
-                    onStart(this.node.get());
+                    onStart(node);
                     this.node.set(node); // do this *after* calling 'onStart', in case the call fails
                 }
             } finally {
@@ -164,12 +164,11 @@ final class DbzNode {
          * Begin to shut down the service.
          */
         public final void beginShutdown() {
-            Lock writeLock = this.startLock.writeLock();
             try {
+                this.startLock.readLock().lock();
                 beginShutdown(this.node.get());
             } finally {
-                this.node.set(null);
-                writeLock.unlock();
+                this.startLock.readLock().unlock();
             }
         }
         
@@ -177,12 +176,12 @@ final class DbzNode {
          * Complete the service shut down.
          */
         public final void completeShutdown() {
-            Lock writeLock = this.startLock.writeLock();
             try {
+                this.startLock.writeLock().lock();
                 completeShutdown(this.node.get());
-            } finally {
                 this.node.set(null);
-                writeLock.unlock();
+            } finally {
+                this.startLock.writeLock().unlock();
             }
         }
         
@@ -224,7 +223,7 @@ final class DbzNode {
     
     private static Properties asProperties(Document doc) {
         Properties props = new Properties();
-        doc.forEach(field -> props.put(field.getName(), field.getValue().convert().asString()));
+        if ( doc != null ) doc.forEach(field -> props.put(field.getName(), field.getValue().convert().asString()));
         return props;
     }
     
@@ -655,6 +654,15 @@ final class DbzNode {
             }
         }
         send("log", "", doc);
+    }
+    
+    public boolean isRunning() {
+        return running;
+    }
+    
+    @Override
+    public String toString() {
+        return id() + " (" + (running? "running":"stopped") + ")";
     }
     
 }

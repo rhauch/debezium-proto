@@ -36,6 +36,7 @@ public interface Value extends Comparable<Value> {
     }
 
     static Value create(Object value) {
+        if ( value instanceof Value ) return (Value)value;
         if ( !isValid(value) ) {
             assert value != null;
             throw new IllegalArgumentException("Unexpected value " + value + "' of type " + value.getClass());

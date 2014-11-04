@@ -34,7 +34,7 @@ public interface Database extends Closeable {
     }
     
     public static interface Outcome<T> {
-        public static enum Status { OK, TIMEOUT, CLIENT_STOPPED }
+        public static enum Status { OK, TIMEOUT, CLIENT_STOPPED, COMMUNICATION_ERROR }
         
         default boolean failed() { return !succeeded(); }
         default boolean succeeded() { return status() != Status.OK; }
