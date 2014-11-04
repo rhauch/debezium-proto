@@ -11,7 +11,7 @@ import org.debezium.core.doc.Document;
  * @author Randall Hauch
  *
  */
-public final class EntityCollection implements Identified<EntityType> {
+public final class EntityCollection implements SchemaComponent<EntityType> {
     
     public static EntityCollection with( EntityType id, Document doc ) {
         return new EntityCollection(id,doc);

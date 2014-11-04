@@ -12,7 +12,7 @@ import org.debezium.core.component.EntityType;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message.Field;
 import org.debezium.core.message.Patch;
-import org.debezium.core.message.Topics;
+import org.debezium.core.message.Topic;
 
 /**
  * @author Randall Hauch
@@ -22,13 +22,13 @@ public class Streams {
     
     public static final String SYSTEM_NAME = "debezium-kafka";
     
-    private static final SystemStream SCHEMA_PATCHES = new SystemStream(SYSTEM_NAME, Topics.SCHEMA_PATCHES);
-    private static final SystemStream SCHEMA_UPDATES = new SystemStream(SYSTEM_NAME, Topics.SCHEMA_UPDATES);
-    private static final SystemStream ENTITY_BATCHES = new SystemStream(SYSTEM_NAME, Topics.ENTITY_BATCHES);
-    private static final SystemStream ENTITY_PATCHES = new SystemStream(SYSTEM_NAME, Topics.ENTITY_PATCHES);
-    private static final SystemStream ENTITY_UPDATES = new SystemStream(SYSTEM_NAME, Topics.ENTITY_UPDATES);
-    private static final SystemStream PARTIAL_RESPONSES = new SystemStream(SYSTEM_NAME, Topics.PARTIAL_RESPONSES);
-    private static final SystemStream COMPLETE_RESPONSES = new SystemStream(SYSTEM_NAME, Topics.COMPLETE_RESPONSES);
+    private static final SystemStream SCHEMA_PATCHES = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_PATCHES);
+    private static final SystemStream SCHEMA_UPDATES = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_UPDATES);
+    private static final SystemStream ENTITY_BATCHES = new SystemStream(SYSTEM_NAME, Topic.ENTITY_BATCHES);
+    private static final SystemStream ENTITY_PATCHES = new SystemStream(SYSTEM_NAME, Topic.ENTITY_PATCHES);
+    private static final SystemStream ENTITY_UPDATES = new SystemStream(SYSTEM_NAME, Topic.ENTITY_UPDATES);
+    private static final SystemStream PARTIAL_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.PARTIAL_RESPONSES);
+    private static final SystemStream COMPLETE_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.COMPLETE_RESPONSES);
     private static final SystemStream SCHEMA_LEARNING = new SystemStream(SYSTEM_NAME, "schema-learning");
     
     // At this time, none of the stream names are a function of database ID. However, we may want to do this so that individual
@@ -128,11 +128,11 @@ public class Streams {
     }
     
     public static boolean isEntityUpdates(SystemStream stream) {
-        return stream.getStream().equals(Topics.ENTITY_UPDATES);
+        return stream.getStream().equals(Topic.ENTITY_UPDATES);
     }
     
     public static boolean isSchemaUpdates(SystemStream stream) {
-        return stream.getStream().equals(Topics.SCHEMA_UPDATES);
+        return stream.getStream().equals(Topic.SCHEMA_UPDATES);
     }
     
     private Streams() {

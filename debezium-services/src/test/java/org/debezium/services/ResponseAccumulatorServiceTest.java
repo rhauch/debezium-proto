@@ -13,7 +13,7 @@ import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Message;
-import org.debezium.core.message.Topics;
+import org.debezium.core.message.Topic;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -45,7 +45,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
         Message.addHeaders(msg, CLIENT_ID, REQUEST_ID, USER);
         Message.setParts(msg, 1, 1);
         OutputMessages output = process(service, RESPONSE_ID, msg);
-        assertNextMessage(output).hasStream(Topics.COMPLETE_RESPONSES)
+        assertNextMessage(output).hasStream(Topic.COMPLETE_RESPONSES)
                                  .hasPartitionKey(CLIENT_ID)
                                  .hasKey(RESPONSE_ID)
                                  .hasMessage(msg);
@@ -68,7 +68,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
         Message.addHeaders(msg2, CLIENT_ID, REQUEST_ID, USER);
         Message.setParts(msg2, 2, 2);
         output = process(service, RESPONSE_ID, msg2);
-        assertNextMessage(output).hasStream(Topics.COMPLETE_RESPONSES)
+        assertNextMessage(output).hasStream(Topic.COMPLETE_RESPONSES)
                                  .hasPartitionKey(CLIENT_ID)
                                  .hasKey(RESPONSE_ID)
                                  .isAggregateOf(msg1, msg2);
@@ -98,7 +98,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
         assertNoMoreMessages(output1);
         
         // Check the output of the second call ...
-        assertNextMessage(output2).hasStream(Topics.COMPLETE_RESPONSES)
+        assertNextMessage(output2).hasStream(Topic.COMPLETE_RESPONSES)
                                   .hasPartitionKey(CLIENT_ID)
                                   .hasKey(RESPONSE_ID)
                                   .isAggregateOf(msg2, msg1);
@@ -136,7 +136,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
         
         // Check the output of the last call ...
         OutputMessages output = outputs.get(indexOfLastPart);
-        assertNextMessage(output).hasStream(Topics.COMPLETE_RESPONSES)
+        assertNextMessage(output).hasStream(Topic.COMPLETE_RESPONSES)
                                  .hasPartitionKey(CLIENT_ID)
                                  .hasKey(RESPONSE_ID)
                                  .isAggregateOf(msgs);

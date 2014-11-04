@@ -5,7 +5,6 @@
  */
 package org.debezium.core.message;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -21,6 +20,7 @@ import org.debezium.core.component.ZoneId;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
+import org.debezium.core.function.Predicates;
 import org.debezium.core.message.Patch.Editor;
 import org.debezium.core.util.Iterators;
 
@@ -45,6 +45,19 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
      * @param <IdType> the type of identifier that can be addressed with the batch
      */
     public static interface Builder<IdType extends Identifier> {
+        /**
+         * Read the target object with the given identifier. This method immediately adds a read patch to the batch.
+         * @param id the identifier of the target object; may not be null
+         * @return this batch builder instance to easily chain together multiple method invocations on the builder; never null
+         */
+        Builder<IdType> read( IdType id );
+        /**
+         * Read the target objects with the given identifiers. This method immediately adds to the batch one read patch for
+         * each identifier.
+         * @param ids the identifiers of the target objects; may not be null
+         * @return this batch builder instance to easily chain together multiple method invocations on the builder; never null
+         */
+        Builder<IdType> read( Iterable<IdType> ids );
         /**
          * Begin creating a new target object with the given identifier. When the editing is {@link Patch.Editor#end() completed}, the changes will be recorded
          * as an additional patch in the batch.
@@ -77,6 +90,17 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
         
         protected List<Patch<T>> patches;
         private final PatchEditor editor = new PatchEditor();
+        @Override
+        public Builder<T> read(T target) {
+            if ( patches == null ) patches = new LinkedList<>();
+            patches.add(Patch.read(target));
+            return this;
+        }
+        @Override
+        public Builder<T> read(Iterable<T> ids) {
+            ids.forEach(this::read);
+            return this;
+        }
         @Override
         public Patch.Editor<Builder<T>> create(T target) {
             if ( patches == null ) patches = new LinkedList<>();
@@ -199,8 +223,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
         return "[ " + patches.stream().map(Object::toString).collect(Collectors.joining(", ")) + " ]";
     }
     public Document asDocument() {
-        Array array = Array.create();
-        patches.stream().forEach((patch)->{array.add(patch.asDocument());});
+        Array array = Array.create(patches.stream().map(Patch::asDocument).collect(Collectors.toList()));
         return Document.create("patches",array);
     }
     
@@ -214,7 +237,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
      * @return true if this batch contains only read requests, or false otherwise
      */
     public boolean isReadRequest() {
-        return !patches.isEmpty() || patches.stream().allMatch((patch)->patch.isReadRequest());
+        return !patches.isEmpty() || patches.stream().allMatch(Patch::isReadRequest);
     }
 
     /**
@@ -223,10 +246,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
      * @return true if the batch contents all apply to the database, or false otherwise
      */
     public boolean appliesTo( DatabaseId dbId ) {
-        for ( Patch<IdType> patch : this ) {
-            if ( patch.target().isIn(dbId) ) return false;
-        }
-        return true;
+        return patches.stream().allMatch(patch->patch.target().isIn(dbId));
     }
     
     /**
@@ -235,10 +255,7 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
      * @return true if the batch contents all apply to the entity, or false otherwise
      */
     public boolean appliesTo( EntityId entityId ) {
-        for ( Patch<IdType> patch : this ) {
-            if ( patch.target().isIn(entityId) ) return false;
-        }
-        return true;
+        return patches.stream().allMatch(patch->patch.target().isIn(entityId));
     }
     
     /**
@@ -247,22 +264,17 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
      * @return true if the batch contents all apply to the zone, or false otherwise
      */
     public boolean appliesTo( ZoneId zoneId ) {
-        for ( Patch<IdType> patch : this ) {
-            if ( patch.target().isIn(zoneId) ) return false;
-        }
-        return true;
+        return patches.stream().allMatch(patch->patch.target().isIn(zoneId));
     }
     
     public static <IdType extends Identifier> Batch<IdType> from( Document doc ) {
         Array array = doc.getArray("patches");
         if ( array == null ) return null;
-        List<Patch<IdType>> patches = new ArrayList<>(array.size());
-        array.streamValues().forEach((value)->{
-            if ( value.isDocument() ) {
-                Patch<IdType> patch = Patch.from(value.asDocument());
-                if ( patch != null ) patches.add(patch);
-            }
-        });
+        @SuppressWarnings("unchecked")
+        List<Patch<IdType>> patches = array.streamValues().filter(Value::isDocument)
+                                                          .map(value->(Patch<IdType>)Patch.from(value.asDocument()))
+                                                          .filter(Predicates.notNull())
+                                                          .collect(Collectors.toList());
         return new Batch<IdType>(patches);
     }
 }

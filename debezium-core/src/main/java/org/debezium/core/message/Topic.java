@@ -9,7 +9,7 @@ package org.debezium.core.message;
  * @author Randall Hauch
  *
  */
-public class Topics {
+public class Topic {
 
     public static final String SCHEMA_PATCHES = "schema-batches";
     public static final String SCHEMA_UPDATES = "schema-updates";
@@ -19,7 +19,7 @@ public class Topics {
     public static final String PARTIAL_RESPONSES = "partial-responses";
     public static final String COMPLETE_RESPONSES = "complete-responses";
     
-    private Topics() {
+    private Topic() {
     }
     
 }

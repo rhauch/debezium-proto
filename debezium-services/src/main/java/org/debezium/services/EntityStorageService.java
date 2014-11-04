@@ -76,6 +76,7 @@ public class EntityStorageService implements StreamTask, InitableTask {
                 Message.setStatus(response, Status.DOES_NOT_EXIST);
                 Message.addFailureReason(response, "Entity '" + id + "' does not exist.");
                 sendResponse(response, idStr, collector);
+                return;
             }
             // Otherwise it was a creation, so create it ...
             entity = Document.create();

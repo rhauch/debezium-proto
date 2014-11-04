@@ -83,11 +83,7 @@ final class BasicDocument implements Document {
             // Can't have all of 'that' if 'that' is bigger ...
             return false;
         }
-        for (Map.Entry<CharSequence, Value> entry : fields.entrySet()) {
-            Value thatValue = that.get(entry.getKey());
-            if ( !entry.getValue().equals(thatValue)) return false;
-        }
-        return true;
+        return fields.entrySet().stream().allMatch(entry->entry.getValue().equals(that.get(entry.getKey())));
     }
 
     @Override
@@ -98,10 +94,7 @@ final class BasicDocument implements Document {
 
     @Override
     public Document putAll(Iterable<Field> object) {
-        for (Field field : object) {
-            Value value = field.getValue().clone();
-            this.setValue(field.getName(), value);
-        }
+        object.forEach(field->setValue(field));
         return this;
     }
 

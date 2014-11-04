@@ -170,4 +170,20 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
     boolean isIn( ZoneId zoneId );
     
     boolean isIn( EntityId entityId );
+    
+    default boolean isNotIn( DatabaseId dbId ) {
+        return !isIn(dbId);
+    }
+    
+    default boolean isNotIn( EntityType entityType ) {
+        return !isIn(entityType);
+    }
+    
+    default boolean isNotIn( ZoneId zoneId ) {
+        return !isIn(zoneId);
+    }
+    
+    default boolean isNotIn( EntityId entityId ) {
+        return !isIn(entityId);
+    }
 }

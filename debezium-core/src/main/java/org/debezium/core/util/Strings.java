@@ -5,6 +5,9 @@
  */
 package org.debezium.core.util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
+
 /**
  * @author Randall Hauch
  *
@@ -55,6 +58,21 @@ public final class Strings {
         return ((st > 0) || (len < str.length())) ? str.substring(st, len) : str;
     }
     
+    /**
+     * Get the stack trace of the supplied exception.
+     * 
+     * @param throwable the exception for which the stack trace is to be returned
+     * @return the stack trace, or null if the supplied exception is null
+     */
+    public static String getStackTrace( Throwable throwable ) {
+        if (throwable == null) return null;
+        final ByteArrayOutputStream bas = new ByteArrayOutputStream();
+        final PrintWriter pw = new PrintWriter(bas);
+        throwable.printStackTrace(pw);
+        pw.close();
+        return bas.toString();
+    }
+
     private Strings() {
     }
 }

@@ -257,4 +257,54 @@ public class Iterators {
         };
     }
     
+    public static <T> Iterator<T> join( Iterable<T> first, T last ) {
+        return  join(first.iterator(),with(last));
+    }
+    
+    public static <T> Iterator<T> join( Iterable<T> first, T last1, T last2 ) {
+        return  join(first.iterator(),with(last1,last2));
+    }
+    
+    public static <T> Iterator<T> join( Iterable<T> first, T last1, T last2, T last3 ) {
+        return  join(first.iterator(),with(last1,last2,last3));
+    }
+    
+    public static <T> Iterator<T> join( Iterable<T> first, T last1, T last2, T last3, T last4 ) {
+        return  join(first.iterator(),with(last1,last2,last3,last4));
+    }
+    
+    public static <T> Iterator<T> join( Iterable<T> first, Iterable<T> second ) {
+        return  join(first.iterator(),second.iterator());
+    }
+    
+    public static <T> Iterator<T> join( Iterator<T> first, Iterator<T> second ) {
+        return new Iterator<T>() {
+            private boolean completedFirst = false;
+            @Override
+            public boolean hasNext() {
+                if (!completedFirst) {
+                    if (first.hasNext()) return true;
+                    completedFirst = true;
+                }
+                return second.hasNext();
+            }
+
+            @Override
+            public T next() {
+                if (!completedFirst) {
+                    if (first.hasNext()) return first.next();
+                    completedFirst = true;
+                }
+                return second.next();
+            }
+
+            @Override
+            public void remove() {
+                if (!completedFirst) {
+                    first.remove();
+                }
+                second.remove();
+            }
+        };
+    }
 }

@@ -16,7 +16,7 @@ import org.debezium.core.doc.Document;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Message.Status;
 import org.debezium.core.message.Patch;
-import org.debezium.core.message.Topics;
+import org.debezium.core.message.Topic;
 import org.debezium.core.util.Collect;
 import org.fest.assertions.Fail;
 import org.junit.Before;
@@ -109,9 +109,9 @@ public class SchemaStorageServiceTest extends AbstractServiceTest {
         
         // Submit the request ...
         OutputMessages output = process(service, DBID.asString(), msg);
-        assertNextMessage(output).hasStream(Topics.SCHEMA_UPDATES).hasKey(DBID).hasMessage(expected);
+        assertNextMessage(output).hasStream(Topic.SCHEMA_UPDATES).hasKey(DBID).hasMessage(expected);
         if (includeResponseAfterUpdate) {
-            assertNextMessage(output).hasStream(Topics.PARTIAL_RESPONSES).hasKey(DBID).hasMessage().with("after", after);
+            assertNextMessage(output).hasStream(Topic.PARTIAL_RESPONSES).hasKey(DBID).hasMessage().with("after", after);
         }
         assertNoMoreMessages(output);
         
@@ -123,7 +123,7 @@ public class SchemaStorageServiceTest extends AbstractServiceTest {
         output = process(service, DBID.asString(), msg2);
         
         // Verify the result is a read response ...
-        assertNextMessage(output).hasStream(Topics.PARTIAL_RESPONSES).hasKey(DBID).hasMessage().with("after", after);
+        assertNextMessage(output).hasStream(Topic.PARTIAL_RESPONSES).hasKey(DBID).hasMessage().with("after", after);
         assertNoMoreMessages(output);
     }
 }

@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -729,6 +730,25 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         return StreamSupport.stream(spliterator(), false);
     }
     
+    default void forEach( BiConsumer<Path,Value> consumer ) {
+        Path root = Path.root();
+        stream().forEach((field)->{
+            Path path = root.append(field.getName().toString());
+            Value value = field.getValue();
+            if ( value.isDocument() ) {
+                value.asDocument().forEach((p,v)->{
+                    consumer.accept(path.append(p),v);
+                });
+            } else if ( value.isArray() ) {
+                value.asArray().forEach((entry)->{
+                    consumer.accept(path.append(Integer.toString(entry.getIndex())),entry.getValue());
+                });
+            } else {
+                consumer.accept(path, value);
+            }
+        });
+    }
+    
     /**
      * Transform all of the field values using the supplied {@link BiFunction transformer function}.
      * 
@@ -900,7 +920,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
     }
     
     /**
-     * Set the value for the field with the given name to be a binary value. The value will be encoded as Base64.
+     * Set the value for the field with the given name.
      * 
      * @param name The name of the field
      * @param value the new value
@@ -908,6 +928,16 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
      */
     Document setValue(CharSequence name,
                       Value value);
+    
+    /**
+     * Set the field on this document.
+     * 
+     * @param field The field
+     * @return This document, to allow for chaining methods
+     */
+    default Document setValue( Field field ) {
+        return setValue(field.getName(),field.getValue());
+    }
     
     /**
      * Set the value for the field with the given name to be a new, empty Document.

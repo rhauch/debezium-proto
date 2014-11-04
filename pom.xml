@@ -59,6 +59,7 @@
     <modules>
         <module>debezium-core</module>
         <module>debezium-client</module>
+        <module>debezium-client-old</module>
         <module>debezium-services</module>
     </modules>
     <developers>

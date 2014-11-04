@@ -7,6 +7,8 @@ package org.debezium.core.doc;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -50,9 +52,7 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
     
     static Array createWithNulls( int number ) {
         Value[] vals = new Value[number];
-        for ( int i=0; i!=number; ++i ) {
-            vals[i] = Value.nullValue();
-        }
+        Arrays.fill(vals, Value.nullValue());
         return new BasicArray(vals);
     }
     
@@ -85,14 +85,14 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
     }
 
     static Array create( Iterable<?> values ) {
-        if ( values == null ) {
-            return create();
-        }
+        if ( values == null ) return create();
         BasicArray array = new BasicArray();
-        for ( Object value : values ) {
-            array.add(Value.create(value));
-        }
+        values.forEach(obj->array.add(Value.create(obj)));
         return array;
+    }
+
+    static Array create( List<Value> values ) {
+        return ( values == null || values.isEmpty() ) ? create() : new BasicArray(values);
     }
 
     /**
@@ -199,9 +199,7 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
      */
     default Array addAll( Value... values ) {
         if (values != null) {
-            for (Value value : values) {
-                add(value != null ? value.clone() : Value.nullValue());
-            }
+            addAll(Stream.of(values));
         }
         return this;
     }
@@ -215,9 +213,20 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
      */
     default Array addAll( Iterable<Value> values ) {
         if (values != null) {
-            for (Value value : values) {
-                add(value != null ? value.clone() : Value.nullValue());
-            }
+            values.forEach(value->add(value != null ? value.clone() : Value.nullValue()));
+        }
+        return this;
+    }
+    /**
+     * Sets on this object all name/value pairs from the supplied object. If the supplied object is null, this method does
+     * nothing.
+     * 
+     * @param values the values to be added to this array
+     * @return this array to allow for chaining methods
+     */
+    default Array addAll( Stream<Value> values ) {
+        if (values != null) {
+            values.forEach(value->add(value != null ? value.clone() : Value.nullValue()));
         }
         return this;
     }
@@ -396,12 +405,12 @@ public interface Array extends Iterable<Array.Entry>, Comparable<Array> {
      */
     default Array putAll( Iterable<Entry> entries ) {
         if (entries != null) {
-            for (Entry entry : entries) {
+            entries.forEach(entry->{
                 if (entry != null) {
                     Value value = entry.getValue().clone();
                     setValue(entry.getIndex(), value);
                 }
-            }
+            });
         }
         return this;
     }

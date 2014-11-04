@@ -7,6 +7,10 @@ package org.debezium.core.doc;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
+import java.util.function.IntConsumer;
+import java.util.function.LongConsumer;
 
 /**
  * @author Randall Hauch
@@ -104,20 +108,7 @@ public interface Value extends Comparable<Value> {
     }
     
     default Type getType() {
-        if ( isString() ) return Type.STRING;
-        if ( isBoolean() ) return Type.BOOLEAN;
-        if ( isBinary() ) return Type.BINARY;
-        if ( isInteger() ) return Type.INTEGER;
-        if ( isLong() ) return Type.LONG;
-        if ( isFloat() ) return Type.FLOAT;
-        if ( isDouble() ) return Type.DOUBLE;
-        if ( isBigInteger() ) return Type.BIG_INTEGER;
-        if ( isBigDecimal() ) return Type.DECIMAL;
-        if ( isDocument() ) return Type.DOCUMENT;
-        if ( isArray() ) return Type.ARRAY;
-        if ( isNull() ) return Type.NULL;
-        assert false;
-        throw new IllegalStateException();
+        return ComparableValue.typeForValue(this);
     }
 
     /**
@@ -152,6 +143,10 @@ public interface Value extends Comparable<Value> {
     byte[] asBytes();
 
     boolean isNull();
+
+    default boolean isNotNull() {
+        return !isNull();
+    }
 
     boolean isString();
 
@@ -191,4 +186,166 @@ public interface Value extends Comparable<Value> {
      *         and not a document or array
      */
     Value clone();
+    
+    /**
+     * If a value is a document, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a document
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifDocument( Consumer<Document> consumer ) {
+        if ( isDocument() ) {
+            consumer.accept(asDocument());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is an array, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is an array
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifArray( Consumer<Array> consumer ) {
+        if ( isArray() ) {
+            consumer.accept(asArray());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a string, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a string
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifString( Consumer<String> consumer ) {
+        if ( isString() ) {
+            consumer.accept(asString());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a boolean value, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a boolean
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifBoolean( Consumer<Boolean> consumer ) {
+        if ( isBoolean() ) {
+            consumer.accept(asBoolean());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a byte array, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a byte array
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifBinary( Consumer<byte[]> consumer ) {
+        if ( isBinary() ) {
+            consumer.accept(asBytes());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is an integer, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is an integer
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifInteger( IntConsumer consumer ) {
+        if ( isInteger() ) {
+            consumer.accept(asInteger().intValue());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a long, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a long
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifLong( LongConsumer consumer ) {
+        if ( isLong() ) {
+            consumer.accept(asLong().longValue());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a float, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a float
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifFloat( DoubleConsumer consumer ) {
+        if ( isFloat() ) {
+            consumer.accept(asFloat().doubleValue());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a double, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a double
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifDouble( DoubleConsumer consumer ) {
+        if ( isDouble() ) {
+            consumer.accept(asDouble().intValue());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a variable-sized integer, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a big integer
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifBigInteger( Consumer<BigInteger> consumer ) {
+        if ( isBigInteger() ) {
+            consumer.accept(asBigInteger());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a variable-sized decimal, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a big decimal
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifBigDecimal( Consumer<BigDecimal> consumer ) {
+        if ( isBigDecimal() ) {
+            consumer.accept(asBigDecimal());
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * If a value is a variable-sized integer, invoke the specified consumer with the value, otherwise do nothing.
+     * @param consumer block to be executed if the value is a big integer
+     * @return true if the block was called, or false otherwise
+     */
+    default boolean ifNull( NullHandler consumer ) {
+        if ( isNull() ) {
+            consumer.call();
+            return true;
+        }
+        return false;
+    }
+    
+    @FunctionalInterface
+    static interface NullHandler {
+        void call();
+    }
+    
 }

@@ -911,7 +911,7 @@ public class Schema {
         return component;
     }
     
-    public static Document getComponent(SchemaComponentId componentId, Document schema) {
+    public static Optional<? extends SchemaComponent<? extends SchemaComponentId>> getComponent(SchemaComponentId componentId, Document schema) {
         Document component = null;
         switch (componentId.type()) {
             case ENTITY_TYPE:
@@ -919,10 +919,13 @@ public class Schema {
                 Document collections = schema.getDocument("collections");
                 if (collections != null) {
                     component = collections.getDocument(type.entityTypeName());
+                    if ( component != null ) {
+                        return Optional.of(EntityCollection.with(type, component));
+                    }
                 }
                 break;
         }
-        return component;
+        return Optional.empty();
     }
     
     public static void setLearning(Document schema, boolean enabled) {

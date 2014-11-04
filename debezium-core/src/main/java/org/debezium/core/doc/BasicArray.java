@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Red Hat, Inc. and/or its affiliates.
- *
+ * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
 package org.debezium.core.doc;
@@ -18,20 +18,25 @@ import org.debezium.core.util.Sequences;
  *
  */
 final class BasicArray implements Array {
-
+    
     private static final BiFunction<Integer, Value, Entry> CONVERT_PAIR_TO_ENTRY = new BiFunction<Integer, Value, Entry>() {
         @Override
         public Entry apply(Integer index, Value value) {
             return new BasicEntry(index.intValue(), value);
         }
     };
-
+    
     private final List<Value> values;
-
+    
     BasicArray() {
         this.values = new ArrayList<>();
     }
-
+    
+    BasicArray(List<Value> values) {
+        assert values != null;
+        this.values = values;
+    }
+    
     BasicArray(Value[] values) {
         if (values == null || values.length == 0) {
             this.values = new ArrayList<>();
@@ -42,20 +47,20 @@ final class BasicArray implements Array {
             }
         }
     }
-
+    
     protected final int indexFrom(CharSequence name) {
         return Integer.parseInt(name.toString());
     }
-
+    
     protected final boolean isValidIndex(int index) {
         return index >= 0 && index < size();
     }
-
+    
     @Override
     public int size() {
         return values.size();
     }
-
+    
     @Override
     public boolean isEmpty() {
         return values.isEmpty();
@@ -63,23 +68,19 @@ final class BasicArray implements Array {
     
     @Override
     public int compareTo(Array that) {
-        if (that == null)
-            return 1;
+        if (that == null) return 1;
         int size = this.size();
-        if (size != that.size()) {
-            return size - that.size();
-        }
+        if (size != that.size()) return size - that.size();
         Array thatArray = that;
         for (int i = 0; i != size; ++i) {
             Value thatValue = thatArray.get(i);
             Value thisValue = get(i);
             int diff = thatValue.compareTo(thisValue);
-            if (diff != 0)
-                return diff;
+            if (diff != 0) return diff;
         }
         return 0;
     }
-
+    
     @Override
     public Iterator<Entry> iterator() {
         return Iterators.around(Sequences.infiniteIntegers(0), values, CONVERT_PAIR_TO_ENTRY);
@@ -93,23 +94,23 @@ final class BasicArray implements Array {
         }
         return null;
     }
-
+    
     @Override
     public Array removeAll() {
         this.values.clear();
         return this;
     }
-
+    
     @Override
     public boolean has(int index) {
         return isValidIndex(index);
     }
-
+    
     @Override
     public Value get(int index) {
         return isValidIndex(index) ? values.get(index) : null;
     }
-
+    
     @Override
     public Array setValue(int index, Value value) {
         if (value == null) value = Value.nullValue();
@@ -128,13 +129,13 @@ final class BasicArray implements Array {
     
     @Override
     public Array add(Value value) {
-        if ( value == null ) value = Value.nullValue();
+        if (value == null) value = Value.nullValue();
         this.values.add(value);
         return this;
     }
     
     @Override
-    public  Iterable<Value> values() {
+    public Iterable<Value> values() {
         return values;
     }
     
@@ -142,12 +143,12 @@ final class BasicArray implements Array {
     public Array clone() {
         return new BasicArray().addAll(this.values);
     }
-
+    
     @Override
     public int hashCode() {
         return values.hashCode();
     }
-
+    
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof BasicArray) {
@@ -156,10 +157,10 @@ final class BasicArray implements Array {
         }
         return false;
     }
-
+    
     @Override
     public String toString() {
         return values.toString();
     }
-
+    
 }

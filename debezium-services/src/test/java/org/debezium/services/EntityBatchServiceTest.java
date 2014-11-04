@@ -15,7 +15,7 @@ import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
-import org.debezium.core.message.Topics;
+import org.debezium.core.message.Topic;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -45,7 +45,7 @@ public class EntityBatchServiceTest extends AbstractServiceTest {
                                        .create(id).add("field1", Value.create(1)).end()
                                        .build();
         OutputMessages output = process(service, random(), batch.asDocument());
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(1, 1).hasKey(id).hasMessage(batch.patch(0).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(1, 1).hasKey(id).hasMessage(batch.patch(0).asDocument());
         assertNoMoreMessages(output);
     }
     
@@ -61,9 +61,9 @@ public class EntityBatchServiceTest extends AbstractServiceTest {
                                        .build();
         OutputMessages output = process(service, random(), batch.asDocument());
         assertThat(output.count()).isEqualTo(3);
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(1, 3).hasKey(id1).hasMessage(batch.patch(0).asDocument());
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(2, 3).hasKey(id2).hasMessage(batch.patch(1).asDocument());
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(3, 3).hasKey(id3).hasMessage(batch.patch(2).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(1, 3).hasKey(id1).hasMessage(batch.patch(0).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(2, 3).hasKey(id2).hasMessage(batch.patch(1).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(3, 3).hasKey(id3).hasMessage(batch.patch(2).asDocument());
         assertNoMoreMessages(output);
     }
     
@@ -81,9 +81,9 @@ public class EntityBatchServiceTest extends AbstractServiceTest {
                                        .build();
         OutputMessages output = process(service, random(), batch.asDocument());
         assertThat(output.count()).isEqualTo(3);
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(1, 3).hasKey(id1).hasMessage(batch.patch(0).asDocument());
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(2, 3).hasKey(id1).hasMessage(batch.patch(1).asDocument());
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(3, 3).hasKey(id1).hasMessage(batch.patch(2).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(1, 3).hasKey(id1).hasMessage(batch.patch(0).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(2, 3).hasKey(id1).hasMessage(batch.patch(1).asDocument());
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(3, 3).hasKey(id1).hasMessage(batch.patch(2).asDocument());
         assertNoMoreMessages(output);
     }
     
@@ -106,7 +106,7 @@ public class EntityBatchServiceTest extends AbstractServiceTest {
         assertThat(output.count()).isEqualTo(1);
         Document patch = batch.patch(0).asDocument();
         Message.addHeaders(patch, clientId, requestNum, user, timestamp);
-        assertNextMessage(output).hasStream(Topics.ENTITY_PATCHES).isPart(1, 1).hasKey(id).hasMessage(patch);
+        assertNextMessage(output).hasStream(Topic.ENTITY_PATCHES).isPart(1, 1).hasKey(id).hasMessage(patch);
         assertNoMoreMessages(output);
     }
 }

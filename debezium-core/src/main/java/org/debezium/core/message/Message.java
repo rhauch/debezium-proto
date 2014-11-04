@@ -8,6 +8,8 @@ package org.debezium.core.message;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
@@ -139,7 +141,7 @@ public final class Message {
         assert part.isInteger();
         int index = part.asInteger().intValue() - 1;
         responses.setDocument(index, partialResponse);
-        if (responses.streamValues().allMatch((value) -> !value.isNull())) {
+        if (responses.streamValues().allMatch(Value::isNotNull)) {
             // The aggregate is complete ...
             aggregateResponse.setNumber(Field.ENDED, System.currentTimeMillis());
             return true;
@@ -159,7 +161,7 @@ public final class Message {
         Array responses = response.getArray(Field.RESPONSES);
         if (responses != null) {
             // It is a partial response ...
-            responses.streamValues().forEach((value) -> handlePartialResponse(function, value.asDocument()));
+            responses.streamValues().forEach(value -> handlePartialResponse(function, value.asDocument()));
         } else {
             // Must not be an aggregate response ...
             handlePartialResponse(function, response);
@@ -219,6 +221,19 @@ public final class Message {
         String id = doc.getString(Field.ENTITY);
         if (id == null) return Identifier.zone(databaseId, entityType, zoneId);
         return Identifier.of(databaseId, entityType, id, zoneId);
+    }
+    
+    public static EntityId getEntityId(Document doc) {
+        String databaseId = doc.getString(Field.DATABASE_ID);
+        String entityType = doc.getString(Field.COLLECTION);
+        String zoneId = doc.getString(Field.ZONE_ID);
+        String id = doc.getString(Field.ENTITY);
+        return Identifier.of(databaseId, entityType, id, zoneId);
+    }
+    
+    public static DatabaseId getDatabaseId(Document doc) {
+        String databaseId = doc.getString(Field.DATABASE_ID);
+        return Identifier.of(databaseId);
     }
     
     public static void addId(Document doc, Identifier id) {

@@ -15,7 +15,7 @@ import java.util.Map;
  *
  */
 final class ComparableValue implements Value {
-    
+
     private static final Map<Class<?>,Type> TYPES_BY_CLASS;
     
     static {
@@ -32,6 +32,29 @@ final class ComparableValue implements Value {
         types.put(BasicDocument.class, Type.DOCUMENT);
         types.put(BasicArray.class, Type.ARRAY);
         TYPES_BY_CLASS = types;
+    }
+
+    static Type typeForValue( Value value ) {
+        assert value != null;
+        if ( value.isNull() ) return Type.NULL;
+        // Check by exact class ...
+        Type type = TYPES_BY_CLASS.get(value.getClass());
+        if ( type != null ) return type;
+        // Otherwise, check using instanceof ...
+        if ( value.isString() ) return Type.STRING;
+        if ( value.isBoolean() ) return Type.BOOLEAN;
+        if ( value.isBinary() ) return Type.BINARY;
+        if ( value.isInteger() ) return Type.INTEGER;
+        if ( value.isLong() ) return Type.LONG;
+        if ( value.isFloat() ) return Type.FLOAT;
+        if ( value.isDouble() ) return Type.DOUBLE;
+        if ( value.isBigInteger() ) return Type.BIG_INTEGER;
+        if ( value.isBigDecimal() ) return Type.DECIMAL;
+        if ( value.isDocument() ) return Type.DOCUMENT;
+        if ( value.isArray() ) return Type.ARRAY;
+        if ( value.isNull() ) return Type.NULL;
+        assert false;
+        throw new IllegalStateException();
     }
 
     private final Comparable<?> value;
@@ -89,57 +112,57 @@ final class ComparableValue implements Value {
 
     @Override
     public String asString() {
-        return value instanceof String ? (String) value : null;
+        return isString() ? (String) value : null;
     }
 
     @Override
     public Integer asInteger() {
-        return value instanceof Integer ? (Integer) value : null;
+        return isInteger() ? (Integer) value : null;
     }
 
     @Override
     public Long asLong() {
-        return value instanceof Long ? (Long) value : null;
+        return isLong() ? (Long) value : null;
     }
 
     @Override
     public Boolean asBoolean() {
-        return value instanceof Boolean ? (Boolean) value : null;
+        return isBoolean() ? (Boolean) value : null;
     }
 
     @Override
     public Number asNumber() {
-        return value instanceof Number ? (Number) value : null;
+        return isNumber() ? (Number) value : null;
     }
 
     @Override
     public BigInteger asBigInteger() {
-        return value instanceof BigInteger ? (BigInteger) value : null;
+        return isBigInteger() ? (BigInteger) value : null;
     }
 
     @Override
     public BigDecimal asBigDecimal() {
-        return value instanceof BigDecimal ? (BigDecimal) value : null;
+        return isBigDecimal() ? (BigDecimal) value : null;
     }
 
     @Override
     public Float asFloat() {
-        return value instanceof Float ? (Float) value : null;
+        return isFloat() ? (Float) value : null;
     }
 
     @Override
     public Double asDouble() {
-        return value instanceof Double ? (Double) value : null;
+        return isDouble() ? (Double) value : null;
     }
 
     @Override
     public Document asDocument() {
-        return value instanceof Document ? (Document) value : null;
+        return isDocument() ? (Document) value : null;
     }
 
     @Override
     public Array asArray() {
-        return value instanceof Array ? (Array) value : null;
+        return isArray() ? (Array) value : null;
     }
 
     @Override

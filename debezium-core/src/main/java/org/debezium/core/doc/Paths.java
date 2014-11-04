@@ -25,7 +25,9 @@ final class Paths {
         path = Strings.trim(path,(c)->c < ' ' || c == '/');
         if ( path.length() == 0 ) return RootPath.INSTANCE;
         String[] segments = path.split("/");
-        if (segments.length == 1 ) return new SingleSegmentPath(parseSegment(segments[0],resolveJsonPointerEscapes));
+        if (segments.length == 1 ) {
+            return new SingleSegmentPath(parseSegment(segments[0],resolveJsonPointerEscapes));
+        }
         if ( resolveJsonPointerEscapes ) {
             for ( int i=0; i!=segments.length; ++i ) segments[i] = parseSegment(segments[i],true);
         }
@@ -38,8 +40,12 @@ final class Paths {
         }
         return segment;
     }
+    
+    static interface InnerPath {
+        int copyInto( String[] segments, int start );
+    }
 
-    static final class RootPath implements Path {
+    static final class RootPath implements Path, InnerPath {
         
         public static final Path INSTANCE = new RootPath();
         public static final Optional<Path> OPTIONAL_OF_ROOT = Optional.of(RootPath.INSTANCE);
@@ -82,9 +88,13 @@ final class Paths {
         public Path append(Path relPath) {
             return relPath;
         }
+        @Override
+        public int copyInto(String[] segments, int start) {
+            return 0;
+        }
     }
     
-    static final class SingleSegmentPath implements Path {
+    static final class SingleSegmentPath implements Path, InnerPath {
         private final Optional<String> segment;
         protected SingleSegmentPath( String segment ) {
             assert segment != null;
@@ -127,19 +137,20 @@ final class Paths {
         @Override
         public Path append(Path relPath) {
             if ( relPath.isRoot() ) return this;
-            String[] segments = new String[1+relPath.size()];
-            segments[0] = segment.get();
-            if ( relPath.isSingle() ) {
-                segments[1] = relPath.segment(0);
-            } else {
-                MultiSegmentPath other = (MultiSegmentPath)relPath;
-                System.arraycopy(other.segments, 0, segments, 1, other.segments.length);
-            }
+            if ( relPath.isSingle() ) return new ChildPath(this,relPath.lastSegment().get());
+            String[] segments = new String[size()+relPath.size()];
+            int offset = this.copyInto(segments,0);
+            copyPathInto(relPath,segments,offset);
             return new MultiSegmentPath(segments);
+        }
+        @Override
+        public int copyInto(String[] segments, int start) {
+            segments[start] = segment.get();
+            return 1;
         }
     }
 
-    static final class MultiSegmentPath implements Path {
+    static final class MultiSegmentPath implements Path, InnerPath {
         private final String[] segments;
         protected MultiSegmentPath( String[] segments ) {
             this.segments = segments;
@@ -188,16 +199,79 @@ final class Paths {
         @Override
         public Path append(Path relPath) {
             if ( relPath.isRoot() ) return this;
+            if ( relPath.isSingle() ) return new ChildPath(this,relPath.lastSegment().get());
             String[] segments = new String[size()+relPath.size()];
-            System.arraycopy(this.segments, 0, segments, 1, this.segments.length);
-            if ( relPath.isSingle() ) {
-                segments[this.size()] = relPath.segment(0);
-            } else {
-                MultiSegmentPath other = (MultiSegmentPath)relPath;
-                System.arraycopy(other.segments, 0, segments, 1, other.segments.length);
-            }
+            int offset = this.copyInto(segments,0);
+            copyPathInto(relPath,segments,offset);
             return new MultiSegmentPath(segments);
         }
+        @Override
+        public int copyInto(String[] segments, int start) {
+            System.arraycopy(this.segments, 0, segments, start, this.segments.length);
+            return this.segments.length;
+        }
+    }
+    
+    static final class ChildPath implements Path, InnerPath {
+        private final Path parent;
+        private final String segment;
+        protected ChildPath(Path parent, String segment) {
+            assert parent instanceof InnerPath;
+            this.parent = parent;
+            this.segment = segment;
+        }
+
+        @Override
+        public Iterator<String> iterator() {
+            return Iterators.join(parent,segment);
+        }
+        @Override
+        public Optional<String> lastSegment() {
+            return Optional.of(segment);
+        }
+        @Override
+        public Optional<Path> parent() {
+            return Optional.of(parent);
+        }
+        @Override
+        public int size() {
+            return parent.size() + 1;
+        }
+        @Override
+        public String segment(int index) {
+            if ( index >= size() || index < 0 ) throw new IllegalArgumentException("Invalid segment index: " + index);
+            return index < parent.size() ? parent.segment(index) : segment;
+        }
+        @Override
+        public Path subpath(int length) {
+            if ( length > size() || length < 0 ) throw new IllegalArgumentException("Invalid subpath length: " + length);
+            return length <= parent.size() ? parent.subpath(length) : this;
+        }
+        @Override
+        public Path append(Path relPath) {
+            if ( relPath.isRoot() ) return this;
+            if ( relPath.isSingle() ) return new ChildPath(this,relPath.lastSegment().get());
+            String[] segments = new String[size()+relPath.size()+1];
+            int offset = copyInto(segments,0);
+            copyPathInto(relPath,segments,offset);
+            return new MultiSegmentPath(segments);
+        }
+        @Override
+        public int copyInto(String[] segments, int start) {
+            int copied = ((InnerPath)parent).copyInto(segments,start);
+            segments[copied] = this.segment;
+            return size();
+        }
+        
+    }
+    
+    static int copyPathInto( Path path, String[] segments, int start ) {
+        if ( path instanceof InnerPath ) {
+            return ((InnerPath)path).copyInto(segments,start);
+        }
+        int i=start;
+        for ( String segment : path ) segments[i++] = segment;
+        return i;
     }
     
     private Paths() {

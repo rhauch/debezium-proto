@@ -77,6 +77,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 Message.setStatus(response, Status.DOES_NOT_EXIST);
                 Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
                 sendResponse(response, dbIdStr, collector);
+                return;
             }
             // Otherwise it was a creation, so create it ...
             schema = Document.create();

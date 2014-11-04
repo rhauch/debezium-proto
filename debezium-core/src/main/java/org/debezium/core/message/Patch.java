@@ -5,7 +5,6 @@
  */
 package org.debezium.core.message;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -26,6 +25,7 @@ import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Path;
 import org.debezium.core.doc.Value;
+import org.debezium.core.function.Predicates;
 import org.debezium.core.util.Iterators;
 import org.debezium.core.util.MathOps;
 
@@ -92,6 +92,15 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
          * @return the document; never null
          */
         Document asDocument();
+        
+        /**
+         * Get a JSON-Patch document representation of this operation wrapped in a {@link Value}.
+         * 
+         * @return the document as a {@link Value}; never null
+         */
+        default Value asValue() {
+            return Value.create(asDocument());
+        }
         
         /**
          * Get a failure description for this operation.
@@ -302,6 +311,7 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
      * @param <P> the type of object returned by the editor when complete.
      */
     public static interface Editor<P> {
+        
         /**
          * Add a requirement to the patch that the value at the given path matches an expected value.
          * 
@@ -544,8 +554,7 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         @Override
         public Boolean apply(Document doc, Consumer<Path> invalid) {
             Path path = Path.parse(this.path);
-            Optional<Path> parentPath = path.parent();
-            if ( !parentPath.isPresent() ) {
+            if ( path.isRoot() ) {
                 // The whole document is to be removed ...
                 if ( doc.isEmpty() ) {
                     return Boolean.FALSE;   // already empty, so not modified
@@ -553,19 +562,19 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
                 doc.clear();
                 return Boolean.TRUE;
             }
-            Optional<Value> result = doc.find(parentPath.get(),(missingPath,missingIndex)->Optional.empty(),invalid);
-            if ( result.isPresent() ) {
-                Value parent = result.get();
+            AtomicBoolean result = new AtomicBoolean(false);
+            // If the parent path does exist, remove the child from the parent ...
+            doc.find(path.parent().get(),(missingPath,missingIndex)->Optional.empty(),invalid).ifPresent((parent)->{
                 if ( parent.isArray() ) {
-                    Optional<Integer> index = Path.Segments.asInteger(path.lastSegment());
-                    if ( index.isPresent() ) {
-                        parent.asArray().remove(index.get().intValue());
-                        return Boolean.TRUE;
-                    }
+                    Path.Segments.asInteger(path.lastSegment()).ifPresent((index)->{
+                        parent.asArray().remove(index.intValue());
+                        result.set(true);
+                    });
+                } else if ( parent.isDocument() ) {
+                    result.set( parent.asDocument().remove(path.lastSegment()) != null );
                 }
-            }
-            // Otherwise does not exist, so removal doesn't mean anything and we haven't modified the document
-            return Boolean.FALSE;
+            });
+            return Boolean.valueOf(result.get());
         }
     }
     
@@ -854,37 +863,37 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     
     public boolean isCreation() {
         if (ops.size() != 1) return false;
-        return ops.stream().anyMatch((operation) -> {
-            if ( operation instanceof Add ) {
-                Add add = (Add)operation;
-                return add.path().equals("/") && add.value().isDocument();
-            }
-            return false;
-        });
-    }
-    
-    public Optional<Value> createdValue() {
-        if ( isCreation() ) {
-            Add addOp = (Add) ops.get(0);
-            return Optional.of(addOp.value());
-        }
-        return Optional.empty();
+        return ops.stream().anyMatch(Patch::isCreationOperation);
     }
     
     public boolean isDeletion() {
         if (ops.size() != 1) return false;
-        return ops.stream().anyMatch((operation) -> {
-            return operation instanceof Remove && ((Remove) operation).path().equals("/");
-        });
+        return ops.stream().anyMatch(Patch::isDeletionOperation);
+    }
+    
+    private static boolean isCreationOperation( Operation op ) {
+        if ( op instanceof Add ) {
+            Add add = (Add)op;
+            return add.path().equals("/") && add.value().isDocument();
+        }
+        return false;
+    }
+    
+    private static boolean isDeletionOperation( Operation op ) {
+        return op instanceof Remove && ((Remove) op).path().equals("/");
+    }
+    
+    public void ifCreation( Consumer<Document> consumer ) {
+        if ( isCreation() ) {
+            Add addOp = (Add) ops.get(0);
+            consumer.accept(addOp.asValue().asDocument());
+        }
     }
     
     public Document asDocument() {
         Document doc = Document.create();
         doc.putAll(id.fields());
-        Array array = doc.setArray("ops");
-        for (Operation op : ops) {
-            array.add(op.asDocument());
-        }
+        doc.setArray("ops",Array.create(ops.stream().map(Operation::asValue).collect(Collectors.toList())));
         return doc;
     }
     
@@ -905,17 +914,15 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         Identifier id = Message.getId(doc);
         if (id == null) return null;
         Array ops = doc.getArray("ops");
-        List<Operation> operations = new ArrayList<>(ops.size());
-        ops.streamValues().forEach((value) -> {
-            if (value.isDocument()) {
-                Operation op = operationFrom(value.asDocument());
-                if (op != null) operations.add(op);
-            }
-        });
+        List<Operation> operations = ops.streamValues().filter(Value::isDocument)
+                                                       .map(Patch::toOperation)
+                                                       .filter(Predicates.notNull())
+                                                       .collect(Collectors.toList());
         return new Patch(id, operations);
     }
     
-    private static Operation operationFrom(Document doc) {
+    private static Operation toOperation(Value value) {
+        Document doc = value.asDocument();
         switch (Action.fromLowercase(doc.getString("op"))) {
             case ADD:
                 return new AddOp(doc.getString("path"), doc.get("value"));
@@ -952,13 +959,6 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         if ( isDeletion() ) {
             return false;
         }
-        AtomicBoolean modified = new AtomicBoolean(false);
-        ops.stream().forEach((op) -> {
-            if ( op.apply(document,(invalidPath)->failed.accept(op)) ) {
-                modified.set(true);
-            }
-            
-        });
-        return modified.get();
+        return ops.stream().map((op)->op.apply(document,(invalidPath)->failed.accept(op))).count() > 0;
     }
 }

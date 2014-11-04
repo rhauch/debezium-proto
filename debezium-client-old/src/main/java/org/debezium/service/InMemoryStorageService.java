@@ -5,7 +5,6 @@
  */
 package org.debezium.service;
 
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -17,7 +16,6 @@ import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
-import org.debezium.core.doc.Value;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Add;
 
@@ -51,12 +49,9 @@ public class InMemoryStorageService implements Service {
                 // Read the change to the database ...
                 Patch<DatabaseId> patch = Patch.forDatabase(request);
                 DatabaseId dbId = patch.target();
-                Optional<Value> created = patch.createdValue();
-                if ( created.isPresent() ) {
+                if ( patch.isCreation() ) {
                     // Request to create a new database ...
-                    Document doc = created.get().asDocument();
-                    if ( doc == null ) doc = Document.create();
-                    schemasByDatabaseIds.putIfAbsent(dbId, doc);
+                    patch.ifCreation(doc->schemasByDatabaseIds.putIfAbsent(dbId, doc));
                 } else if ( patch.isDeletion() ) {
                     // Delete an existing database ...
                     schemasByDatabaseIds.remove(dbId);
