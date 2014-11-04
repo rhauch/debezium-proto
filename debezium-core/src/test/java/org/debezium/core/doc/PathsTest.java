@@ -7,6 +7,7 @@ package org.debezium.core.doc;
 
 import static org.fest.assertions.Assertions.assertThat;
 
+import org.debezium.Testing;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -14,7 +15,7 @@ import org.junit.Test;
  * @author Randall Hauch
  *
  */
-public class PathsTest {
+public class PathsTest implements Testing {
     
     private Path path;
 

@@ -14,7 +14,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>debezium-core</artifactId>
-    <name>Debezium</name>
+    <name>Debezium Core</name>
     <packaging>jar</packaging>
     <properties>
         <module-name>org.debezium.core</module-name>
@@ -27,7 +27,6 @@
         <dependency>
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-api</artifactId>
-            <scope>runtime</scope>
         </dependency>
         <!-- Test dependencies -->
         <dependency>

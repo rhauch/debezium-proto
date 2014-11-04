@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import org.debezium.core.util.HashCode;
 import org.debezium.core.util.Iterators;
 import org.debezium.core.util.Joiner;
 import org.debezium.core.util.Strings;
@@ -65,6 +66,14 @@ final class Paths {
             return 0;
         }
         @Override
+        public int hashCode() {
+            return 1;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            return obj == this;
+        }
+        @Override
         public String toString() {
             return "/";
         }
@@ -111,6 +120,20 @@ final class Paths {
         @Override
         public int size() {
             return 1;
+        }
+        @Override
+        public int hashCode() {
+            return segment.get().hashCode();
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if ( obj == this ) return true;
+            if ( obj instanceof Path ) {
+                Path that = (Path)obj;
+                if ( this.size() != that.size() ) return false;
+                return this.lastSegment().get().equals(that.lastSegment().get());
+            }
+            return false;
         }
         @Override
         public String toString() {
@@ -168,6 +191,25 @@ final class Paths {
         @Override
         public int size() {
             return segments.length;
+        }
+        @Override
+        public int hashCode() {
+            return segments.hashCode();
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if ( obj == this ) return true;
+            if ( obj instanceof Path ) {
+                Path that = (Path)obj;
+                if ( this.size() != that.size() ) return false;
+                Iterator<String> thisIter = this.iterator();
+                Iterator<String> thatIter = that.iterator();
+                while ( thisIter.hasNext() ) {
+                    if ( !thisIter.next().equals(thatIter.next())) return false;
+                }
+                return true;
+            }
+            return false;
         }
         @Override
         public String toString() {
@@ -236,6 +278,25 @@ final class Paths {
         @Override
         public int size() {
             return parent.size() + 1;
+        }
+        @Override
+        public int hashCode() {
+            return HashCode.compute(parent,segment);
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if ( obj == this ) return true;
+            if ( obj instanceof Path ) {
+                Path that = (Path)obj;
+                if ( this.size() != that.size() ) return false;
+                if ( !this.parent.equals(that.parent())) return false;
+                return this.segment.equals(that.lastSegment().get());
+            }
+            return false;
+        }
+        @Override
+        public String toString() {
+            return Joiner.on("/","/").join(parent,segment);
         }
         @Override
         public String segment(int index) {

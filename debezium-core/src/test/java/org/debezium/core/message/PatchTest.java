@@ -39,7 +39,7 @@ public class PatchTest implements Testing {
 
     @Test
     public void shouldBuildAndApplyCreationPatch() {
-        Testing.Print.enable();
+        //Testing.Print.enable();
         
         Document initial = Document.create("firstName", "Jackie", "lastName", "Jones");
         Patch<EntityId> patch = Patch.create(ENTITY_ID, initial);
@@ -56,7 +56,7 @@ public class PatchTest implements Testing {
 
     @Test
     public void shouldBuildAndApplyPatchToAddSimpleFieldsToEntity() {
-        Testing.Print.enable();
+        //Testing.Print.enable();
         
         Patch<EntityId> patch = Patch.edit(ENTITY_ID)
                 .add("firstName", Value.create("Jackie"))
@@ -78,7 +78,7 @@ public class PatchTest implements Testing {
 
     @Test
     public void shouldBuildAndApplyPatchToAddSimpleAndDocumentFieldsToEntity() {
-        Testing.Print.enable();
+        //Testing.Print.enable();
         
         Patch<EntityId> patch = Patch.edit(ENTITY_ID)
                 .add("firstName", Value.create("Jackie"))
@@ -104,7 +104,7 @@ public class PatchTest implements Testing {
 
     @Test
     public void shouldBuildAndApplyPatchToAddFieldToNestedDocument() {
-        Testing.Print.enable();
+        //Testing.Print.enable();
         
         Patch<EntityId> patch = Patch.edit(ENTITY_ID)
                 .add("firstName", Value.create("Jackie"))
@@ -144,7 +144,7 @@ public class PatchTest implements Testing {
     
     @Test
     public void shouldBuildAndApplyPatchToReplaceFields() {
-        Testing.Print.enable();
+        //Testing.Print.enable();
         
         Patch<EntityId> patch = Patch.edit(ENTITY_ID)
                 .add("firstName", Value.create("Jackie"))

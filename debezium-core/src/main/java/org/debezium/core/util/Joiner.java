@@ -54,6 +54,17 @@ public final class Joiner {
         return joiner.toString();
     }
     
+    public String join( Iterable<?> values, CharSequence nextValue, CharSequence... additionalValues ) {
+        for ( Object value : values ) {
+            if ( value != null ) joiner.add(value.toString());
+        }
+        if ( nextValue != null ) joiner.add(nextValue);
+        for ( CharSequence value : additionalValues ) {
+            if ( value != null ) joiner.add(value);
+        }
+        return joiner.toString();
+    }
+    
     public String join( Iterator<?> values ) {
         while ( values.hasNext() ) {
             Object value = values.next();

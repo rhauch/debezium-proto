@@ -7,13 +7,14 @@ package org.debezium.core.doc;
 
 import static org.fest.assertions.Assertions.assertThat;
 
+import org.debezium.Testing;
 import org.junit.Before;
 import org.junit.Test;
 
 /**
  * @author Randall Hauch
  */
-public class JacksonWriterTest {
+public class JacksonWriterTest implements Testing {
     
     private Document doc;
     private Document after;
@@ -50,7 +51,7 @@ public class JacksonWriterTest {
         doc.set("field2", 22);
         doc.set("field3", Document.create("a","A","b","B"));
         after = reader.read(writer.write(doc));
-        System.out.println(after);
+        Testing.print(after);
         assertThat(after.getString("field1")).isEqualTo("value");
         assertThat(after.getInteger("field2")).isEqualTo(22);
         assertThat(after.size()).isEqualTo(3);
@@ -65,7 +66,7 @@ public class JacksonWriterTest {
         doc.set("field2", 22);
         doc.set("field3", Document.create("a","A","b","B","c",Document.create("x","X")));
         after = reader.read(writer.write(doc));
-        System.out.println(after);
+        Testing.print(after);
         assertThat(after.getString("field1")).isEqualTo("value");
         assertThat(after.getInteger("field2")).isEqualTo(22);
         assertThat(after.size()).isEqualTo(3);

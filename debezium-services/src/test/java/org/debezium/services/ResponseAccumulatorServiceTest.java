@@ -8,7 +8,6 @@ package org.debezium.services;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.debezium.Testing;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
@@ -107,7 +106,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
     
     @Test
     public void shouldStoreAndForwardResponsesForManyParts() {
-        Testing.Debug.enable();
+        // Testing.Debug.enable();
         int numParts = 10;
         
         // Create the two messages ...
