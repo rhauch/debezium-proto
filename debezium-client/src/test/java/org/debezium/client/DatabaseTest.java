@@ -60,8 +60,11 @@ public class DatabaseTest {
 
     @AfterClass
     public static void afterAll() throws IOException {
-        if (client != null) client.shutdown(5, TimeUnit.SECONDS);
-        kafka.stopAndCleanUp();
+        try {
+            if (client != null) client.shutdown(5, TimeUnit.SECONDS);
+        } finally {
+            kafka.stopAndCleanUp();
+        }
     }
 
     @Before

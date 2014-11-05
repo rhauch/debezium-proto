@@ -55,10 +55,22 @@ public class ResponseHandlersTest implements Testing {
     
     @After
     public void afterEach() {
-        if (node != null) {
-            node.shutdown();
+        try {
+            if ( node != null ) {
+                node.shutdown();
+            }
+        } finally {
+            try {
+                executor.shutdown();
+            } finally {
+                try {
+                    executor.awaitTermination(10, TimeUnit.SECONDS);
+                } catch ( InterruptedException e ) {
+                    // We were interrupted while blocking, so clear the status ...
+                    Thread.interrupted();
+                }
+            }
         }
-        executor.shutdown();
     }
     
     protected void startWith(Document config) {
