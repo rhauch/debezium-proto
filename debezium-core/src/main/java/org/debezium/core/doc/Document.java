@@ -39,6 +39,15 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
          */
         Value getValue();
         
+        default boolean isNull() {
+            Value v = getValue();
+            return v == null || v.isNull();
+        }
+        
+        default boolean isNotNull() {
+            return !isNull();
+        }
+        
         @Override
         default int compareTo(Field that) {
             if (that == null) return 1;
@@ -274,6 +283,49 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
             ++i;
         }
         return Optional.of(value);
+    }
+
+    /**
+     * Find a document at the given path and obtain a stream over its fields. This will return an empty stream when:
+     * <ul>
+     * <li>a value does not exist in this document at the supplied path; or</li>
+     * <li>a non-document value does exist in this document at the supplied path; or</li>
+     * <li>a document value does exist in this document at the supplied path, but that document is empty</li>
+     * </ul>
+     * @param path the path to the contained document
+     * @return the stream of fields in the document at the given path; never null
+     */
+    default Stream<Field> children( Path path ) {
+        Value parent = find(path).orElse(Value.create(Document.create()));
+        if ( !parent.isDocument() ) return Stream.empty();
+        return parent.asDocument().stream();
+    }
+
+    /**
+     * Find the document at the given field name and obtain a stream over its fields. This will return an empty stream when:
+     * <ul>
+     * <li>a field with the given name does not exist in this document; or</li>
+     * <li>a field with the given name does exist in this document but the value is not a document; or</li>
+     * <li>a field with the given name does exist in this document and the value is an empty document</li>
+     * </ul>
+     * @param fieldName the path to the contained document
+     * @return the stream of fields within the nested document; never null
+     */
+    default Stream<Field> children( String fieldName ) {
+        Document doc = getDocument(fieldName);
+        if ( doc == null ) return Stream.empty();
+        return doc.stream();
+    }
+    
+    /**
+     * Gets the field in this document with the given field name.
+     * 
+     * @param fieldName The name of the field
+     * @return The field, if found, or null otherwise
+     */
+    default Field getField( CharSequence fieldName ) {
+        Value value = get(fieldName);
+        return value != null ? new BasicField(fieldName,value) : null;
     }
     
     /**

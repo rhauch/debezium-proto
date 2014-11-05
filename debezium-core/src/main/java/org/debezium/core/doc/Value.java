@@ -26,6 +26,10 @@ public interface Value extends Comparable<Value> {
         return value == null || value.isNull();
     }
 
+    static boolean notNull( Value value ) {
+        return value != null && !value.isNull();
+    }
+
     static boolean isValid(Object value) {
         return value == null || value instanceof Value ||
                 value instanceof String || value instanceof Boolean ||

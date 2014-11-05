@@ -8,10 +8,10 @@ package org.debezium.services;
 import org.apache.samza.config.Config;
 import org.debezium.Testing;
 import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityCollection.FieldType;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
-import org.debezium.core.component.Schema;
-import org.debezium.core.component.Schema.FieldType;
+import org.debezium.core.component.SchemaEditor;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Message.Status;
@@ -39,25 +39,25 @@ public class SchemaStorageServiceTest extends AbstractServiceTest {
     
     static {
         Document schema = Document.create();
-        Document contacts = Schema.getOrCreateComponent(CONTACTS, schema);
-        Document calls = Schema.getOrCreateComponent(CALLS, schema);
+        Document contacts = SchemaEditor.getOrCreateComponent(CONTACTS, schema);
+        Document calls = SchemaEditor.getOrCreateComponent(CALLS, schema);
         
         // Edit the 'contacts' type ...
         Patch.Editor<Patch<EntityType>> contactsEditor = Patch.edit(CONTACTS);
-        Schema.createField(contactsEditor, "firstName").type(FieldType.STRING).optional(false).description("First name");
-        Schema.createField(contactsEditor, "lastName").type(FieldType.STRING).optional(false).description("Last name");
-        Schema.createField(contactsEditor, "middleName").type(FieldType.STRING).optional(true).description("Middle name");
+        SchemaEditor.createField(contactsEditor, "firstName").type(FieldType.STRING).optional(false).description("First name");
+        SchemaEditor.createField(contactsEditor, "lastName").type(FieldType.STRING).optional(false).description("Last name");
+        SchemaEditor.createField(contactsEditor, "middleName").type(FieldType.STRING).optional(true).description("Middle name");
         contactsEditor.end().apply(contacts, (op) -> Fail.fail("failed to patch 'contacts': " + op));
         
         // Edit the 'calls' type ...
         Patch.Editor<Patch<EntityType>> callsEditor = Patch.edit(CALLS);
-        Schema.createField(callsEditor, "time").type(FieldType.TIMESTAMP).optional(false).description("Time of call");
-        Schema.createField(callsEditor, "from").type(FieldType.STRING).optional(false).description("Caller number");
-        Schema.createField(callsEditor, "to").type(FieldType.STRING).optional(false).description("Called number");
-        Schema.createField(callsEditor, "duration").type(FieldType.INTEGER).optional(false).description("Duration of call in minutes");
+        SchemaEditor.createField(callsEditor, "time").type(FieldType.TIMESTAMP).optional(false).description("Time of call");
+        SchemaEditor.createField(callsEditor, "from").type(FieldType.STRING).optional(false).description("Caller number");
+        SchemaEditor.createField(callsEditor, "to").type(FieldType.STRING).optional(false).description("Called number");
+        SchemaEditor.createField(callsEditor, "duration").type(FieldType.INTEGER).optional(false).description("Duration of call in minutes");
         callsEditor.end().apply(calls, (op) -> Fail.fail("failed to patch 'calls': " + op));
         
-        Schema.setLearning(schema, true);
+        SchemaEditor.setLearning(schema, true);
         
         // Testing.Print.enable();
         Testing.print(schema);

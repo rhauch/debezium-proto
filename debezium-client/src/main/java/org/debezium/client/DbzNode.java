@@ -221,12 +221,6 @@ final class DbzNode {
         void call();
     }
     
-    private static Properties asProperties(Document doc) {
-        Properties props = new Properties();
-        if ( doc != null ) doc.forEach(field -> props.put(field.getName(), field.getValue().convert().asString()));
-        return props;
-    }
-    
     private final String nodeId = UUID.randomUUID().toString();
     private final Properties producerConfig;
     private final Properties consumerConfig;
@@ -242,8 +236,8 @@ final class DbzNode {
     
     public DbzNode(Document config, Supplier<Executor> executor) {
         this.config = config;
-        this.producerConfig = asProperties(config.getDocument("producer"));
-        this.consumerConfig = asProperties(config.getDocument("consumer"));
+        this.producerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.PRODUCER_SECTION));
+        this.consumerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.CONSUMER_SECTION));
         this.executor = executor;
         // On node startup, start all registered services ...
         registerStart(() -> services.forEach((service) -> service.start(this)));

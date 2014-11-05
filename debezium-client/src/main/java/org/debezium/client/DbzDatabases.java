@@ -84,19 +84,25 @@ final class DbzDatabases extends Service {
         activeDatabases.clear();
     }
     
-    DatabaseConnection connect(ExecutionContext context, DatabaseId dbId, long timeout, TimeUnit unit) {
+    DbzConnection connect(ExecutionContext context, long timeout, TimeUnit unit) {
         whenRunning(node -> {
-            ActiveDatabase db = activeDatabases.get(dbId);
-            if (db == null) {
-                db = handlers.requestAndWait(context, timeout, unit, submitReadSchema(context, dbId, node),
-                                             this::updateActiveDatabase, notAvailable(dbId))
-                                             .orElseThrow(DebeziumConnectionException::new);
-            }
-            assert db != null;
-            return new DatabaseConnection(this, context);
+            activeDatabase(node,context,timeout,unit);
+            return new DbzConnection(this, context);
         }).orElseThrow(DebeziumClientException::new);
         assert false : "Should never get here";
         return null;
+    }
+    
+    private ActiveDatabase activeDatabase(DbzNode node, ExecutionContext context, long timeout, TimeUnit unit) {
+        DatabaseId dbId = context.databaseId();
+        ActiveDatabase db = activeDatabases.get(dbId);
+        if (db == null) {
+            db = handlers.requestAndWait(context, timeout, unit, submitReadSchema(context, dbId, node),
+                                         this::updateActiveDatabase, notAvailable(dbId))
+                                         .orElseThrow(DebeziumConnectionException::new);
+        }
+        assert db != null;
+        return db;
     }
     
     private Consumer<RequestId> submitReadSchema(ExecutionContext context, DatabaseId id, DbzNode node) {
@@ -126,9 +132,15 @@ final class DbzDatabases extends Service {
         };
     }
     
-    boolean disconnect(DatabaseConnection connection) {
+    boolean disconnect(DbzConnection connection) {
         // Clean up any resources held for the given database connection ...
         return true;
+    }
+    
+    void readSchema(ExecutionContext context, Handlers handlers) {
+        if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to read entities");
+        // We should always have one locally since we're connected ...
+        whenRunning(node -> activeDatabase(node,context,10,TimeUnit.SECONDS).schema());
     }
     
     void readEntities(ExecutionContext context, Iterable<EntityId> entityIds, Handlers handlers) {
@@ -142,4 +154,17 @@ final class DbzDatabases extends Service {
             return requestId;
         }).orElseThrow(DebeziumClientException::new);
     }
+    
+    
+    void changeEntities(ExecutionContext context, Batch<EntityId> batch, Handlers handlers) {
+        if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to change entities");
+        whenRunning(node -> {
+            RequestId requestId = this.handlers.register(context, 1, handlers).orElseThrow(DebeziumClientException::new);
+            Document request = batch.asDocument();
+            Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
+            node.send(Topic.ENTITY_BATCHES, requestId.asString(), request);
+            return requestId;
+        }).orElseThrow(DebeziumClientException::new);
+    }
+    
 }

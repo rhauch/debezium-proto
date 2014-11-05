@@ -5,8 +5,11 @@
  */
 package org.debezium.core.message;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
@@ -21,9 +24,9 @@ import org.debezium.core.util.Collect;
  *
  */
 public final class Message {
-    
+
     private static final AtomicLong REQUEST_NUMBER = new AtomicLong();
-    
+
     public static final class Field {
         public static final String CLIENT_ID = "clientid";
         public static final String REQUEST = "request";
@@ -47,19 +50,19 @@ public final class Message {
         public static final String AFTER = "after";
         public static final String RESPONSES = "responses";
     }
-    
+
     public static enum Status {
         SUCCESS(1), DOES_NOT_EXIST(2), PATCH_FAILED(3);
         private final int code;
-        
+
         private Status(int code) {
             this.code = code;
         }
-        
+
         public int code() {
             return this.code;
         }
-        
+
         public static Status fromCode(int code) {
             switch (code) {
                 case 1:
@@ -72,7 +75,7 @@ public final class Message {
             return null;
         }
     }
-    
+
     private static final Set<String> HEADER_FIELD_NAMES = Collect.unmodifiableSet(Field.CLIENT_ID,
                                                                                   Field.REQUEST,
                                                                                   Field.USER,
@@ -81,7 +84,7 @@ public final class Message {
                                                                                   Field.LEARNING,
                                                                                   Field.INCLUDE_BEFORE,
                                                                                   Field.INCLUDE_AFTER);
-    
+
     /**
      * Create a new response message from the supplied request. The response will contain all of the {@link #HEADER_FIELD_NAMES
      * header fields} from the original request and a {@link Status#SUCCESS success status}.
@@ -95,7 +98,7 @@ public final class Message {
         Message.setStatus(response, Status.SUCCESS);
         return response;
     }
-    
+
     /**
      * Create a new aggregate response message from the supplied partial response.
      * 
@@ -120,7 +123,7 @@ public final class Message {
         responses.setDocument(index, partialResponse);
         return complete;
     }
-    
+
     /**
      * Add the supplied partial response to the given aggregate response message.
      * 
@@ -148,7 +151,7 @@ public final class Message {
         }
         return false;
     }
-    
+
     /**
      * Given the supplied aggregate or partial response message, invoke the function for each of the partial responses.
      * If the given document is an aggregate, the function will be called once for each contained partial response. If the
@@ -167,7 +170,7 @@ public final class Message {
             handlePartialResponse(function, response);
         }
     }
-    
+
     private static void handlePartialResponse(PartialResponseHandler function, Document partialResponse) {
         Identifier id = getId(partialResponse);
         long request = getRequest(partialResponse);
@@ -175,7 +178,7 @@ public final class Message {
         int part = getPart(partialResponse);
         function.accept(id, part, request, partialResponse);
     }
-    
+
     /**
      * A functional interface used to process each partial response in an aggregate response document.
      * 
@@ -194,7 +197,7 @@ public final class Message {
          */
         void accept(Identifier id, int partialNumber, long request, Document response);
     }
-    
+
     /**
      * Create a new response message from the supplied request. The response will contain all of the {@link #HEADER_FIELD_NAMES
      * header fields} from the original request and a {@link Status#SUCCESS success status}.
@@ -209,7 +212,7 @@ public final class Message {
         addId(batchRequest, patch.target());
         return patchRequest;
     }
-    
+
     public static Identifier getId(Document doc) {
         if (doc == null) return null;
         String databaseId = doc.getString(Field.DATABASE_ID);
@@ -222,7 +225,7 @@ public final class Message {
         if (id == null) return Identifier.zone(databaseId, entityType, zoneId);
         return Identifier.of(databaseId, entityType, id, zoneId);
     }
-    
+
     public static EntityId getEntityId(Document doc) {
         String databaseId = doc.getString(Field.DATABASE_ID);
         String entityType = doc.getString(Field.COLLECTION);
@@ -230,24 +233,24 @@ public final class Message {
         String id = doc.getString(Field.ENTITY);
         return Identifier.of(databaseId, entityType, id, zoneId);
     }
-    
+
     public static DatabaseId getDatabaseId(Document doc) {
         String databaseId = doc.getString(Field.DATABASE_ID);
         return Identifier.of(databaseId);
     }
-    
+
     public static void addId(Document doc, Identifier id) {
         id.fields().forEachRemaining((field) -> doc.set(field.getName(), field.getValue()));
     }
-    
+
     public static void addHeaders(Document doc, String clientId) {
         addHeaders(doc, clientId, REQUEST_NUMBER.incrementAndGet(), null, System.currentTimeMillis());
     }
-    
+
     public static void addHeaders(Document doc, String clientId, long request, String user) {
         addHeaders(doc, clientId, request, user, System.currentTimeMillis());
     }
-    
+
     public static void addHeaders(Document doc, String clientId, long request, String user, long timestamp) {
         assert clientId != null;
         doc.setString(Field.CLIENT_ID, clientId);
@@ -255,7 +258,7 @@ public final class Message {
         if (user != null) doc.setString(Field.USER, user);
         if (timestamp > 0L) doc.setNumber(Field.BEGUN, timestamp);
     }
-    
+
     /**
      * Copy into the target document all of the header fields in the source document.
      * 
@@ -266,20 +269,29 @@ public final class Message {
     public static void copyHeaders(Document source, Document target) {
         target.putAll(source, (name) -> HEADER_FIELD_NAMES.contains(name.toString()));
     }
-    
+
+    /**
+     * Get the {@link Status} in the supplied message.
+     * @param message the response message
+     * @return the status, or null if there is no (known) status
+     */
+    public static Status getStatus(Document message) {
+        return Status.fromCode(message.getInteger(Field.STATUS, -1));
+    }
+
     public static void setStatus(Document message, Status status) {
         message.setNumber(Field.STATUS, status.code());
     }
-    
+
     public static boolean isStatus(Document message, Status status) {
         Integer value = message.getInteger(Field.STATUS);
         return value != null && value.intValue() == status.code();
     }
-    
+
     public static boolean isSuccess(Document message) {
         return isStatus(message, Status.SUCCESS);
     }
-    
+
     public static void addFailureReason(Document message, String reason) {
         Value value = message.get(Field.ERROR);
         if (value == null) {
@@ -292,22 +304,37 @@ public final class Message {
             throw new IllegalStateException();
         }
     }
-    
+
+    public static Collection<String> getFailureReasons(Document message) {
+        Value value = message.get(Field.ERROR);
+        if (Value.notNull(value)) {
+            if (value.isArray()) {
+                return value.asArray().streamValues().filter(Value::notNull).map(Value::toString).collect(Collectors.toList());
+            }
+            if (value.isDocument()) {
+                return value.asDocument().stream().filter(Document.Field::isNotNull).map(f -> f.getValue().toString())
+                            .collect(Collectors.toList());
+            }
+            return Collections.singleton(value.toString());
+        }
+        return Collections.emptyList();
+    }
+
     public static String getClient(Document message) {
         return message.getString(Field.CLIENT_ID);
     }
-    
+
     public static boolean isFromClient(Document message, String clientId) {
         Value value = message.get(Field.CLIENT_ID);
         return value != null && value.isString() && value.asString().equals(clientId);
     }
-    
+
     public static long getRequest(Document message) {
         Long value = message.getLong(Field.REQUEST);
         assert value != null;
         return value.longValue();
     }
-    
+
     public static void setLearning(Document message, boolean enabled) {
         if (enabled) {
             message.setBoolean(Field.LEARNING, true);
@@ -315,43 +342,48 @@ public final class Message {
             message.remove(Field.LEARNING);
         }
     }
-    
+
     public static boolean isLearningEnabled(Document message) {
         return message.getBoolean(Field.LEARNING, false);
     }
-    
+
     public static void setAfter(Document message, Document representation) {
         message.setDocument(Field.AFTER, representation);
     }
-    
+
     public static void setBefore(Document message, Document representation) {
         message.setDocument(Field.BEFORE, representation);
     }
-    
+
     public static Document getAfter(Document message) {
         return message.setDocument(Field.AFTER);
     }
-    
+
     public static Document getBefore(Document message) {
         return message.setDocument(Field.BEFORE);
     }
-    
+
+    public static Document getAfterOrBefore(Document message) {
+        Document result = getAfter(message);
+        return result != null ? result : getBefore(message);
+    }
+
     public static boolean includeAfter(Document message) {
         return message.getBoolean(Field.INCLUDE_AFTER, false);
     }
-    
+
     public static boolean includeBefore(Document message) {
         return message.getBoolean(Field.INCLUDE_BEFORE, false);
     }
-    
+
     public static int getParts(Document message) {
         return message.getInteger(Field.PARTS, 1);
     }
-    
+
     public static int getPart(Document message) {
         return message.getInteger(Field.PART, 1);
     }
-    
+
     public static void setParts(Document message, int part, int parts) {
         assert part <= part;
         assert part >= 0;
@@ -359,8 +391,8 @@ public final class Message {
         message.setNumber(Field.PART, part);
         message.setNumber(Field.PARTS, parts);
     }
-    
+
     private Message() {
     }
-    
+
 }

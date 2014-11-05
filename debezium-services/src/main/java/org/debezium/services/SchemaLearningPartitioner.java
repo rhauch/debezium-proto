@@ -16,7 +16,7 @@ import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
-import org.debezium.core.component.Schema;
+import org.debezium.core.component.SchemaEditor;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Message;
 
@@ -63,10 +63,10 @@ public class SchemaLearningPartitioner implements StreamTask {
         Document schema = Message.getAfter(message);
         assert schema != null;
         
-        if (Schema.isLearningEnabled(schema)) {
+        if (SchemaEditor.isLearningEnabled(schema)) {
             // Send each entity type within the schema via a separate read message onto the output stream,
             // partitioned by entity type...
-            Schema.onEachEntityType(schema, dbId, (type, typeDoc) -> {
+            SchemaEditor.onEachEntityType(schema, dbId, (type, typeDoc) -> {
                 Document typeMessage = Message.createResponseFromRequest(message);
                 Message.setAfter(message, typeDoc);
                 collector.send(new OutgoingMessageEnvelope(Streams.schemaLearning(dbId), type, type, typeMessage));

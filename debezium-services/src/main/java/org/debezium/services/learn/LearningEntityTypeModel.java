@@ -9,11 +9,12 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import org.debezium.core.annotation.NotThreadSafe;
+import org.debezium.core.component.EntityCollection;
+import org.debezium.core.component.EntityCollection.FieldDefinition;
+import org.debezium.core.component.EntityCollection.FieldType;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
-import org.debezium.core.component.Schema;
-import org.debezium.core.component.Schema.FieldType;
-import org.debezium.core.component.Schema.FieldViewer;
+import org.debezium.core.component.SchemaEditor;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Patch;
@@ -39,7 +40,7 @@ public class LearningEntityTypeModel {
     private static final Logger LOGGER = LoggerFactory.getLogger(LearningEntityTypeModel.class);
     
     private final EntityType type;
-    private Document model;
+    private EntityCollection model;
     private Patch.Editor<Patch<EntityType>> typeEditor;
     private Strategy strategy;
     
@@ -51,7 +52,7 @@ public class LearningEntityTypeModel {
      */
     public LearningEntityTypeModel(EntityType type, Document model) {
         this.type = type;
-        this.model = model;
+        this.model = EntityCollection.with(type,model);
         this.typeEditor = Patch.edit(type);
         this.strategy = new SimpleFieldStrategy();
     }
@@ -70,7 +71,7 @@ public class LearningEntityTypeModel {
         // Now figure out if anything changed ...
         typeEditor.endIfChanged().ifPresent((entityTypePatch) -> {
             // Update the model ...
-            entityTypePatch.apply(model, (failedOp) -> LOGGER.error("Unable to apply {} to model for {}: {}", failedOp, type, model));
+            entityTypePatch.apply(model.document(), (failedOp) -> LOGGER.error("Unable to apply {} to model for {}: {}", failedOp, type, model));
             // And call the supplied function ...
             updatedEntityType.accept(entityTypePatch);
         });
@@ -78,19 +79,19 @@ public class LearningEntityTypeModel {
     
     protected static interface Strategy {
         
-        void handle(Add add, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Add add, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        void handle(Remove remove, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Remove remove, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        void handle(Replace replace, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Replace replace, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        void handle(Move move, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Move move, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        void handle(Copy copy, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Copy copy, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        void handle(Increment incr, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model);
+        void handle(Increment incr, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model);
         
-        default void handle(Require require, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
+        default void handle(Require require, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
             // do nothing ...
         }
         
@@ -102,7 +103,7 @@ public class LearningEntityTypeModel {
          * @param editor the editor for the entity type definition; never null
          * @param entityTypeModel the definition of the entity type; never null
          */
-        default void handle(Operation op, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document entityTypeModel) {
+        default void handle(Operation op, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection entityTypeModel) {
             switch (op.action()) {
                 case ADD:
                     handle((Add) op, updatedEntity, editor, entityTypeModel);
@@ -129,6 +130,10 @@ public class LearningEntityTypeModel {
         }
     }
     
+    private static FieldType determineBestFieldType(Value value) {
+        return FieldType.inferFrom(value).orElse(null);
+    }
+    
     private static FieldType determineBestFieldType(Value value, Optional<FieldType> knownType) {
         Optional<FieldType> inferred = FieldType.inferFrom(value);
         if (!inferred.isPresent()) return knownType.orElse(null);
@@ -138,91 +143,95 @@ public class LearningEntityTypeModel {
     
     protected static class SimpleFieldStrategy implements Strategy {
         @Override
-        public void handle(Add add, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
+        public void handle(Add add, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
             // Make sure that the field is already known and the type can handle the value ...
-            FieldViewer viewer = Schema.viewField(model, add.path());
-            Optional<FieldType> knownType = viewer.type();
-            FieldType bestType = determineBestFieldType(add.value(), knownType);
-            if (knownType.orElse(bestType) != bestType) {
-                // We have to change the type ...
-                Schema.editField(editor, add.path()).type(bestType);
+            Optional<FieldDefinition> field = model.field(add.path());
+            if ( field.isPresent() ) {
+                // The field exists ...
+                Optional<FieldType> knownType = field.get().type();
+                FieldType bestType = determineBestFieldType(add.value(), knownType);
+                if (knownType.orElse(bestType) != bestType) {
+                    // We have to change the type ...
+                    SchemaEditor.editField(editor, add.path()).type(bestType);
+                }
+            } else {
+                // Add the field definition with a best-guess of the type based upon the value ...
+                FieldType bestType = determineBestFieldType(add.value());
+                SchemaEditor.editField(editor, add.path()).type(bestType);
             }
         }
         
         @Override
-        public void handle(Remove remove, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
-            FieldViewer viewer = Schema.viewField(model, remove.path());
-            if (viewer.isDefined() && !viewer.isOptional()) {
-                // The field is defined, so make sure that it is optional ...
-                Schema.editField(editor, remove.path()).optional(true);
-            }
+        public void handle(Remove remove, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
+            model.field(remove.path()).ifPresent(field->{
+                if (!field.isEmpty() && !field.isOptional()) {
+                    // The field is defined, so make sure that it is optional ...
+                    SchemaEditor.editField(editor, remove.path()).optional(true);
+                }
+            });
         }
         
         @Override
-        public void handle(Replace replace, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
+        public void handle(Replace replace, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
             // The field should already be known, but make sure that the field's type can handle the new value ...
-            FieldViewer viewer = Schema.viewField(model, replace.path());
-            Optional<FieldType> knownType = viewer.type();
-            FieldType bestType = determineBestFieldType(replace.value(), knownType);
-            if (knownType.orElse(bestType) != bestType) {
-                // We have to change the type ...
-                Schema.editField(editor, replace.path()).type(bestType);
-            }
+            model.field(replace.path()).ifPresent(field->{
+                Optional<FieldType> knownType = field.type();
+                FieldType bestType = determineBestFieldType(replace.value(), knownType);
+                if (knownType.orElse(bestType) != bestType) {
+                    // We have to change the type ...
+                    SchemaEditor.editField(editor, replace.path()).type(bestType);
+                }
+            });
         }
         
         @Override
-        public void handle(Move move, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
+        public void handle(Move move, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
             // Make sure the 'from' is marked as optional ...
-            FieldViewer fromViewer = Schema.viewField(model, move.fromPath());
-            if (fromViewer.isDefined() && !fromViewer.isOptional()) {
-                // The field is defined, so make sure that it is optional ...
-                Schema.editField(editor, move.fromPath()).optional(true);
-            }
+            Optional<FieldDefinition> toField = model.field(move.toPath());
+            toField.ifPresent((field)->{
+                if ( !field.isOptional() ) {
+                    // The field is defined, so make sure that it is optional ...
+                    SchemaEditor.editField(editor, move.fromPath()).optional(true);
+                }
+            });
             
-            FieldViewer toViewer = Schema.viewField(model, move.toPath());
-            if ( !toViewer.isDefined() ) {
-                // The 'to' field is new to us, but the 'from' field should not be ...
-                // Copy the 'from' field definition ...
-                Schema.copyField(editor, move.fromPath(), move.toPath());
-                return;
-            }
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
-            Optional<FieldType> knownType = toViewer.type();
+            Optional<FieldType> knownType = toField.isPresent() ? toField.get().type() : Optional.empty();
             Value value = updatedEntity.get(move.toPath()); // TODO: this might not be the value we were copying
             if ( value != null ) {
                 FieldType bestType = determineBestFieldType(value, knownType);
                 if (knownType.orElse(bestType) != bestType) {
                     // We have to change the type ...
-                    Schema.editField(editor, move.toPath()).type(bestType);
+                    SchemaEditor.editField(editor, move.toPath()).type(bestType);
                 }
             }
         }
         
         @Override
-        public void handle(Copy copy, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
-            FieldViewer toViewer = Schema.viewField(model, copy.toPath());
-            if ( !toViewer.isDefined() ) {
+        public void handle(Copy copy, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
+            Optional<FieldDefinition> toField = model.field(copy.toPath());
+            if ( !toField.isPresent() || toField.get().isEmpty() ) {
                 // The 'to' field is new to us, but the 'from' field should not be ...
                 // Copy the 'from' field definition ...
-                Schema.copyField(editor, copy.fromPath(), copy.toPath());
+                SchemaEditor.copyField(editor, copy.fromPath(), copy.toPath());
                 return;
             }
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
-            Optional<FieldType> knownType = toViewer.type();
+            Optional<FieldType> knownType = toField.get().type();
             Value value = updatedEntity.get(copy.toPath()); // TODO: this might not be the value we were copying
             if ( value != null ) {
                 FieldType bestType = determineBestFieldType(value, knownType);
                 if (knownType.orElse(bestType) != bestType) {
                     // We have to change the type ...
-                    Schema.editField(editor, copy.toPath()).type(bestType);
+                    SchemaEditor.editField(editor, copy.toPath()).type(bestType);
                 }
             }
         }
         
         @Override
-        public void handle(Increment incr, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, Document model) {
+        public void handle(Increment incr, Document updatedEntity, Patch.Editor<Patch<EntityType>> editor, EntityCollection model) {
             // Make sure that the field is a numeric type ...
         }
     }

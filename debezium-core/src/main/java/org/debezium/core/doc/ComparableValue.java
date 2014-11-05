@@ -104,7 +104,7 @@ final class ComparableValue implements Value {
         assert type != null;
         return type;
     }
-
+    
     @Override
     public Comparable<?> asObject() {
         return value;
