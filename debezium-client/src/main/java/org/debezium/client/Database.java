@@ -7,6 +7,8 @@ package org.debezium.client;
 
 import java.io.Closeable;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
 import org.debezium.core.component.Entity;
@@ -23,18 +25,45 @@ import org.debezium.core.message.Patch;
  */
 public interface Database extends Closeable {
 
-    void readSchema(OutcomeHandler<Schema> handler);
+    Completion readSchema(OutcomeHandler<Schema> handler);
 
-    void readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler);
+    Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler);
 
-    default void readEntity(EntityId entityId, OutcomeHandler<Stream<Entity>> handler) {
-        readEntities(Collections.singleton(entityId), handler);
+    default Completion readEntity(EntityId entityId, OutcomeHandler<Stream<Entity>> handler) {
+        return readEntities(Collections.singleton(entityId), handler);
     }
     
-    void changeEntities( Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId,Entity>>> handler );
+    Completion changeEntities( Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId,Entity>>> handler );
 
+    boolean isConnected();
+    
     @Override
     void close();
+    
+    public static interface Completion {
+        /**
+         * Waits if necessary for the operation to complete, and then
+         * retrieves its result.
+         *
+         * @throws InterruptedException if the current thread was interrupted
+         * while waiting
+         */
+        void await() throws InterruptedException;
+
+        /**
+         * Waits if necessary for at most the given time for the operation
+         * to complete, and then retrieves its result, if available.
+         *
+         * @param timeout the maximum time to wait
+         * @param unit the time unit of the timeout argument
+         * @throws InterruptedException if the current thread was interrupted
+         * while waiting
+         * @throws TimeoutException if the wait timed out
+         */
+        void await(long timeout, TimeUnit unit)
+            throws InterruptedException, TimeoutException;
+
+    }
 
     @FunctionalInterface
     public static interface OutcomeHandler<T> {

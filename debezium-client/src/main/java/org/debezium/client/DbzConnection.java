@@ -8,10 +8,14 @@ package org.debezium.client;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import org.debezium.client.DbzNode.Callable;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identified;
@@ -46,6 +50,10 @@ final class DbzConnection implements Database {
         return context;
     }
     
+    @Override
+    public boolean isConnected() {
+        return !isClosed;
+    }
     
     @Override
     public synchronized void close() {
@@ -59,25 +67,30 @@ final class DbzConnection implements Database {
     }
 
     @Override
-    public void readSchema(OutcomeHandler<Schema> handler) {
+    public Completion readSchema(OutcomeHandler<Schema> handler) {
         ensureOpen();
-        dbs.readSchema(context,handle(handler,response->Schema.with(context.databaseId(),response)));
+        RequestCompletion latch = new RequestCompletion();
+        dbs.readSchema(context,handle(handler,latch,response->Schema.with(context.databaseId(),response)));
+        return latch;
     }
     
     @Override
-    public void readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler) {
+    public Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler) {
         ensureOpen();
-        dbs.readEntities(context,entityIds,handleStream(handler,response->{
+        RequestCompletion latch = new RequestCompletion();
+        dbs.readEntities(context,entityIds,handleStream(handler,latch,response->{
             EntityId id = Message.getEntityId(response);
             Document representation = Message.getAfter(response);
             return Entity.with(id,representation);
         }));
+        return latch;
     }
     
     @Override
-    public void changeEntities(Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId,Entity>>> handler) {
+    public Completion changeEntities(Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId,Entity>>> handler) {
         ensureOpen();
-        dbs.changeEntities(context,batch,handleStream(handler,response->{
+        RequestCompletion latch = new RequestCompletion();
+        dbs.changeEntities(context,batch,handleStream(handler,latch,response->{
             EntityId id = Message.getEntityId(response);
             Document entity = Message.getAfterOrBefore(response);
             Patch<EntityId> patch = Patch.forEntity(response);
@@ -85,15 +98,16 @@ final class DbzConnection implements Database {
             Collection<String> failureReasons = Message.getFailureReasons(response);
             return changed(status,id,Entity.with(id,entity),patch,failureReasons);
         }));
+        return latch;
     }
     
-    private <R> ResponseHandlers.Handlers handleStream( OutcomeHandler<Stream<R>> handler, Function<Document,R> processResponse ) {
-        StreamOutcomeBuilder<R> builder = new StreamOutcomeBuilder<R>(handler,processResponse);
+    private <R> ResponseHandlers.Handlers handleStream( OutcomeHandler<Stream<R>> handler, RequestCompletion latch, Function<Document,R> processResponse ) {
+        StreamOutcomeBuilder<R> builder = new StreamOutcomeBuilder<R>(handler,latch::complete,processResponse);
         return ResponseHandlers.with(builder::accumulate, builder::success, builder::failed);
     }
     
-    private <R> ResponseHandlers.Handlers handle( OutcomeHandler<R> handler, Function<Document,R> processResponse ) {
-        SingleOutcomeBuilder<R> builder = new SingleOutcomeBuilder<R>(handler,processResponse);
+    private <R> ResponseHandlers.Handlers handle( OutcomeHandler<R> handler, RequestCompletion latch, Function<Document,R> processResponse ) {
+        SingleOutcomeBuilder<R> builder = new SingleOutcomeBuilder<R>(handler,latch::complete,processResponse);
         return ResponseHandlers.with(builder::set, builder::success, builder::failed);
     }
     
@@ -106,13 +120,30 @@ final class DbzConnection implements Database {
         throw new IllegalStateException("Unknown status: " + messageStatus);
     }
     
+    private static final class RequestCompletion implements Completion {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        @Override
+        public void await() throws InterruptedException {
+            latch.await();
+        }
+        @Override
+        public void await(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException {
+            latch.await(timeout,unit);
+        }
+        protected void complete() {
+            latch.countDown();
+        }
+    }
+    
     private static final class StreamOutcomeBuilder<T> {
         private final OutcomeHandler<Stream<T>> handler;
         private final List<T> results = new ArrayList<>();
         private final Function<Document,T> responseAdapter;
-        protected StreamOutcomeBuilder( OutcomeHandler<Stream<T>> handler, Function<Document,T> adapter ) {
+        private final Callable completion;
+        protected StreamOutcomeBuilder( OutcomeHandler<Stream<T>> handler, Callable completion, Function<Document,T> adapter ) {
             this.responseAdapter = adapter;
             this.handler = handler;
+            this.completion = completion;
         }
         public void accumulate( Document response ) {
             T result = responseAdapter.apply(response);
@@ -134,6 +165,7 @@ final class DbzConnection implements Database {
                     return null;
                 }
             });
+            if ( completion != null ) completion.call();
         }
         public void failed( Outcome.Status status, String failureReason ) {
             if ( handler == null ) return;
@@ -151,6 +183,7 @@ final class DbzConnection implements Database {
                     return failureReason;
                 }
             });
+            if ( completion != null ) completion.call();
         }
     }
     
@@ -159,9 +192,11 @@ final class DbzConnection implements Database {
         private final OutcomeHandler<T> handler;
         private final AtomicReference<T> results = new AtomicReference<>();
         private final Function<Document,T> responseAdapter;
-        protected SingleOutcomeBuilder( OutcomeHandler<T> handler, Function<Document,T> adapter ) {
+        private final Callable completion;
+        protected SingleOutcomeBuilder( OutcomeHandler<T> handler, Callable completion, Function<Document,T> adapter ) {
             this.responseAdapter = adapter;
             this.handler = handler;
+            this.completion = completion;
         }
         public void set( Document response ) {
             results.set(responseAdapter.apply(response));
@@ -181,6 +216,7 @@ final class DbzConnection implements Database {
                     return null;
                 }
             });
+            if ( completion != null ) completion.call();
         }
         public void failed( Outcome.Status status, String failureReason ) {
             handler.handle( new Outcome<T>() {
@@ -197,6 +233,7 @@ final class DbzConnection implements Database {
                     return failureReason;
                 }
             });
+            if ( completion != null ) completion.call();
         }
     }
     

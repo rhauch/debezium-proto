@@ -10,8 +10,8 @@ import static org.fest.assertions.Assertions.assertThat;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.debezium.KafkaTestCluster;
 import org.debezium.client.Debezium.Acknowledgement;
@@ -23,15 +23,18 @@ import org.debezium.core.component.Identifier;
 import org.debezium.core.component.Schema;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
+import org.fest.assertions.Fail;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * @author Randall Hauch
  */
+@Ignore("We can't run the client locally because the backend services don't run in unit test")
 public class DatabaseTest {
 
     private static KafkaTestCluster kafka;
@@ -48,7 +51,9 @@ public class DatabaseTest {
         Configuration config = Debezium.configure()
                                        .clientId(DatabaseTest.class.getSimpleName())
                                        .withBroker(kafka.getKafkaBrokerString())
+                                       .withZookeeper(kafka.getZkConnectString())
                                        .acknowledgement(Acknowledgement.ALL)
+                                       .lazyInitialization(true)
                                        .build();
         client = Debezium.start(config);
     }
@@ -71,7 +76,12 @@ public class DatabaseTest {
     }
 
     @Test
-    public void shouldReadSchema() {
+    public void shouldBeAvailableAfterStartup() throws InterruptedException, TimeoutException {
+        assertThat(database.isConnected()).isTrue();
+    }
+
+    @Test
+    public void shouldReadSchema() throws InterruptedException, TimeoutException {
         database.readSchema((outcome) -> {
             if (outcome.succeeded()) {
                 Schema schema = outcome.result();
@@ -85,7 +95,7 @@ public class DatabaseTest {
     }
 
     @Test
-    public void shouldReadEntitiesAndIterate() {
+    public void shouldReadEntitiesAndIterate() throws InterruptedException, TimeoutException {
         final Collection<EntityId> entityIds = new ArrayList<>();
         entityIds.add(Identifier.of(type, "myEntityId"));
         database.readEntities(entityIds, (outcome) -> {
@@ -109,7 +119,7 @@ public class DatabaseTest {
     }
 
     @Test
-    public void shouldReadSingleEntity() {
+    public void shouldReadSingleEntity() throws InterruptedException, TimeoutException {
         EntityId entityId = Identifier.of(type, "myEntityId");
         database.readEntity(entityId, (outcome) -> {
             if (outcome.succeeded()) {
@@ -123,13 +133,12 @@ public class DatabaseTest {
                 String reason = outcome.failureReason();
                 assertThat(reason).isNotNull();
             }
-        });
+        }).await(10,TimeUnit.SECONDS);
     }
 
     @Test
-    public void shouldChangeEntities() throws InterruptedException {
+    public void shouldChangeEntities() throws InterruptedException, TimeoutException {
         Batch<EntityId> batch = null;
-        CountDownLatch latch = new CountDownLatch(1); // let's us wait for the handler to be called ...
         database.changeEntities(batch, (outcome) -> {
             if (outcome.succeeded()) {
                 outcome.result().forEach(change -> {
@@ -139,7 +148,7 @@ public class DatabaseTest {
                         // Our patch for this entity could not be applied ...
                         switch (change.status()) {
                             case OK:
-                                // This was actually a success ...
+                                Fail.fail("This should never happen, since we already know that the change failed");
                                 break;
                             case DOES_NOT_EXIST:
                                 // The entity was removed by someone else, so we should delete it locally ...
@@ -162,11 +171,7 @@ public class DatabaseTest {
                 String reason = outcome.failureReason();
                 assert reason != null;
             }
-            latch.countDown();
-        });
-
-        // This is a test case that is synchronous, so wait 5 seconds for the handler to be called ...
-        latch.await(5L, TimeUnit.SECONDS);
+        }).await(5L,TimeUnit.SECONDS);
     }
 
     // @Test

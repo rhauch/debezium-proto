@@ -39,7 +39,10 @@ public class DbzNodeTest {
     }
     
     protected void startWith( Document config ) {
-        if ( config == null ) config = Document.create();
+        if ( config == null ) {
+            config = Document.create();
+            config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
+        }
         node = new DbzNode(config,()->executor);
         node.start();
     }

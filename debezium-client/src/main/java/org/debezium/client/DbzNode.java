@@ -41,6 +41,7 @@ import org.debezium.core.doc.Document;
 import org.debezium.core.doc.DocumentReader;
 import org.debezium.core.doc.DocumentWriter;
 import org.debezium.core.doc.Value;
+import org.debezium.core.util.LazyReference;
 import org.debezium.core.util.Strings;
 
 /**
@@ -49,7 +50,7 @@ import org.debezium.core.util.Strings;
  * @author Randall Hauch
  */
 final class DbzNode {
-    
+
     /**
      * A function that decodes a byte array into another type.
      * 
@@ -65,7 +66,7 @@ final class DbzNode {
          */
         T fromBytes(byte[] bytes);
     }
-    
+
     /**
      * A function that encodes an object into a byte array.
      * 
@@ -81,7 +82,7 @@ final class DbzNode {
          */
         byte[] toBytes(T value);
     }
-    
+
     /**
      * A function that consumes a message from a topic.
      *
@@ -102,15 +103,15 @@ final class DbzNode {
          */
         boolean consume(String topic, int partition, long offset, KeyType key, MessageType message);
     }
-    
+
     /**
      * A component that can run within a {@link DbzNode}.
      */
     public static abstract class Service {
-        
+
         private final ReadWriteLock startLock = new ReentrantReadWriteLock();
         private final AtomicReference<DbzNode> node = new AtomicReference<>();
-        
+
         /**
          * Start the service running within the given {@link DbzNode}.
          * 
@@ -127,14 +128,14 @@ final class DbzNode {
                 this.startLock.writeLock().unlock();
             }
         }
-        
+
         protected abstract void onStart(DbzNode node);
-        
+
         protected abstract void beginShutdown(DbzNode node);
-        
+
         protected abstract void completeShutdown(DbzNode node);
-        
-        protected <R> Optional<R> whenRunning(Function<DbzNode,R> function) {
+
+        protected <R> Optional<R> whenRunning(Function<DbzNode, R> function) {
             try {
                 this.startLock.readLock().lock();
                 DbzNode node = this.node.get();
@@ -146,8 +147,8 @@ final class DbzNode {
                 this.startLock.readLock().unlock();
             }
         }
-        
-        protected <R> boolean ifRunning(Function<DbzNode,Boolean> function) {
+
+        protected <R> boolean ifRunning(Function<DbzNode, Boolean> function) {
             try {
                 this.startLock.readLock().lock();
                 DbzNode node = this.node.get();
@@ -159,7 +160,7 @@ final class DbzNode {
                 this.startLock.readLock().unlock();
             }
         }
-        
+
         /**
          * Begin to shut down the service.
          */
@@ -171,7 +172,7 @@ final class DbzNode {
                 this.startLock.readLock().unlock();
             }
         }
-        
+
         /**
          * Complete the service shut down.
          */
@@ -184,26 +185,26 @@ final class DbzNode {
                 this.startLock.writeLock().unlock();
             }
         }
-        
+
         protected Logger logger() {
             return node.get().logger(getClass());
         }
     }
-    
+
     private static final DefaultDecoder DEFAULT_DECODER = new DefaultDecoder(new VerifiableProperties());
     private static final StringDecoder STRING_RAW_DECODER = new StringDecoder(new VerifiableProperties());
     private static final StringEncoder STRING_RAW_ENCODER = new StringEncoder(new VerifiableProperties());
-    
+
     private static final Decoder<String> STRING_DECODER = new Decoder<String>() {
         @Override
         public String fromBytes(byte[] bytes) {
             return STRING_RAW_DECODER.fromBytes(bytes);
         }
     };
-    
+
     private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
-    
+
     private static final Decoder<Document> DOCUMENT_DECODER = new Decoder<Document>() {
         @Override
         public Document fromBytes(byte[] bytes) {
@@ -215,30 +216,31 @@ final class DbzNode {
             }
         }
     };
-    
+
     @FunctionalInterface
     public static interface Callable {
         void call();
     }
-    
+
     private final String nodeId = UUID.randomUUID().toString();
     private final Properties producerConfig;
     private final Properties consumerConfig;
     private final Document config;
     private final Supplier<Executor> executor;
-    private final AtomicReference<Producer<byte[], byte[]>> producer = new AtomicReference<>();
+    private final LazyReference<Producer<byte[], byte[]>> producer;
     private final CopyOnWriteArrayList<Service> services = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> preShutdownListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> postShutdownListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> startListeners = new CopyOnWriteArrayList<>();
     private final Lock runningLock = new ReentrantLock();
-    private volatile boolean running = true;
-    
+    private volatile boolean running = false;
+
     public DbzNode(Document config, Supplier<Executor> executor) {
         this.config = config;
         this.producerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.PRODUCER_SECTION));
         this.consumerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.CONSUMER_SECTION));
         this.executor = executor;
+        this.producer = LazyReference.create(this::createProducer);
         // On node startup, start all registered services ...
         registerStart(() -> services.forEach((service) -> service.start(this)));
         // On node shutdown, stop all registered services ...
@@ -246,6 +248,11 @@ final class DbzNode {
         registerPostShutdown(() -> services.forEach(Service::completeShutdown));
     }
     
+    private Producer<byte[],byte[]> createProducer() {
+        ProducerConfig pconf = new ProducerConfig(this.producerConfig);
+        return new Producer<byte[], byte[]>(pconf);
+    }
+
     /**
      * Get the configuration property with the given name.
      * 
@@ -257,7 +264,7 @@ final class DbzNode {
     public Value getConfig(String propertyName, Value defaultValue) {
         return config.get(propertyName, defaultValue);
     }
-    
+
     /**
      * Get the unique identifier of this node.
      * 
@@ -266,7 +273,7 @@ final class DbzNode {
     public String id() {
         return nodeId;
     }
-    
+
     /**
      * Register a function that is to be invoked when {@link #start()} is subsequently called.
      * This method does nothing if {@code notified} is null.
@@ -276,7 +283,7 @@ final class DbzNode {
     public void registerStart(Callable notified) {
         if (notified != null) this.startListeners.addIfAbsent(notified);
     }
-    
+
     /**
      * Register a function that is to be invoked at the beginning of any subsequent call to {@link #shutdown()}.
      * This method does nothing if {@code notified} is null.
@@ -286,7 +293,7 @@ final class DbzNode {
     public void registerPreShutdown(Callable notified) {
         if (notified != null) this.preShutdownListeners.addIfAbsent(notified);
     }
-    
+
     /**
      * Register a function that is to be invoked at the end of any subsequent call to {@link #shutdown()}.
      * This method does nothing if {@code notified} is null.
@@ -296,7 +303,7 @@ final class DbzNode {
     public void registerPostShutdown(Callable notified) {
         if (notified != null) this.postShutdownListeners.addIfAbsent(notified);
     }
-    
+
     /**
      * Add one or more services that will each be automatically {@link Service#start(DbzNode) started} when this node is
      * {@link #start() started} and automatically {@link Service#beginShutdown() stopped} when
@@ -311,7 +318,7 @@ final class DbzNode {
             }
         });
     }
-    
+
     /**
      * Remove one or more a services. Each service that was previously {@link #add(Service...) added} will be automatically
      * stopped.
@@ -328,7 +335,7 @@ final class DbzNode {
             }
         });
     }
-    
+
     /**
      * Call the supplied function if and only if this node is running.
      * 
@@ -348,7 +355,7 @@ final class DbzNode {
             runningLock.unlock();
         }
     }
-    
+
     /**
      * Call the supplied function if and only if this node is not running.
      * 
@@ -362,22 +369,20 @@ final class DbzNode {
             runningLock.unlock();
         }
     }
-    
+
     /**
      * Start this node. This will also notify each of the {@link #registerStart(Callable) registered startup} callbacks.
      */
     public void start() {
         whenNotRunning(() -> {
-            try {
-                ProducerConfig pconf = new ProducerConfig(this.producerConfig);
-                this.producer.set(new Producer<byte[], byte[]>(pconf));
-                this.startListeners.forEach(Callable::call);
-            } finally {
-                this.running = true;
+            this.running = true;
+            if ( !this.config.get(DbzConfiguration.INIT_PRODUCER_LAZILY,false).convert().asBoolean() ) {
+                this.producer.get();
             }
+            this.startListeners.forEach(Callable::call);
         });
     }
-    
+
     /**
      * Shut down this node and release any reserved resources. This will also notify each of the
      * {@link #registerPreShutdown(Callable) registered pre-shutdown} callbacks
@@ -391,21 +396,15 @@ final class DbzNode {
                 preShutdownListeners.forEach(Callable::call);
             } finally {
                 try {
-                    // Shutdown the producer ...
-                    if (producer.get() != null) {
-                        try {
-                            producer.get().close();
-                        } finally {
-                            producer.set(null);
-                        }
-                    }
+                    // Shutdown the producer if it was accessed ...
+                    producer.release(Producer::close);
                 } finally {
                     postShutdownListeners.forEach(Callable::call);
                 }
             }
         });
     }
-    
+
     /**
      * Send the binary array as a message on the named topic using the given key for the message and a different key that will
      * be used for partitioning.
@@ -424,7 +423,7 @@ final class DbzNode {
         }
         return false;
     }
-    
+
     /**
      * Send the binary array as a message on the named topic using the given key for the message.
      * 
@@ -436,7 +435,7 @@ final class DbzNode {
     public boolean send(String topic, byte[] key, byte[] msg) {
         return send(topic, null, key, msg);
     }
-    
+
     /**
      * Send the binary array as a message on the named topic using the given key for the message and a different key that will
      * be used for partitioning.
@@ -451,7 +450,7 @@ final class DbzNode {
     public boolean send(String topic, Object partitionKey, String key, byte[] msg) {
         return send(topic, partitionKey, STRING_RAW_ENCODER.toBytes(key), msg);
     }
-    
+
     /**
      * Send the document as a message on the named topic using the given key for the message and a different key that will
      * be used for partitioning.
@@ -466,7 +465,7 @@ final class DbzNode {
     public boolean send(String topic, Object partitionKey, String key, Document doc) {
         return send(topic, partitionKey, STRING_RAW_ENCODER.toBytes(key), DOCUMENT_WRITER.writeAsBytes(doc));
     }
-    
+
     /**
      * Send the binary array as a message on the named topic using the given key for the message.
      * 
@@ -478,7 +477,7 @@ final class DbzNode {
     public boolean send(String topic, String key, byte[] msg) {
         return send(topic, STRING_RAW_ENCODER.toBytes(key), msg);
     }
-    
+
     /**
      * Send the document as a message on the named topic using the given key for the message.
      * 
@@ -490,7 +489,7 @@ final class DbzNode {
     public boolean send(String topic, String key, Document doc) {
         return send(topic, STRING_RAW_ENCODER.toBytes(key), DOCUMENT_WRITER.writeAsBytes(doc));
     }
-    
+
     /**
      * Subscribe to one or more topics.
      * 
@@ -505,7 +504,7 @@ final class DbzNode {
                                         MessageConsumer<String, MessageType> consumer) {
         subscribe(groupId, topicFilter, numThreads, STRING_DECODER, messageDecoder, consumer);
     }
-    
+
     /**
      * Subscribe to one or more topics.
      * 
@@ -517,7 +516,7 @@ final class DbzNode {
     public void subscribe(String groupId, TopicFilter topicFilter, int numThreads, MessageConsumer<String, Document> consumer) {
         subscribe(groupId, topicFilter, numThreads, STRING_DECODER, DOCUMENT_DECODER, consumer);
     }
-    
+
     /**
      * Subscribe to one or more topics.
      * 
@@ -534,16 +533,18 @@ final class DbzNode {
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
         // Create the config for this consumer ...
         boolean autoCommit = false;
-        Properties props = new Properties(this.consumerConfig);
+        Properties props = new Properties();
+        props.putAll(this.consumerConfig);
+        props.put("consumer.id", id());
         props.put("group.id", groupId);
         props.put("auto.commit.enable", Boolean.toString(autoCommit));
-        
+
         // Create the consumer ...
         ConsumerConfig config = new ConsumerConfig(props);
         ConsumerConnector connector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
         List<KafkaStream<byte[], byte[]>> streams = connector.createMessageStreamsByFilter(topicFilter, numThreads, DEFAULT_DECODER,
                                                                                            DEFAULT_DECODER);
-        
+
         // Iterate over the streams and create a thread to process each one ...
         for (KafkaStream<byte[], byte[]> stream : streams) {
             // Submit a runnable that consumes the topics ...
@@ -567,7 +568,7 @@ final class DbzNode {
             });
         }
     }
-    
+
     /**
      * Call the supplied runnable using this node's {@link Executor executor}.
      * 
@@ -576,7 +577,7 @@ final class DbzNode {
     public void execute(Runnable runnable) {
         if (runnable != null) this.executor.get().execute(runnable);
     }
-    
+
     /**
      * Periodically call the supplied runnable using this node's {@link Executor executor}. The thread will terminate
      * automatically when this service is stopped.
@@ -591,7 +592,7 @@ final class DbzNode {
                 while (true) {
                     try {
                         Thread.sleep(TimeUnit.MILLISECONDS.convert(time, unit));
-                        if ( !whenRunning(runnable) ) break;
+                        if (!whenRunning(runnable)) break;
                     } catch (InterruptedException e) {
                         Thread.interrupted(); // clear the flag for this thread ...
                         break;
@@ -600,7 +601,7 @@ final class DbzNode {
             });
         }
     }
-    
+
     /**
      * Get a logger for the context with the given classname, where all log messages are sent to the "log" topic.
      * 
@@ -610,7 +611,7 @@ final class DbzNode {
     public Logger logger(Class<?> clazz) {
         return logger(clazz.getName());
     }
-    
+
     /**
      * Get a logger for the context with the given classname, where all log messages are sent to the "log" topic.
      * 
@@ -623,18 +624,19 @@ final class DbzNode {
             public void log(Level level, String msg, Object... params) {
                 DbzNode.this.log(classname, level, null, msg, params);
             }
+
             @Override
             public void log(Level level, Throwable error, String msg, Object... params) {
                 DbzNode.this.log(classname, level, error, msg, params);
             }
         };
     }
-    
+
     private void log(String classname, Logger.Level level, Throwable t, String msg, Object[] params) {
         Document doc = Document.create();
         doc.setString("level", level.toString());
         doc.setString("msg", msg);
-        if ( t != null ) {
+        if (t != null) {
             doc.setString("error", t.getMessage());
             doc.setString("stackTrace", Strings.getStackTrace(t));
         }
@@ -649,14 +651,14 @@ final class DbzNode {
         }
         send("log", "", doc);
     }
-    
+
     public boolean isRunning() {
         return running;
     }
-    
+
     @Override
     public String toString() {
-        return id() + " (" + (running? "running":"stopped") + ")";
+        return id() + " (" + (running ? "running" : "stopped") + ")";
     }
-    
+
 }

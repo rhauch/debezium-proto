@@ -8,11 +8,11 @@ package org.debezium.client;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.debezium.client.Debezium.Configure;
 import org.debezium.core.doc.Document;
-
-import com.google.common.base.Supplier;
 
 /**
  * @author Randall Hauch
@@ -50,7 +50,7 @@ final class DbzConfigurator implements Debezium.Configure {
     public DbzConfigurator withZookeeper(String zookeeperConnectString) {
         return setConsumerProperty("zookeeper.connect", zookeeperConnectString);
     }
-
+    
     @Override
     public DbzConfigurator withBroker(String brokerString) {
         kafkaBrokerAddresses.add(BrokerAddress.parse(brokerString));
@@ -114,6 +114,12 @@ final class DbzConfigurator implements Debezium.Configure {
     public DbzConfigurator socketBufferSize(int size) {
         assert size > 0;
         return setProducerProperty("send.buffer.bytes", Integer.toString(size));
+    }
+    
+    @Override
+    public Configure lazyInitialization(boolean lazy) {
+        config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY, lazy);
+        return this;
     }
 
     @Override

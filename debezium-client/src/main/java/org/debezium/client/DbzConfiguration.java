@@ -17,6 +17,7 @@ final class DbzConfiguration implements Configuration {
     
     public static final String CONSUMER_SECTION = "consumer";
     public static final String PRODUCER_SECTION = "producer";
+    public static final String INIT_PRODUCER_LAZILY = "initProducerLazily";
 
     private final Document config;
     
