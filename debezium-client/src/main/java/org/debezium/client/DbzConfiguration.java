@@ -15,8 +15,8 @@ import org.debezium.core.doc.Document;
  */
 final class DbzConfiguration implements Configuration {
     
-    public static final String CONSUMER_SECTION = "consumer";
-    public static final String PRODUCER_SECTION = "producer";
+    public static final String CONSUMER_SECTION = "consumers";
+    public static final String PRODUCER_SECTION = "producers";
     public static final String INIT_PRODUCER_LAZILY = "initProducerLazily";
 
     private final Document config;
@@ -29,9 +29,16 @@ final class DbzConfiguration implements Configuration {
         return config.clone();
     }
     
+    @Override
+    public String toString() {
+        return config.toString();
+    }
+    
     static Properties asProperties(Document doc) {
         Properties props = new Properties();
-        if ( doc != null ) doc.forEach(field -> props.put(field.getName(), field.getValue().convert().asString()));
+        if ( doc != null ) doc.forEach(field -> {
+            props.put(field.getName(), field.getValue().convert().asString());
+        });
         return props;
     }
     

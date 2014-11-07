@@ -13,6 +13,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.core.doc.Document;
+import org.debezium.core.doc.DocumentReader;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -69,5 +70,10 @@ public class DbzNodeTest {
         assertThat(node.isRunning()).isTrue();
         System.out.println("Running: " + node);
     }
-    
+
+    @Test
+    public void shouldReadPropertiesCorrectly() throws Exception {
+        Document config = DocumentReader.defaultReader().read(getClass().getClassLoader().getResourceAsStream("debezium.json"));
+        node = new DbzNode(config, () -> executor,()->scheduledExecutor);
+    }
 }

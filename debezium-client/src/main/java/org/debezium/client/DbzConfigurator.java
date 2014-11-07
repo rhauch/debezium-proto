@@ -124,10 +124,10 @@ final class DbzConfigurator implements Debezium.Configure {
 
     @Override
     public Configuration build() {
-        // producerProps.put("serializer.class","kafka.serializer.StringEncoder");
-        // producerProps.put("serializer.class",DebeziumSerializer.class.getName());
-        setProducerProperty("metadata.broker.list",
-                            kafkaBrokerAddresses.stream().map(Object::toString).collect(Collectors.joining(",")));
+        if ( !kafkaBrokerAddresses.isEmpty() ) {
+            setProducerProperty("metadata.broker.list",
+                                kafkaBrokerAddresses.stream().map(Object::toString).collect(Collectors.joining(",")));
+        }
         if (!compressedTopics.isEmpty()) {
             setProducerProperty("compressed.topics",
                                 compressedTopics.stream().map(Object::toString).collect(Collectors.joining(",")));

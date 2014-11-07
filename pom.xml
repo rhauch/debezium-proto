@@ -59,9 +59,9 @@
     </properties>
     <modules>
         <module>debezium-core</module>
-        <module>debezium-client</module>
         <module>debezium-services</module>
         <module>debezium-services-job-package</module>
+        <module>debezium-client</module>
         <module>debezium-example-app</module>
     </modules>
     <developers>
