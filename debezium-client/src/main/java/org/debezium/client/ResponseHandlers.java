@@ -27,10 +27,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.debezium.client.Database.Outcome;
-import org.debezium.client.DbzNode.Callable;
 import org.debezium.client.DbzNode.Service;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
+import org.debezium.core.function.Callable;
 
 /**
  * A service that manages a set of handlers for response messages. The service partitions the handlers and response messages

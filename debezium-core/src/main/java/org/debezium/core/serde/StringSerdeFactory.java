@@ -8,17 +8,16 @@ package org.debezium.core.serde;
 import org.apache.samza.config.Config;
 import org.apache.samza.serializers.Serde;
 import org.apache.samza.serializers.SerdeFactory;
-import org.debezium.core.doc.Document;
 
 /**
- * A factory for a {@link Document} serializer and deserializer, or <em>serde</em>.
+ * A factory for a {@link String} serializer and deserializer, or <em>serde</em>.
  * @author Randall Hauch
  */
-public final class DocumentSerdeFactory implements SerdeFactory<Document> {
+public final class StringSerdeFactory implements SerdeFactory<String> {
     
     @Override
-    public Serde<Document> getSerde(String name, Config config) {
-        return Serdes.document();
+    public Serde<String> getSerde(String name, Config config) {
+        return Serdes.string();
     }
     
 }

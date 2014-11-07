@@ -7,6 +7,7 @@ package org.debezium.core.util;
 
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * A simple named thread factory that creates threads named "{@code $PREFIX$-$NAME$-thread-$NUMBER$}".
@@ -22,6 +23,7 @@ public final class NamedThreadFactory implements ThreadFactory {
     private final AtomicInteger threadNumber = new AtomicInteger(1);
     private final String namePrefix;
     private final int stackSize;
+    private final Consumer<String> afterThreadCreation;
 
     public NamedThreadFactory(String prefix, String name) {
         this(prefix,name,DEFAULT_DAEMON_THREAD,DEFAULT_STACK_SIZE);
@@ -32,19 +34,32 @@ public final class NamedThreadFactory implements ThreadFactory {
     }
 
     public NamedThreadFactory(String prefix, String name, boolean daemonThreads, int stackSize) {
+        this(prefix,name,daemonThreads,stackSize,null);
+    }
+
+    public NamedThreadFactory(String prefix, String name, boolean daemonThreads, int stackSize, Consumer<String> afterThreadCreation ) {
         final SecurityManager s = System.getSecurityManager();
         this.group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
         this.namePrefix = prefix + "-" + name + "-thread-";
         this.daemonThreads = daemonThreads;
         this.stackSize = stackSize;
+        this.afterThreadCreation = afterThreadCreation;
     }
 
     @Override
     public Thread newThread(final Runnable runnable) {
-        final Thread t = new Thread(group, runnable, namePrefix + threadNumber.getAndIncrement(), stackSize);
+        String threadName = namePrefix + threadNumber.getAndIncrement();
+        final Thread t = new Thread(group, runnable, threadName, stackSize);
         t.setDaemon(daemonThreads);
         if (t.getPriority() != Thread.NORM_PRIORITY) {
             t.setPriority(Thread.NORM_PRIORITY);
+        }
+        if ( afterThreadCreation != null ) {
+            try {
+                afterThreadCreation.accept(threadName);
+            } catch ( Throwable e ) {
+                // do nothing
+            }
         }
         return t;
     }

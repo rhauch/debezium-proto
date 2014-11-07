@@ -5,12 +5,13 @@
  */
 package org.debezium.client;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,14 +36,13 @@ import kafka.message.MessageAndMetadata;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
 import kafka.serializer.DefaultDecoder;
-import kafka.serializer.StringDecoder;
-import kafka.serializer.StringEncoder;
 import kafka.utils.VerifiableProperties;
 
 import org.debezium.core.doc.Document;
-import org.debezium.core.doc.DocumentReader;
-import org.debezium.core.doc.DocumentWriter;
 import org.debezium.core.doc.Value;
+import org.debezium.core.function.Callable;
+import org.debezium.core.serde.Decoder;
+import org.debezium.core.serde.Serdes;
 import org.debezium.core.util.LazyReference;
 import org.debezium.core.util.Strings;
 
@@ -52,38 +52,6 @@ import org.debezium.core.util.Strings;
  * @author Randall Hauch
  */
 final class DbzNode {
-
-    /**
-     * A function that decodes a byte array into another type.
-     * 
-     * @param <T> the type of object to decode
-     */
-    @FunctionalInterface
-    public static interface Decoder<T> {
-        /**
-         * Decode the byte array into an object.
-         * 
-         * @param bytes the bytes; never null
-         * @return the object; never null
-         */
-        T fromBytes(byte[] bytes);
-    }
-
-    /**
-     * A function that encodes an object into a byte array.
-     * 
-     * @param <T> the type of object to encode
-     */
-    @FunctionalInterface
-    public static interface Encoder<T> {
-        /**
-         * Encode the object into a byte array.
-         * 
-         * @param value the value to encode; never null
-         * @return the bytes; never null
-         */
-        byte[] toBytes(T value);
-    }
 
     /**
      * A function that consumes a message from a topic.
@@ -192,37 +160,8 @@ final class DbzNode {
             return node.get().logger(getClass());
         }
     }
-
+    
     private static final DefaultDecoder DEFAULT_DECODER = new DefaultDecoder(new VerifiableProperties());
-    private static final StringDecoder STRING_RAW_DECODER = new StringDecoder(new VerifiableProperties());
-    private static final StringEncoder STRING_RAW_ENCODER = new StringEncoder(new VerifiableProperties());
-
-    private static final Decoder<String> STRING_DECODER = new Decoder<String>() {
-        @Override
-        public String fromBytes(byte[] bytes) {
-            return STRING_RAW_DECODER.fromBytes(bytes);
-        }
-    };
-
-    private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
-    private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
-
-    private static final Decoder<Document> DOCUMENT_DECODER = new Decoder<Document>() {
-        @Override
-        public Document fromBytes(byte[] bytes) {
-            try {
-                return DOCUMENT_READER.read(bytes);
-            } catch (IOException e) {
-                // Should never see this, but shit if we do ...
-                throw new RuntimeException(e);
-            }
-        }
-    };
-
-    @FunctionalInterface
-    public static interface Callable {
-        void call();
-    }
 
     private final String nodeId = UUID.randomUUID().toString();
     private final Properties producerConfig;
@@ -231,6 +170,7 @@ final class DbzNode {
     private final Supplier<Executor> executor;
     private final Supplier<ScheduledExecutorService> scheduledExecutor;
     private final List<ScheduledFuture<?>> scheduledTasks = new CopyOnWriteArrayList<>();
+    private final Map<Properties,ConsumerConnector> connectors = new ConcurrentHashMap<>();
     private final LazyReference<Producer<byte[], byte[]>> producer;
     private final CopyOnWriteArrayList<Service> services = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> preShutdownListeners = new CopyOnWriteArrayList<>();
@@ -404,12 +344,18 @@ final class DbzNode {
                     // Shutdown the producer if it was accessed ...
                     producer.release(Producer::close);
                 } finally {
-                    // Cancel all of the scheduled tasks ...
                     try {
+                        // Cancel all of the scheduled tasks ...
                         scheduledTasks.forEach(f->f.cancel(true));
                     } finally {
                         scheduledTasks.clear();
-                        postShutdownListeners.forEach(Callable::call);
+                        try {
+                            // Shutdown each of the consumer connectors ...
+                            connectors.values().forEach(ConsumerConnector::shutdown);
+                        } finally {
+                            connectors.clear();
+                            postShutdownListeners.forEach(Callable::call);
+                        }
                     }
                 }
             }
@@ -459,7 +405,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, Object partitionKey, String key, byte[] msg) {
-        return send(topic, partitionKey, STRING_RAW_ENCODER.toBytes(key), msg);
+        return send(topic, partitionKey, Serdes.stringToBytes(key), msg);
     }
 
     /**
@@ -474,7 +420,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, Object partitionKey, String key, Document doc) {
-        return send(topic, partitionKey, STRING_RAW_ENCODER.toBytes(key), DOCUMENT_WRITER.writeAsBytes(doc));
+        return send(topic, partitionKey, Serdes.stringToBytes(key), Serdes.documentToBytes(doc));
     }
 
     /**
@@ -486,7 +432,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, String key, byte[] msg) {
-        return send(topic, STRING_RAW_ENCODER.toBytes(key), msg);
+        return send(topic, Serdes.stringToBytes(key), msg);
     }
 
     /**
@@ -498,7 +444,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, String key, Document doc) {
-        return send(topic, STRING_RAW_ENCODER.toBytes(key), DOCUMENT_WRITER.writeAsBytes(doc));
+        return send(topic, Serdes.stringToBytes(key), Serdes.documentToBytes(doc));
     }
 
     /**
@@ -513,7 +459,7 @@ final class DbzNode {
      */
     public <MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<MessageType> messageDecoder,
                                         MessageConsumer<String, MessageType> consumer) {
-        subscribe(groupId, topicFilter, numThreads, STRING_DECODER, messageDecoder, consumer);
+        subscribe(groupId, topicFilter, numThreads, Serdes::bytesToString, messageDecoder, consumer);
     }
 
     /**
@@ -525,7 +471,7 @@ final class DbzNode {
      * @param consumer the consumer, which should be threadsafe if {@code numThreads} is more than 1
      */
     public void subscribe(String groupId, TopicFilter topicFilter, int numThreads, MessageConsumer<String, Document> consumer) {
-        subscribe(groupId, topicFilter, numThreads, STRING_DECODER, DOCUMENT_DECODER, consumer);
+        subscribe(groupId, topicFilter, numThreads, Serdes::bytesToString, Serdes::bytesToDocument, consumer);
     }
 
     /**
@@ -542,8 +488,10 @@ final class DbzNode {
      */
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
+        if ( numThreads < 1 ) return;
+        
         // Create the config for this consumer ...
-        boolean autoCommit = false;
+        boolean autoCommit = this.config.getBoolean("auto.commmit.enable",true);
         Properties props = new Properties();
         props.putAll(this.consumerConfig);
         props.put("consumer.id", id());
@@ -551,8 +499,7 @@ final class DbzNode {
         props.put("auto.commit.enable", Boolean.toString(autoCommit));
 
         // Create the consumer ...
-        ConsumerConfig config = new ConsumerConfig(props);
-        ConsumerConnector connector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
+        ConsumerConnector connector = getOrCreateConnector(props);
         List<KafkaStream<byte[], byte[]>> streams = connector.createMessageStreamsByFilter(topicFilter, numThreads, DEFAULT_DECODER,
                                                                                            DEFAULT_DECODER);
 
@@ -578,6 +525,23 @@ final class DbzNode {
                 }
             });
         }
+    }
+    
+    private ConsumerConnector getOrCreateConnector( Properties props ) {
+        ConsumerConfig config = new ConsumerConfig(props);
+        ConsumerConnector connector = connectors.get(props);
+        if ( connector == null ) {
+            ConsumerConnector newConnector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
+            connector = connectors.putIfAbsent(props, newConnector);
+            if ( connector != null ) {
+                // The new connector we created was not needed ...
+                executor.get().execute(()->newConnector.shutdown());
+            } else {
+                connector = newConnector;
+            }
+        }
+        assert connector != null;
+        return connector;
     }
 
     /**

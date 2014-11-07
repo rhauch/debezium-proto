@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-import org.debezium.client.DbzNode.Callable;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
@@ -23,6 +22,7 @@ import org.debezium.core.component.Identified;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.component.Schema;
 import org.debezium.core.doc.Document;
+import org.debezium.core.function.Callable;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Patch;

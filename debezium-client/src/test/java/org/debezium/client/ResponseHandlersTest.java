@@ -15,10 +15,10 @@ import java.util.concurrent.TimeUnit;
 
 import org.debezium.Testing;
 import org.debezium.client.Database.Outcome;
-import org.debezium.client.DbzNode.Callable;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
+import org.debezium.core.function.Callable;
 import org.debezium.core.message.Message;
 import org.fest.assertions.Fail;
 import org.junit.After;

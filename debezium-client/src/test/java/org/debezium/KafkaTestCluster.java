@@ -70,8 +70,12 @@ public class KafkaTestCluster {
     }
  
     public void stop() throws IOException {
-        kafkaServer.shutdown();
-        zkServer.stop();
+        try {
+            kafkaServer.shutdown();
+            kafkaServer.awaitShutdown();
+        } finally {
+            zkServer.close();
+        }
     }
     
     public void stopAndCleanUp() throws IOException {
