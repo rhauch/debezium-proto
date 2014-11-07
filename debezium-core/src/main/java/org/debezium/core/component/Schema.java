@@ -38,6 +38,10 @@ public final class Schema {
         return id;
     }
     
+    public Document document() {
+        return doc;
+    }
+    
     public Stream<? extends SchemaComponent<? extends SchemaComponentId>> components() {
         return collections();
         //return Stream.concat(collections(), b);

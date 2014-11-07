@@ -41,6 +41,14 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     }
     
     /**
+     * Create a builder that can be used to record patches on multiple entities.
+     * @return the builder for creating a batch; never null
+     */
+    public static Builder<EntityId> entities() {
+        return new BatchBuilder<EntityId>();
+    }
+    
+    /**
      * An interface for building a batch of multiple patches.
      * @param <IdType> the type of identifier that can be addressed with the batch
      */

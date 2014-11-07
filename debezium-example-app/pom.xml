@@ -13,11 +13,11 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>debezium-client</artifactId>
-    <name>Debezium Client</name>
+    <artifactId>debezium-example-app</artifactId>
+    <name>Debezium Example App</name>
     <packaging>jar</packaging>
     <properties>
-        <module-name>org.debezium.client</module-name>
+        <module-name>org.debezium.example.app</module-name>
     </properties>
     <dependencies>
         <dependency>
@@ -25,39 +25,8 @@
             <artifactId>debezium-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_${scala.label.version}</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-        </dependency>
-        <!-- Used for unit testing with Kafka -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_${scala.label.version}</artifactId>
-            <classifier>test</classifier>
-        </dependency>
-        <dependency>
             <groupId>org.debezium</groupId>
-            <artifactId>debezium-core</artifactId>
-            <type>test-jar</type>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-test</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.easytesting</groupId>
-            <artifactId>fest-assert</artifactId>
+            <artifactId>debezium-client</artifactId>
         </dependency>
     </dependencies>
     <build>
@@ -67,6 +36,27 @@
                 <executions>
                     <execution>
                         <id>assemble-module</id>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- skip the test JAR assembly -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <configuration>
+                    <skipSource>true</skipSource>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <phase>never</phase>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

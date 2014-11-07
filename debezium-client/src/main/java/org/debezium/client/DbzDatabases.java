@@ -84,6 +84,22 @@ final class DbzDatabases extends Service {
         activeDatabases.clear();
     }
     
+    DbzConnection provision(ExecutionContext context, long timeout, TimeUnit unit) {
+        whenRunning(node -> {
+            DatabaseId dbId = context.databaseId();
+            ActiveDatabase db = activeDatabases.get(dbId);
+            if (db != null) {
+                throw new DebeziumProvisioningException("Unable to provision database '" + dbId + "'");
+            }
+            db = handlers.requestAndWait(context, timeout, unit, submitCreateSchema(context, dbId, node),
+                                         this::updateActiveDatabase, this::provisioningFailed)
+                                         .orElseThrow(DebeziumConnectionException::new);
+            return new DbzConnection(this, context);
+        }).orElseThrow(DebeziumClientException::new);
+        assert false : "Should never get here";
+        return null;
+    }
+    
     DbzConnection connect(ExecutionContext context, long timeout, TimeUnit unit) {
         whenRunning(node -> {
             activeDatabase(node,context,timeout,unit);
@@ -115,6 +131,16 @@ final class DbzDatabases extends Service {
         };
     }
     
+    private Consumer<RequestId> submitCreateSchema(ExecutionContext context, DatabaseId id, DbzNode node) {
+        return requestId -> {
+            Document request = Patch.create(id).asDocument();
+            Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
+            if ( !node.send(Topic.SCHEMA_PATCHES, context.databaseId().asString(), request) ) {
+                throw new DebeziumClientException("Unable to send request to create schema for " + id);
+            }
+        };
+    }
+    
     private ActiveDatabase updateActiveDatabase(Document schemaReadReponse) {
         DatabaseId dbId = Message.getDatabaseId(schemaReadReponse);
         if ( Message.isSuccess(schemaReadReponse)) {
@@ -130,6 +156,10 @@ final class DbzDatabases extends Service {
         return (status, reason) -> {
             throw new DebeziumConnectionException("The database '" + dbId + "' is not available");
         };
+    }
+    
+    private void provisioningFailed( Outcome.Status status, String reason ) {
+        throw new DebeziumProvisioningException(reason);
     }
     
     boolean disconnect(DbzConnection connection) {

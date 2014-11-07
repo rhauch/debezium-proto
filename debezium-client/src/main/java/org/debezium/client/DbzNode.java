@@ -13,6 +13,8 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -227,6 +229,8 @@ final class DbzNode {
     private final Properties consumerConfig;
     private final Document config;
     private final Supplier<Executor> executor;
+    private final Supplier<ScheduledExecutorService> scheduledExecutor;
+    private final List<ScheduledFuture<?>> scheduledTasks = new CopyOnWriteArrayList<>();
     private final LazyReference<Producer<byte[], byte[]>> producer;
     private final CopyOnWriteArrayList<Service> services = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> preShutdownListeners = new CopyOnWriteArrayList<>();
@@ -235,11 +239,12 @@ final class DbzNode {
     private final Lock runningLock = new ReentrantLock();
     private volatile boolean running = false;
 
-    public DbzNode(Document config, Supplier<Executor> executor) {
+    public DbzNode(Document config, Supplier<Executor> executor, Supplier<ScheduledExecutorService> scheduledExecutor) {
         this.config = config;
         this.producerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.PRODUCER_SECTION));
         this.consumerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.CONSUMER_SECTION));
         this.executor = executor;
+        this.scheduledExecutor = scheduledExecutor;
         this.producer = LazyReference.create(this::createProducer);
         // On node startup, start all registered services ...
         registerStart(() -> services.forEach((service) -> service.start(this)));
@@ -399,7 +404,13 @@ final class DbzNode {
                     // Shutdown the producer if it was accessed ...
                     producer.release(Producer::close);
                 } finally {
-                    postShutdownListeners.forEach(Callable::call);
+                    // Cancel all of the scheduled tasks ...
+                    try {
+                        scheduledTasks.forEach(f->f.cancel(true));
+                    } finally {
+                        scheduledTasks.clear();
+                        postShutdownListeners.forEach(Callable::call);
+                    }
                 }
             }
         });
@@ -582,23 +593,14 @@ final class DbzNode {
      * Periodically call the supplied runnable using this node's {@link Executor executor}. The thread will terminate
      * automatically when this service is stopped.
      * 
-     * @param time the time between calls
+     * @param initialDelay the initial delay before the function is first called
+     * @param period the time between calls
      * @param unit the time unit; may not be null
      * @param runnable the runnable function; never null
      */
-    public void execute(long time, TimeUnit unit, Callable runnable) {
+    public void execute(long initialDelay, long period, TimeUnit unit, Callable runnable) {
         if (runnable != null) {
-            this.executor.get().execute(() -> {
-                while (true) {
-                    try {
-                        Thread.sleep(TimeUnit.MILLISECONDS.convert(time, unit));
-                        if (!whenRunning(runnable)) break;
-                    } catch (InterruptedException e) {
-                        Thread.interrupted(); // clear the flag for this thread ...
-                        break;
-                    }
-                }
-            });
+            this.scheduledTasks.add(this.scheduledExecutor.get().scheduleAtFixedRate(()->runnable.call(), initialDelay, period, unit));
         }
     }
 

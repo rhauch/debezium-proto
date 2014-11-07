@@ -10,6 +10,7 @@ import static org.fest.assertions.Assertions.assertThat;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.Testing;
@@ -35,6 +36,7 @@ public class ResponseHandlersTest implements Testing {
     private ResponseHandlers handlers;
     private DbzNode node;
     private ExecutorService executor;
+    private ScheduledExecutorService scheduledExecutor;
     private ExecutionContext context;
     private DatabaseId dbId;
     private volatile RequestId requestId;
@@ -46,6 +48,7 @@ public class ResponseHandlersTest implements Testing {
         handlers = null;
         node = null;
         executor = Executors.newCachedThreadPool();
+        scheduledExecutor = Executors.newScheduledThreadPool(1);
         dbId = Identifier.of("my-db");
         context = new ExecutionContext(dbId, USERNAME);
         requestId = null;
@@ -78,7 +81,7 @@ public class ResponseHandlersTest implements Testing {
             config = Document.create();
             config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
         }
-        node = new DbzNode(config, () -> executor);
+        node = new DbzNode(config, () -> executor,()->scheduledExecutor);
         handlers = new ResponseHandlers();
         node.add(handlers);
         node.start();

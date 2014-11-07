@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identified;
@@ -24,6 +25,8 @@ import org.debezium.core.message.Patch;
  *
  */
 public interface Database extends Closeable {
+    
+    DatabaseId databaseId();
 
     Completion readSchema(OutcomeHandler<Schema> handler);
 

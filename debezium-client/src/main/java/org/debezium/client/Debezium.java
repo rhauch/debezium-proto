@@ -241,7 +241,22 @@ public interface Debezium {
          * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
          */
         Database connect(DatabaseId id, String username);
+        
+        /**
+         * Provision a new database with the given name.
+         * @param id the database identifier
+         * @param username the username
+         * @return the database connection
+         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
+         * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
+         */
+        Database provision(DatabaseId id, String username);
 
+        /**
+         * Shutdown this client and release all resources.
+         * @param timeout the maximum time that this method should block before returning; must be positive
+         * @param unit the time unit for {@code timeout}; may not be null
+         */
         void shutdown(long timeout, TimeUnit unit);
     }
 

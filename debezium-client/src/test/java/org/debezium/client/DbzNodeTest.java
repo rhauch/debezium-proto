@@ -9,6 +9,7 @@ import static org.fest.assertions.Assertions.assertThat;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.core.doc.Document;
@@ -24,11 +25,13 @@ public class DbzNodeTest {
 
     private DbzNode node;
     private ExecutorService executor;
+    private ScheduledExecutorService scheduledExecutor;
     
     @Before
     public void beforeEach() {
         node = null;
         executor = Executors.newCachedThreadPool();
+        scheduledExecutor = Executors.newScheduledThreadPool(1);
     }
     
     @After
@@ -56,7 +59,7 @@ public class DbzNodeTest {
             config = Document.create();
             config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
         }
-        node = new DbzNode(config,()->executor);
+        node = new DbzNode(config, () -> executor,()->scheduledExecutor);
         node.start();
     }
     

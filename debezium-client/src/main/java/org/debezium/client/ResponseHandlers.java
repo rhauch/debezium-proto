@@ -138,10 +138,8 @@ final class ResponseHandlers extends Service {
                 public void run() {
                     while (run.get()) {
                         try {
-                            Document doc = queue.poll(1, TimeUnit.SECONDS);
-                            if (doc != null) {
-                                consumer.accept(doc);
-                            }
+                            Document doc = queue.poll(500, TimeUnit.MILLISECONDS);
+                            if (doc != null) consumer.accept(doc);
                         } catch (InterruptedException e) {
                             Thread.interrupted(); // clear the flag for this thread ...
                             break;
@@ -196,7 +194,7 @@ final class ResponseHandlers extends Service {
         this.numPartitions = partitions.size();
         
         // Start the cleaner thread ..
-        node.execute(60, TimeUnit.SECONDS, this::cleanRegistrations);
+        node.execute(60,60, TimeUnit.SECONDS, this::cleanRegistrations);
     }
     
     @Override

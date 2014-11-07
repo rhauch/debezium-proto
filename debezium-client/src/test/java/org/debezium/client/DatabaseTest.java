@@ -94,7 +94,7 @@ public class DatabaseTest {
                 String reason = outcome.failureReason();
                 assertThat(reason).isNotNull();
             }
-        });
+        }).await(10,TimeUnit.SECONDS);
     }
 
     @Test
@@ -118,7 +118,7 @@ public class DatabaseTest {
                 String reason = outcome.failureReason();
                 assertThat(reason).isNotNull();
             }
-        });
+        }).await(10,TimeUnit.SECONDS);
     }
 
     @Test

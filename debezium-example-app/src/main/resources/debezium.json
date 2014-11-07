@@ -1,0 +1,14 @@
+{
+	"response.partitions" : 10,
+	"response.max.backlog" : 10,
+	"producers" : {
+		"metadata.broker.list" : "localhost:9092",
+		"producer.type" : "sync",
+		"compression.codec" : "none",
+		"serializer.class" : "kafka.serializer.DefaultEncoder",
+	},
+	"consumers" : {
+		"zookeeper.connect" : "127.0.0.1:2181",
+		"zookeeper.connection.timeout.ms" : 1000000,
+	}
+}

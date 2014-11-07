@@ -407,7 +407,12 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     }
     
     public static <T extends Identifier> Patch<T> create(T target, Document value) {
+        assert value != null;
         return edit(target).add("/", Value.create(value)).end();
+    }
+    
+    public static <T extends Identifier> Patch<T> create(T target) {
+        return create(target, Document.create());
     }
     
     public static <T extends Identifier> Patch<T> read(T target) {

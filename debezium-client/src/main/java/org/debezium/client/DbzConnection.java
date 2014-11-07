@@ -16,6 +16,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.debezium.client.DbzNode.Callable;
+import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identified;
@@ -48,6 +49,11 @@ final class DbzConnection implements Database {
     
     ExecutionContext getContext() {
         return context;
+    }
+    
+    @Override
+    public DatabaseId databaseId() {
+        return context.databaseId();
     }
     
     @Override
