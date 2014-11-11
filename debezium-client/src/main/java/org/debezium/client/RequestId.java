@@ -69,4 +69,9 @@ final class RequestId implements Comparable<RequestId> {
         }
         return false;
     }
+    
+    @Override
+    public String toString() {
+        return asString();
+    }
 }

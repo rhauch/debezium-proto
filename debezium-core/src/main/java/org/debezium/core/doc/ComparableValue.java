@@ -117,12 +117,27 @@ final class ComparableValue implements Value {
 
     @Override
     public Integer asInteger() {
-        return isInteger() ? (Integer) value : null;
+        if ( value instanceof Integer ) return (Integer)value;
+        if ( value instanceof Long ) {
+            long raw = ((Long)value).longValue();
+            if ( isValidInteger(raw) ) return new Integer((int)raw);
+        }
+        return null;
+    }
+    
+    private static boolean isValidInteger( long value ) {
+        return value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE;
+    }
+
+    private static boolean isValidFloat( double value ) {
+        return value >= Float.MIN_VALUE && value <= Float.MAX_VALUE;
     }
 
     @Override
     public Long asLong() {
-        return isLong() ? (Long) value : null;
+        if ( value instanceof Long ) return (Long)value;
+        if ( value instanceof Integer ) return new Long(((Integer)value).longValue());
+        return null;
     }
 
     @Override
@@ -147,12 +162,19 @@ final class ComparableValue implements Value {
 
     @Override
     public Float asFloat() {
-        return isFloat() ? (Float) value : null;
+        if ( value instanceof Float ) return (Float)value;
+        if ( value instanceof Double ) {
+            double raw = ((Double)value).doubleValue();
+            if ( isValidFloat(raw) ) return new Float((float)raw);
+        }
+        return null;
     }
 
     @Override
     public Double asDouble() {
-        return isDouble() ? (Double) value : null;
+        if ( value instanceof Double ) return (Double)value;
+        if ( value instanceof Float ) return new Double(((Float)value).doubleValue());
+        return null;
     }
 
     @Override
@@ -182,22 +204,22 @@ final class ComparableValue implements Value {
 
     @Override
     public boolean isInteger() {
-        return value instanceof Integer;
+        return value instanceof Integer || (value instanceof Long && isValidInteger(((Long)value).longValue()));
     }
 
     @Override
     public boolean isLong() {
-        return value instanceof Long;
+        return value instanceof Long || value instanceof Integer;   // all integers are longs
     }
 
     @Override
     public boolean isFloat() {
-        return value instanceof Float;
+        return value instanceof Float || (value instanceof Double && isValidFloat(((Double)value).doubleValue()));
     }
 
     @Override
     public boolean isDouble() {
-        return value instanceof Double;
+        return value instanceof Double || value instanceof Float;   // all floats are doubles
     }
 
     @Override
@@ -207,12 +229,12 @@ final class ComparableValue implements Value {
 
     @Override
     public boolean isBigInteger() {
-        return value instanceof BigInteger;
+        return value instanceof BigInteger || value instanceof Integer || value instanceof Long;
     }
 
     @Override
     public boolean isBigDecimal() {
-        return value instanceof BigDecimal;
+        return value instanceof BigDecimal || value instanceof Float || value instanceof Double;
     }
 
     @Override

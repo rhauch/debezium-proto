@@ -24,13 +24,13 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.debezium.client.Database.Outcome;
 import org.debezium.client.DbzNode.Service;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.function.Callable;
+import org.debezium.core.util.Sequences;
 
 /**
  * A service that manages a set of handlers for response messages. The service partitions the handlers and response messages
@@ -59,6 +59,10 @@ final class ResponseHandlers extends Service {
             this.successHandler = Optional.ofNullable(successHandler);
             this.completionHandler = Optional.ofNullable(completionHandler);
             this.failureHandler = Optional.ofNullable(failureHandler);
+        }
+        @Override
+        public String toString() {
+            return successHandler + " & " + completionHandler + " & " + failureHandler;
         }
     }
     
@@ -131,11 +135,12 @@ final class ResponseHandlers extends Service {
         private final Runnable runnable;
         private final AtomicBoolean run = new AtomicBoolean(true);
         
-        protected Partition(int maxBacklog, Consumer<Document> consumer, Consumer<Partition> onCompletion) {
+        protected Partition(int maxBacklog, Consumer<Document> consumer, Consumer<Partition> onStartup, Consumer<Partition> onCompletion) {
             this.queue = new LinkedBlockingDeque<Document>(maxBacklog);
             this.runnable = new Runnable() {
                 @Override
                 public void run() {
+                    onStartup.accept(Partition.this);
                     while (run.get()) {
                         try {
                             Document doc = queue.poll(500, TimeUnit.MILLISECONDS);
@@ -186,9 +191,9 @@ final class ResponseHandlers extends Service {
         maxRegistrationAgeInSeconds = node.getConfig("response.max.registration.age.seconds",
                                                      Value.create(DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS)).convert().asLong();
         threads = new CountDownLatch(numPartitions);
-        IntStream.range(0, numPartitions).forEach(i -> {
-            partitions.add(new Partition(maxBacklog, this::processResponse, this::partitionStopped));
-        });
+        Sequences.times(numPartitions)
+                 .mapToObj(i->new Partition(maxBacklog, this::processResponse, this::partitionStarted, this::partitionStopped))
+                 .forEach(partitions::add);
         // Run each of the partitions ...
         partitions.forEach(partition -> node.execute(partition.runnable));
         this.numPartitions = partitions.size();
@@ -212,6 +217,9 @@ final class ResponseHandlers extends Service {
                 Thread.interrupted();
             }
         }
+    }
+    
+    protected void partitionStarted(Partition partition) {
     }
     
     protected void partitionStopped(Partition partition) {
@@ -342,7 +350,7 @@ final class ResponseHandlers extends Service {
             try {
                 registration.handle(id, response, () -> registrations.remove(id));
             } catch (Throwable t) {
-                logger().error(t, "Unable to process response using handler {}: {}", registration, response);
+                logger().error("Unable to process response using handler {}: {}", registration, response, t);
             }
         }
     }
@@ -358,7 +366,7 @@ final class ResponseHandlers extends Service {
                          .collect(Collectors.toSet())
                          .forEach(this::failRegistration);
         } catch (RuntimeException t) {
-            logger().error(t, "Error while cleaning expired response registrations");
+            logger().error("Error while cleaning expired response registrations",t);
         }
     }
     
@@ -368,7 +376,7 @@ final class ResponseHandlers extends Service {
             try {
                 registration.fail(Outcome.Status.CLIENT_STOPPED, "Client stopped");
             } catch (RuntimeException e) {
-                logger().error(e, "Unable to process response using handler {}: {}", registration, e.getMessage());
+                logger().error("Unable to process response using handler {}: {}", registration, e.getMessage(), e);
             }
         }
     }

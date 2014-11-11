@@ -35,27 +35,5 @@ interface Logger {
         log(Level.TRACE,msg,params);
     }
     
-    default void info(Throwable error, String msg, Object... params) {
-        log(Level.INFO,error,msg,params);
-    }
-    
-    default void error(Throwable error, String msg, Object... params) {
-        log(Level.ERROR,error,msg,params);
-    }
-    
-    default void warn(Throwable error, String msg, Object... params) {
-        log(Level.WARN,error,msg,params);
-    }
-    
-    default void debug(Throwable error, String msg, Object... params) {
-        log(Level.DEBUG,error,msg,params);
-    }
-    
-    default void trace(Throwable error, String msg, Object... params) {
-        log(Level.TRACE,error,msg,params);
-    }
-    
     void log(Level level, String msg, Object... params);
-    
-    void log(Level level, Throwable error, String msg, Object... params);
 }

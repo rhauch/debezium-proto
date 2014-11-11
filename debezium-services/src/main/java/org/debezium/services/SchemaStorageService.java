@@ -41,79 +41,94 @@ import org.debezium.core.message.Patch.Operation;
  */
 @NotThreadSafe
 public class SchemaStorageService implements StreamTask, InitableTask {
-    
+
     public static final String SEND_RESPONSE_WITH_UDATE = "task.send.response.with.update";
-    
+
     private KeyValueStore<String, Document> store;
     private boolean sendResponseUponUpdate = false;
-    
+
+    public SchemaStorageService() {
+        System.out.println("Creating SchemaStorageService instance");
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
+        System.out.println("SchemaStorageService.init(...)");
         this.sendResponseUponUpdate = config.getBoolean(SEND_RESPONSE_WITH_UDATE, sendResponseUponUpdate);
         this.store = (KeyValueStore<String, Document>) context.getStore("schema-store");
+        System.out.println("SchemaStorageService.init(...) completed");
     }
-    
+
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
-        String dbIdStr = (String) env.getKey();
-        DatabaseId dbId = Identifier.parseDatabaseId(dbIdStr);
-        Document request = (Document) env.getMessage();
-        
-        // Construct the patch from the request ...
-        Patch<DatabaseId> patch = Patch.from(request);
-        assert patch.target().equals(dbId);
-        
-        // Construct the response message ...
-        Document response = Message.createResponseFromRequest(request);
-        
-        // Look up the entity in the store ...
-        Document schema = store.get(dbIdStr);
-        
-        if (schema == null) {
-            // The schema does not exist ...
-            if (!patch.isCreation()) {
-                // The entity did not exist ...
-                Message.setStatus(response, Status.DOES_NOT_EXIST);
-                Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
+        try {
+            System.out.println("SchemaStorageService.process(...) begin");
+            String dbIdStr = (String) env.getKey();
+            DatabaseId dbId = Identifier.parseDatabaseId(dbIdStr);
+            Document request = (Document) env.getMessage();
+
+            // Construct the patch from the request ...
+            Patch<DatabaseId> patch = Patch.from(request);
+            assert patch.target().equals(dbId);
+
+            // Construct the response message ...
+            Document response = Message.createResponseFromRequest(request);
+
+            // Look up the entity in the store ...
+            Document schema = store.get(dbIdStr);
+
+            if (schema == null) {
+                // The schema does not exist ...
+                if (!patch.isCreation()) {
+                    // The entity did not exist ...
+                    Message.setStatus(response, Status.DOES_NOT_EXIST);
+                    Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
+                    sendResponse(response, dbIdStr, collector);
+                    System.out.println("SchemaStorageService.process(...) completed with DOES_NOT_EXIST");
+                    return;
+                }
+                // Otherwise it was a creation, so create it ...
+                schema = Document.create();
+            } else if (patch.isReadRequest()) {
+                // We're reading an existing schema ...
+                assert schema != null;
+                Message.setAfter(response, schema);
                 sendResponse(response, dbIdStr, collector);
+                System.out.println("SchemaStorageService.process(...) completed read request");
                 return;
             }
-            // Otherwise it was a creation, so create it ...
-            schema = Document.create();
-        } else if (patch.isReadRequest()) {
-            // We're reading an existing schema ...
-            assert schema != null;
-            Message.setAfter(response, schema);
-            sendResponse(response, dbIdStr, collector);
-            return;
-        }
-        
-        // Apply the patch ...
-        if (patch.apply(schema, (failedOp) -> record(failedOp, response))) {
-            // The schema was successfully changed, so store the changes ...
-            store.put(dbIdStr, schema);
-            Message.setAfter(response, schema);
-            
-            // Output the result ...
-            collector.send(new OutgoingMessageEnvelope(Streams.schemaUpdates(dbId), dbIdStr, dbIdStr, response));
 
-            // And (depending upon the config) also send the response to the partial responses stream ...
-            if ( sendResponseUponUpdate ) sendResponse(response,dbIdStr, collector);
-        } else {
-            // Otherwise the patch failed, so just output it as unchanged ...
-            sendResponse(response, dbIdStr, collector);
+            // Apply the patch ...
+            if (patch.apply(schema, (failedOp) -> record(failedOp, response))) {
+                // The schema was successfully changed, so store the changes ...
+                store.put(dbIdStr, schema);
+                Message.setAfter(response, schema);
+
+                // Output the result ...
+                collector.send(new OutgoingMessageEnvelope(Streams.schemaUpdates(dbId), dbIdStr, dbIdStr, response));
+
+                // And (depending upon the config) also send the response to the partial responses stream ...
+                if (sendResponseUponUpdate) sendResponse(response, dbIdStr, collector);
+            } else {
+                // Otherwise the patch failed, so just output it as unchanged ...
+                sendResponse(response, dbIdStr, collector);
+            }
+            System.out.println("SchemaStorageService.process(...) completed");
+        } catch (RuntimeException t) {
+            t.printStackTrace();
+            throw t;
         }
     }
-    
+
     private void sendResponse(Document response, String idStr, MessageCollector collector) {
         String clientId = Message.getClient(response);
         collector.send(new OutgoingMessageEnvelope(Streams.partialResponses(), clientId, idStr, response));
     }
-    
+
     private void record(Operation failedOperation, Document response) {
         Message.addFailureReason(response, failedOperation.failureDescription());
         Message.setStatus(response, Status.PATCH_FAILED);
     }
-    
+
 }

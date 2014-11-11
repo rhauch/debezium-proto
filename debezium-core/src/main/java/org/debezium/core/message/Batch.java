@@ -228,7 +228,10 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     
     @Override
     public String toString() {
-        return "[ " + patches.stream().map(Object::toString).collect(Collectors.joining(", ")) + " ]";
+        return "[ " + patches.stream()
+                             .map(Object::toString)
+                             .collect(Collectors.joining(", "))
+                             + " ]";
     }
     public Document asDocument() {
         Array array = Array.create(patches.stream().map(Patch::asDocument).collect(Collectors.toList()));
@@ -278,9 +281,9 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     public static <IdType extends Identifier> Batch<IdType> from( Document doc ) {
         Array array = doc.getArray("patches");
         if ( array == null ) return null;
-        @SuppressWarnings("unchecked")
         List<Patch<IdType>> patches = array.streamValues().filter(Value::isDocument)
-                                                          .map(value->(Patch<IdType>)Patch.from(value.asDocument()))
+                                                          .map(Value::asDocument)
+                                                          .map(d->Patch.<IdType>from(d))
                                                           .filter(Predicates.notNull())
                                                           .collect(Collectors.toList());
         return new Batch<IdType>(patches);

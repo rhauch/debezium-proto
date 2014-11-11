@@ -957,13 +957,14 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     public boolean apply(Document document, Consumer<Operation> failed ) {
         if ( isEmpty() ) return false;
         if ( isCreation() ) {
-            document.putAll(((Add)ops.get(0)).value().asDocument());
+            Add add = (Add)ops.stream().findFirst().get();
+            document.putAll(add.value().asDocument());
             Message.addId(document, id);
             return true;
         }
         if ( isDeletion() ) {
             return false;
         }
-        return ops.stream().map((op)->op.apply(document,(invalidPath)->failed.accept(op))).count() > 0;
+        return ops.stream().map(op->op.apply(document,invalidPath->failed.accept(op))).count() > 0;
     }
 }

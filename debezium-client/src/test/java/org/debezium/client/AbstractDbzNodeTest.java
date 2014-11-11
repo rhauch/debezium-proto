@@ -11,11 +11,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 import org.debezium.Testing;
 import org.debezium.core.doc.Document;
 import org.debezium.core.util.NamedThreadFactory;
+import org.debezium.core.util.Sequences;
 import org.fest.assertions.Fail;
 import org.junit.After;
 import org.junit.Before;
@@ -29,8 +29,6 @@ public class AbstractDbzNodeTest implements Testing {
     protected DbzNode node;
     protected ExecutorService executor;
     protected ScheduledExecutorService scheduledExecutor;
-    protected String metadataBrokerList = "localhost:9092";
-    protected String zookeeperConnectString = "localhost:2181/";
 
     @Before
     public void beforeEach() {
@@ -99,7 +97,7 @@ public class AbstractDbzNodeTest implements Testing {
         });
         
         // Now fire a couple of messages on this topic
-        IntStream.range(0, numMessages).forEach(i->{
+        Sequences.times(numMessages).forEach(i->{
             String key = "key" + i;
             Testing.print("Sending message '" + key + "'");
             node.send(topicName, key, Document.create("started",System.currentTimeMillis()));

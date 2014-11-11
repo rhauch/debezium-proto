@@ -149,8 +149,9 @@ final class JacksonReader implements DocumentReader {
     private Array parseArray( JsonParser parser ) throws IOException {
         // Iterate over the fields in the top-level document ...
         BasicArray array = new BasicArray();
-        while ( parser.nextToken() != JsonToken.END_ARRAY ) {
-            switch (parser.nextToken()) {
+        JsonToken token = parser.nextToken();
+        while ( token != JsonToken.END_ARRAY ) {
+            switch (token) {
                 case START_OBJECT:
                     array.add(parseDocument(parser,true));
                     break;
@@ -204,7 +205,7 @@ final class JacksonReader implements DocumentReader {
                 case END_OBJECT:
                     throw new JsonParseException("Not expecting an END_OBJECT token",parser.getCurrentLocation());
             }
-            
+            token = parser.nextToken();
         }
         return array;
     }

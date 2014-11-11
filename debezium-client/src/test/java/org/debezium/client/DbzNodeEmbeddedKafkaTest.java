@@ -11,21 +11,22 @@ import java.util.concurrent.TimeUnit;
 import org.debezium.KafkaTestCluster;
 import org.debezium.client.Debezium.Acknowledgement;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * @author Randall Hauch
  *
  */
-public class DbzNodeEmbeddedKafkaTest extends DbzNodeExternalKafkaTest {
+@Ignore("This doesn't seem to allow consumers to connect to it.")
+public class DbzNodeEmbeddedKafkaTest extends AbstractDbzNodeTest {
 
     private static KafkaTestCluster kafka;
 
     @BeforeClass
     public static void beforeAll() throws Exception {
-        kafka = KafkaTestCluster.forTest(DatabaseTest.class);
+        kafka = KafkaTestCluster.forTest(DbzNodeEmbeddedKafkaTest.class);
     }
     
     @AfterClass
@@ -33,17 +34,11 @@ public class DbzNodeEmbeddedKafkaTest extends DbzNodeExternalKafkaTest {
         kafka.stopAndCleanUp();
     }
 
-    @Override
-    @Before
-    public void beforeEach() {
-        super.beforeEach();
-        metadataBrokerList = kafka.getKafkaBrokerString();
-        zookeeperConnectString = kafka.getZkConnectString();
-    }
-    
-    @Override
     @Test
     public void shouldConnectToKafka() throws InterruptedException {
+        System.out.println("Kafka broker string: " + kafka.getKafkaBrokerString());
+        System.out.println("Zookeeper connect string: " + kafka.getZkConnectString());
+        
         DbzConfiguration config = (DbzConfiguration) Debezium.configure()
                 .clientId(DatabaseTest.class.getSimpleName())
                 .withBroker(kafka.getKafkaBrokerString())
@@ -52,7 +47,7 @@ public class DbzNodeEmbeddedKafkaTest extends DbzNodeExternalKafkaTest {
                 .lazyInitialization(true)
                 .build();
         startWith(config.getDocument());
-        sendAndReceiveMessages(10, 1, "dbz-node-test", 10, TimeUnit.SECONDS);
+        sendAndReceiveMessages(10, 1, "dbz-embedded-node-test", 10, TimeUnit.SECONDS);
     }
 
 }

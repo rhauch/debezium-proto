@@ -9,15 +9,16 @@ import java.util.concurrent.TimeUnit;
 
 import org.debezium.Testing;
 import org.debezium.client.Debezium.Acknowledgement;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * @author Randall Hauch
  *
  */
+@Ignore
 public class DbzNodeExternalKafkaTest extends AbstractDbzNodeTest {
 
-    //@Ignore
     @Test
     public void shouldConnectToKafka() throws InterruptedException {
         Testing.Print.enable();

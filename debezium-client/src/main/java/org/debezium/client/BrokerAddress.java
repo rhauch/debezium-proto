@@ -5,7 +5,7 @@
  */
 package org.debezium.client;
 
-import java.util.Optional;
+import java.util.Objects;
 
 /**
  * @author Randall Hauch
@@ -33,11 +33,11 @@ final class BrokerAddress {
     }
 
     private final String brokerName;
-    private final Optional<String> machine;
+    private final String machine;
     private final int port;
     protected BrokerAddress( String brokerName, String machine, int port ) {
         this.brokerName = brokerName;
-        this.machine = Optional.ofNullable(machine);
+        this.machine = machine;
         this.port = port;
     }
     @Override
@@ -50,13 +50,13 @@ final class BrokerAddress {
         if ( obj instanceof BrokerAddress ) {
             BrokerAddress that = (BrokerAddress)obj;
             return this.brokerName.equals(that.brokerName) &&
-                   this.machine.equals(that.machine) &&
+                   Objects.equals(this.machine, that.machine) &&
                    this.port == that.port;
         }
         return false;
     }
     @Override
     public String toString() {
-        return brokerName + ":" + ( machine.isPresent() ? machine.get() + ":" : "" ) + Integer.toString(port);
+        return brokerName + ":" + ( machine != null ? machine + ":" : "" ) + Integer.toString(port);
     }
 }

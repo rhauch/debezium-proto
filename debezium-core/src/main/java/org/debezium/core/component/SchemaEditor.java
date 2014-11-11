@@ -438,7 +438,7 @@ public class SchemaEditor {
     public static void onEachEntityType(Document schema, DatabaseId dbId, BiConsumer<EntityType, Document> consumer) {
         Document collections = schema.getDocument("collections");
         if (collections != null) {
-            collections.forEach((field) -> {
+            collections.forEach(field -> {
                 Value value = field.getValue();
                 if (value != null && value.isDocument()) {
                     consumer.accept(Identifier.of(dbId, field.getName()), value.asDocument());

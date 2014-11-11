@@ -80,6 +80,10 @@ public final class Message {
                                                                                   Field.REQUEST,
                                                                                   Field.USER,
                                                                                   Field.PARTS,
+                                                                                  Field.DATABASE_ID,
+                                                                                  Field.COLLECTION,
+                                                                                  Field.ZONE_ID,
+                                                                                  Field.ENTITY,
                                                                                   Field.BEGUN,
                                                                                   Field.LEARNING,
                                                                                   Field.INCLUDE_BEFORE,
@@ -272,6 +276,7 @@ public final class Message {
 
     /**
      * Get the {@link Status} in the supplied message.
+     * 
      * @param message the response message
      * @return the status, or null if there is no (known) status
      */
@@ -294,14 +299,14 @@ public final class Message {
 
     public static void addFailureReason(Document message, String reason) {
         Value value = message.get(Field.ERROR);
-        if (value == null) {
+        if (Value.isNull(value)) {
             message.setString(Field.ERROR, reason);
         } else if (value.isArray()) {
             value.asArray().add(reason);
         } else if (value.isString()) {
             message.setArray(Field.ERROR, Array.create(value.asString(), reason));
         } else {
-            throw new IllegalStateException();
+            throw new IllegalStateException("Unexpected value: " + value);
         }
     }
 
@@ -309,15 +314,28 @@ public final class Message {
         Value value = message.get(Field.ERROR);
         if (Value.notNull(value)) {
             if (value.isArray()) {
-                return value.asArray().streamValues().filter(Value::notNull).map(Value::toString).collect(Collectors.toList());
+                return value.asArray().streamValues().filter(Value::notNull)
+                            .map(Value::toString)
+                            .collect(Collectors.toList());
             }
             if (value.isDocument()) {
-                return value.asDocument().stream().filter(Document.Field::isNotNull).map(f -> f.getValue().toString())
+                return value.asDocument().stream().filter(Document.Field::isNotNull)
+                            .map(Document.Field::getValue)
+                            .map(Value::toString)
                             .collect(Collectors.toList());
             }
             return Collections.singleton(value.toString());
         }
         return Collections.emptyList();
+    }
+
+    public static void setOperations(Document response, Document originalRequest) {
+        Value value = originalRequest.get(Field.OPS);
+        if (Value.notNull(value)) response.set(Field.OPS, value);
+    }
+
+    public static void setOperations(Document message, Patch<?> patch ) {
+        setOperations(message,patch.asDocument());
     }
 
     public static String getClient(Document message) {
@@ -356,11 +374,11 @@ public final class Message {
     }
 
     public static Document getAfter(Document message) {
-        return message.setDocument(Field.AFTER);
+        return message.getDocument(Field.AFTER);
     }
 
     public static Document getBefore(Document message) {
-        return message.setDocument(Field.BEFORE);
+        return message.getDocument(Field.BEFORE);
     }
 
     public static Document getAfterOrBefore(Document message) {

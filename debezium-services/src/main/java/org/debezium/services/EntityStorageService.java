@@ -41,76 +41,89 @@ import org.debezium.core.message.Patch.Operation;
  */
 @NotThreadSafe
 public class EntityStorageService implements StreamTask, InitableTask {
-    
+
+    public static final String SEND_RESPONSE_WITH_UDATE = "task.send.response.with.update";
+
     private KeyValueStore<String, Document> store;
     private boolean sendResponseUponUpdate = false;
-    
+
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
-        this.sendResponseUponUpdate = config.getBoolean("", sendResponseUponUpdate);
+        this.sendResponseUponUpdate = config.getBoolean(SEND_RESPONSE_WITH_UDATE, sendResponseUponUpdate);
         this.store = (KeyValueStore<String, Document>) context.getStore("entity-store");
     }
-    
+
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
-        String idStr = (String) env.getKey();
-        EntityId id = Identifier.parseEntityId(idStr);
-        DatabaseId dbId = id.databaseId();
-        Document request = (Document) env.getMessage();
-        
-        // Construct the patch from the request ...
-        Patch<EntityId> patch = Patch.from(request);
-        assert patch.target().equals(id);
-        
-        // Construct the response message ...
-        Document response = Message.createResponseFromRequest(request);
-        
-        // Look up the entity in the store ...
-        Document entity = store.get(idStr);
-        
-        if (entity == null) {
-            // The entity does not exist ...
-            if (!patch.isCreation()) {
-                // The entity did not exist ...
-                Message.setStatus(response, Status.DOES_NOT_EXIST);
-                Message.addFailureReason(response, "Entity '" + id + "' does not exist.");
-                sendResponse(response, idStr, collector);
+        try {
+            String idStr = (String) env.getKey();
+            EntityId id = Identifier.parseEntityId(idStr);
+            DatabaseId dbId = id.databaseId();
+            Document request = (Document) env.getMessage();
+
+            // Construct the patch from the request ...
+            Patch<EntityId> patch = Patch.from(request);
+            assert patch.target().equals(id);
+
+            // Construct the response message ...
+            Document response = Message.createResponseFromRequest(request);
+
+            // Look up the entity in the store ...
+            Document entity = store.get(idStr);
+
+            if ( patch.isReadRequest() ) {
+                if ( entity == null ) {
+                    // The entity does not exist ...
+                    Message.setStatus(response, Status.DOES_NOT_EXIST);
+                    Message.addFailureReason(response, "Entity '" + id + "' does not exist.");
+                    sendResponse(response, idStr, collector);
+                } else {
+                    // We're reading an existing entity ...
+                    assert entity != null;
+                    Message.setAfter(response, entity);
+                    sendResponse(response, idStr, collector);
+                }
                 return;
             }
-            // Otherwise it was a creation, so create it ...
-            entity = Document.create();
-        } else if (patch.isReadRequest()) {
-            // We're reading an existing entity ...
-            assert entity != null;
-            Message.setAfter(response, entity);
-            sendResponse(response, idStr, collector);
-        }
-        
-        // Apply the patch ...
-        if (patch.apply(entity, (failedOp) -> record(failedOp, response))) {
-            // The entity was successfully changed, so store the changes ...
-            store.put(idStr, entity);
             
-            // Output the result ...
-            collector.send(new OutgoingMessageEnvelope(Streams.entityUpdates(dbId), idStr, idStr, response));
+            // Make sure there is an entity document ...
+            if (entity == null) entity = Document.create();
+            
+            // Add the patch operations to the response ...
+            Message.setOperations(response,request);
+            Message.setBefore(response, entity.clone());
+            
+            // Apply the patch, which may create the entity ...
+            if (patch.apply(entity, (failedOp) -> record(failedOp, response))) {
+                // The entity was successfully changed, so store the changes ...
+                store.put(idStr, entity);
+                Message.setAfter(response, entity.clone());
 
-            // And (depending upon the config) also send the response to the partial responses stream ...
-            if ( sendResponseUponUpdate ) sendResponse(response,idStr, collector);
+                // Output the result ...
+                collector.send(new OutgoingMessageEnvelope(Streams.entityUpdates(dbId), idStr, idStr, response));
+
+                // And (depending upon the config) also send the response to the partial responses stream ...
+                if (sendResponseUponUpdate) sendResponse(response, idStr, collector);
+            } else {
+                // Could not apply the patch, so just output it as unchanged (with the failure recorded) ...
+                sendResponse(response, idStr, collector);
+            }
+
+        } catch (RuntimeException t) {
+            t.printStackTrace();
+            throw t;
         }
-        
-        // Otherwise the patch failed, so just output it as unchanged ...
-        sendResponse(response, idStr, collector);
     }
-    
+
     private void sendResponse(Document response, String idStr, MessageCollector collector) {
         String clientId = Message.getClient(response);
         collector.send(new OutgoingMessageEnvelope(Streams.partialResponses(), clientId, idStr, response));
     }
-    
+
     private void record(Operation failedOperation, Document response) {
         Message.addFailureReason(response, failedOperation.failureDescription());
         Message.setStatus(response, Status.PATCH_FAILED);
     }
-    
+
 }

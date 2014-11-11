@@ -47,7 +47,7 @@ public class EntityBatchService implements StreamTask {
         // Fire off a separate request for each patch ...
         int parts = batch.patchCount();
         AtomicInteger partCounter = new AtomicInteger(0);
-        batch.forEach((patch) -> {
+        batch.forEach(patch -> {
             // Construct the response message and fire it off ...
             Document patchRequest = Message.createPatchRequest(batchRequest, patch);
             

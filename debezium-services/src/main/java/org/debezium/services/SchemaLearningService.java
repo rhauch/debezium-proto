@@ -63,7 +63,7 @@ public class SchemaLearningService implements StreamTask, InitableTask {
     public void init(Config config, TaskContext context) {
         this.entityTypesCache = (KeyValueStore<String, Document>) context.getStore("schema-learning-cache");
         // Load the models from the cache ...
-        entityTypesCache.all().forEachRemaining((entry) -> {
+        entityTypesCache.all().forEachRemaining(entry -> {
             EntityType type = Identifier.parseEntityType(entry.getKey());
             updateModel(type, entry.getValue());
         });
@@ -89,7 +89,7 @@ public class SchemaLearningService implements StreamTask, InitableTask {
             // entity type, but those have to get totally ordered via the stream. IOW, by doing it this way, changes to the
             // entity type - whether from us or from clients - will be ordered and handled correctly, and we always update
             // the model and cache based upon those properly ordered changes.
-            model.adapt(patch, entityRepresentation, (entityTypePatch) -> {
+            model.adapt(patch, entityRepresentation, entityTypePatch -> {
                 DatabaseId dbId = type.databaseId();
                 String dbIdStr = dbId.asString();
                 Document entityTypePatchRequest = entityTypePatch.asDocument();

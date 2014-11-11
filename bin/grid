@@ -95,6 +95,8 @@ install_debezium() {
   echo "Extracting Debezium services..."
   mkdir -p $DEPLOY_ROOT_DIR/samza
   tar -xf $DOWNLOAD_DEBEZIUM -C $DEPLOY_ROOT_DIR/samza
+  # Copy the Log4J binding jar for SLF4J
+  cp deploy/samza/lib/slf4j-log4j*.jar deploy/kafka/libs/
 }
 
 install() {
@@ -163,9 +165,9 @@ start_debezium() {
   create_topic "schema-updates"
   create_topic "schema-learning"
   # start the services
+  deploy_samza_job schema-storage-service.properties
   deploy_samza_job entity-batch-service.properties
   deploy_samza_job entity-storage-service.properties
-  deploy_samza_job schema-storage-service.properties
   deploy_samza_job response-accumulator-service.properties
   #deploy_samza_job schema-learning-partitioner-service.properties
   #deploy_samza_job schema-learning-service.properties
@@ -178,6 +180,11 @@ create_topic() {
 
 list_topics() {
   $DEPLOY_ROOT_DIR/kafka/bin/kafka-topics.sh --list --zookeeper $ZOOKEEPER_HOST
+}
+
+watch_topic() {
+  TOPIC_NAME=$1
+  deploy/kafka/bin/kafka-console-consumer.sh  --zookeeper $ZOOKEEPER_HOST --topic $TOPIC_NAME
 }
 
 deploy_samza_job() {
@@ -225,6 +232,12 @@ stop_kafka() {
 if [ "$COMMAND" == "bootstrap" ] && test -z "$SYSTEM"; then
   bootstrap
   exit 0
+elif [ "$COMMAND" == "watch" ] && test -z "$SYSTEM"; then
+  list_topics
+  exit 0
+elif [ "$COMMAND" == "watch" ]; then
+  watch_topic "$SYSTEM"
+  exit 0
 elif (test -z "$COMMAND" && test -z "$SYSTEM") \
   || ( [ "$COMMAND" == "help" ] || test -z "$COMMAND" || test -z "$SYSTEM"); then
   echo
@@ -235,6 +248,7 @@ elif (test -z "$COMMAND" && test -z "$SYSTEM") \
   echo "  $ grid install [yarn|kafka|zookeeper|debezium|all]"
   echo "  $ grid start [yarn|kafka|zookeeper|debezium|all]"
   echo "  $ grid stop [yarn|kafka|zookeeper|all]"
+  echo "  $ grid watch {topicname}"
   echo
   exit 1
 else

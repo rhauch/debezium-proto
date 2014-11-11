@@ -5,7 +5,10 @@
  */
 package org.debezium;
 
+import static org.fest.assertions.Assertions.assertThat;
+
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
@@ -15,6 +18,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.EnumSet;
 import java.util.Set;
 
+import org.debezium.core.util.IoUtil;
+import org.fest.assertions.Fail;
 import org.junit.Before;
 
 /**
@@ -86,7 +91,22 @@ public interface Testing {
     }
     
     public static interface Files {
-
+        
+        public static InputStream readResourceAsStream( String pathOnClasspath ) {
+            InputStream stream = Testing.class.getClassLoader().getResourceAsStream(pathOnClasspath);
+            assertThat(stream).isNotNull();
+            return stream;
+        }
+        
+        public static String readResourceAsString( String pathOnClasspath ) {
+            try ( InputStream stream = readResourceAsStream(pathOnClasspath)) {
+                return IoUtil.read(stream);
+            } catch ( IOException e ) {
+                Fail.fail("Unable to read '" + pathOnClasspath + "'", e);
+                return null;
+            }
+        }
+        
         /**
          * A method that will delete a file or folder only if it is within the 'target' directory (for safety).
          * Folders are removed recursively.

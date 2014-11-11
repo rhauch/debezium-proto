@@ -105,6 +105,7 @@ public class SchemaStorageServiceTest extends AbstractServiceTest {
         Document expected = Document.create();
         Message.addHeaders(expected, CLIENT_ID, REQUEST_ID, USER, TIMESTAMP);
         Message.setStatus(expected, Status.SUCCESS);
+        Message.addId(expected, DBID);
         expected.setDocument("after", after);
         
         // Submit the request ...

@@ -20,7 +20,7 @@ import org.debezium.core.message.Topic;
  */
 public class Streams {
     
-    public static final String SYSTEM_NAME = "debezium-kafka";
+    public static final String SYSTEM_NAME = "debezium";
     
     private static final SystemStream SCHEMA_PATCHES = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_PATCHES);
     private static final SystemStream SCHEMA_UPDATES = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_UPDATES);

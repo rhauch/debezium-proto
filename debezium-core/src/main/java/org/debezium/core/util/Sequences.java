@@ -6,12 +6,17 @@
 package org.debezium.core.util;
 
 import java.util.Iterator;
+import java.util.stream.IntStream;
 
 /**
  * @author Randall Hauch
  *
  */
 public class Sequences {
+    
+    public static IntStream times( int number ) {
+        return IntStream.range(0, number);
+    }
     
     public static Iterable<Integer> infiniteIntegers() {
         return infiniteIntegers(0);

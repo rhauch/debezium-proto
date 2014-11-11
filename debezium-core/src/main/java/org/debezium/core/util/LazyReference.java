@@ -35,6 +35,7 @@ public final class LazyReference<T> {
 
     /**
      * Determine if the referenced object has been created and accessed.
+     * 
      * @return {@code true} if the object has been created, or false otherwise
      */
     public boolean isInitialized() {
@@ -69,6 +70,19 @@ public final class LazyReference<T> {
                 creationLock.unlock();
             }
         }
+    }
+
+    /**
+     * Get the referenced value (creating it if required) and call the supplied function.
+     * 
+     * @param consumer the function that operates on the value; may not be null
+     * @return true if the function was called on the referenced value, or false if there is no referenced value
+     */
+    public boolean execute(Consumer<T> consumer) {
+        T value = get();
+        if (value == null) return false;
+        consumer.accept(value);
+        return true;
     }
 
     public T get() {

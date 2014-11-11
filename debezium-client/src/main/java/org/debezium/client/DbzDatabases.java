@@ -20,6 +20,7 @@ import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
+import org.debezium.core.function.Callable;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Patch;
@@ -85,7 +86,7 @@ final class DbzDatabases extends Service {
     }
     
     DbzConnection provision(ExecutionContext context, long timeout, TimeUnit unit) {
-        whenRunning(node -> {
+        return whenRunning(node -> {
             DatabaseId dbId = context.databaseId();
             ActiveDatabase db = activeDatabases.get(dbId);
             if (db != null) {
@@ -96,17 +97,13 @@ final class DbzDatabases extends Service {
                                          .orElseThrow(DebeziumConnectionException::new);
             return new DbzConnection(this, context);
         }).orElseThrow(DebeziumClientException::new);
-        assert false : "Should never get here";
-        return null;
     }
     
     DbzConnection connect(ExecutionContext context, long timeout, TimeUnit unit) {
-        whenRunning(node -> {
+        return whenRunning(node -> {
             activeDatabase(node,context,timeout,unit);
             return new DbzConnection(this, context);
         }).orElseThrow(DebeziumClientException::new);
-        assert false : "Should never get here";
-        return null;
     }
     
     private ActiveDatabase activeDatabase(DbzNode node, ExecutionContext context, long timeout, TimeUnit unit) {
@@ -141,10 +138,10 @@ final class DbzDatabases extends Service {
         };
     }
     
-    private ActiveDatabase updateActiveDatabase(Document schemaReadReponse) {
-        DatabaseId dbId = Message.getDatabaseId(schemaReadReponse);
-        if ( Message.isSuccess(schemaReadReponse)) {
-            Document schema = Message.getAfter(schemaReadReponse);
+    private ActiveDatabase updateActiveDatabase(Document schemaReadResponse) {
+        DatabaseId dbId = Message.getDatabaseId(schemaReadResponse);
+        if ( Message.isSuccess(schemaReadResponse)) {
+            Document schema = Message.getAfter(schemaReadResponse);
             ActiveDatabase db = new ActiveDatabase(dbId, schema);
             activeDatabases.put(dbId, db);
             return db;
@@ -170,7 +167,12 @@ final class DbzDatabases extends Service {
     void readSchema(ExecutionContext context, Handlers handlers) {
         if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to read entities");
         // We should always have one locally since we're connected ...
-        whenRunning(node -> activeDatabase(node,context,10,TimeUnit.SECONDS).schema());
+        whenRunning(node -> {
+            Document schema = activeDatabase(node,context,10,TimeUnit.SECONDS).schema();
+            handlers.successHandler.ifPresent(c->c.accept(schema));
+            handlers.completionHandler.ifPresent(Callable::call);
+            return true;
+        });
     }
     
     void readEntities(ExecutionContext context, Iterable<EntityId> entityIds, Handlers handlers) {
@@ -189,7 +191,7 @@ final class DbzDatabases extends Service {
     void changeEntities(ExecutionContext context, Batch<EntityId> batch, Handlers handlers) {
         if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to change entities");
         whenRunning(node -> {
-            RequestId requestId = this.handlers.register(context, 1, handlers).orElseThrow(DebeziumClientException::new);
+            RequestId requestId = this.handlers.register(context, batch.patchCount(), handlers).orElseThrow(DebeziumClientException::new);
             Document request = batch.asDocument();
             Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
             node.send(Topic.ENTITY_BATCHES, requestId.asString(), request);

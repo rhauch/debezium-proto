@@ -45,6 +45,12 @@ public interface Database extends Closeable {
     
     public static interface Completion {
         /**
+         * Determine if this is already complete.
+         * @return true if complete, or false if it is not yet completed and {@link #await()} or {@link #await(long, TimeUnit)} can
+         * be called to wait until complete
+         */
+        boolean isComplete();
+        /**
          * Waits if necessary for the operation to complete, and then
          * retrieves its result.
          *
@@ -83,7 +89,7 @@ public interface Database extends Closeable {
         }
 
         default boolean succeeded() {
-            return status() != Status.OK;
+            return status() == Status.OK;
         }
 
         Status status();
@@ -105,7 +111,7 @@ public interface Database extends Closeable {
         }
 
         default boolean succeeded() {
-            return status() != ChangeStatus.OK;
+            return status() == ChangeStatus.OK;
         }
 
         ChangeStatus status();

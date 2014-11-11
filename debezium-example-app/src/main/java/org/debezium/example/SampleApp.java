@@ -25,7 +25,7 @@ import org.debezium.client.Database.Change;
 import org.debezium.client.Database.Completion;
 import org.debezium.client.Database.Outcome;
 import org.debezium.client.Debezium;
-import org.debezium.client.DebeziumProvisioningException;
+import org.debezium.client.DebeziumConnectionException;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
@@ -81,13 +81,13 @@ public class SampleApp {
         DatabaseId dbId = Identifier.of(dbName);
         Database db = null;
         try {
-            db = client.provision(dbId,username);
-        } catch ( DebeziumProvisioningException e ) {
-            // Provisioning failed, so try to connect ...
+            db = client.connect(dbId, username);
+        } catch ( DebeziumConnectionException e ) {
+            // Connecting failed, so try to provision ...
             try {
-                db = client.connect(dbId, username);
+                db = client.provision(dbId,username);
             } catch (Throwable e2) {
-                System.out.println("Error provisioning new Debezium database '" + dbName + "': " + e.getMessage());
+                System.out.println("Error connecting to or provisioning Debezium database '" + dbName + "': " + e.getMessage());
                 System.exit(2);
             }
         }
@@ -119,7 +119,13 @@ public class SampleApp {
     private static void attempt( Supplier<Completion> runnable ) {
         try {
             Completion result = runnable.get();
-            if ( result != null ) result.await(10, TimeUnit.SECONDS);
+            if ( result != null && !result.isComplete() ) {
+                System.out.println("Waiting for results...");
+                result.await(10, TimeUnit.SECONDS);
+                if ( !result.isComplete() ) System.out.println("Timed out");
+            } else {
+                System.out.println("No need to wait");
+            }
         } catch ( TimeoutException e ) {
             System.out.println("Timeout waiting for response for " + runnable + ": " + e.getMessage());
         } catch ( InterruptedException e ) {
@@ -136,7 +142,9 @@ public class SampleApp {
     }
 
     public void shutdown() {
+        System.out.println("Shutting down Debezium client...");
         db.close();
+        System.out.println("Shutdown complete.");
     }
     
     protected void print( Object msg ) {

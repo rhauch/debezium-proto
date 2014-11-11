@@ -13,6 +13,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.core.component.DatabaseId;
+import org.debezium.core.message.Topic;
 import org.debezium.core.util.NamedThreadFactory;
 
 
@@ -53,6 +54,8 @@ final class DbzClient implements Debezium.Client {
         executor = Executors.newCachedThreadPool(threadFactory);
         scheduledExecutor = Executors.newScheduledThreadPool(0,scheduledThreadFactory);
         node.start();
+        // Subscribe to the 'partial-responses' topic and forward to all of the response handlers ...
+        node.subscribe(node.id(), Topics.of(Topic.PARTIAL_RESPONSES), 1, (topic,partition,offset,key,msg)->responseHandlers.submit(msg));
         return this;
     }
     

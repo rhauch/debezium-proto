@@ -19,6 +19,10 @@ import org.debezium.core.message.Topic;
  *
  */
 final class Topics {
+    
+    public static TopicFilter of( String topic ) {
+        return new Whitelist(topic);
+    }
 
     public static TopicFilter anyOf( String...topics) {
         StringJoiner joiner = new StringJoiner(",");

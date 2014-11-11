@@ -28,7 +28,6 @@ import java.util.function.Supplier;
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
-import kafka.consumer.KafkaStream;
 import kafka.consumer.TopicFilter;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.javaapi.producer.Producer;
@@ -41,10 +40,12 @@ import kafka.utils.VerifiableProperties;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.function.Callable;
+import org.debezium.core.function.Predicates;
 import org.debezium.core.serde.Decoder;
 import org.debezium.core.serde.Serdes;
 import org.debezium.core.util.LazyReference;
 import org.debezium.core.util.Strings;
+import org.slf4j.LoggerFactory;
 
 /**
  * A component that represents a single compute node within the Debezium cluster.
@@ -81,6 +82,7 @@ final class DbzNode {
 
         private final ReadWriteLock startLock = new ReentrantReadWriteLock();
         private final AtomicReference<DbzNode> node = new AtomicReference<>();
+        private Logger logger = null;
 
         /**
          * Start the service running within the given {@link DbzNode}.
@@ -91,6 +93,7 @@ final class DbzNode {
             try {
                 this.startLock.writeLock().lock();
                 if (this.node.get() == null) {
+                    this.logger = node.logger(getClass());
                     onStart(node);
                     this.node.set(node); // do this *after* calling 'onStart', in case the call fails
                 }
@@ -157,10 +160,10 @@ final class DbzNode {
         }
 
         protected Logger logger() {
-            return node.get().logger(getClass());
+            return logger;
         }
     }
-    
+
     private static final DefaultDecoder DEFAULT_DECODER = new DefaultDecoder(new VerifiableProperties());
 
     private final String nodeId = UUID.randomUUID().toString();
@@ -170,7 +173,7 @@ final class DbzNode {
     private final Supplier<Executor> executor;
     private final Supplier<ScheduledExecutorService> scheduledExecutor;
     private final List<ScheduledFuture<?>> scheduledTasks = new CopyOnWriteArrayList<>();
-    private final Map<Properties,ConsumerConnector> connectors = new ConcurrentHashMap<>();
+    private final Map<Properties, ConsumerConnector> connectors = new ConcurrentHashMap<>();
     private final LazyReference<Producer<byte[], byte[]>> producer;
     private final CopyOnWriteArrayList<Service> services = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> preShutdownListeners = new CopyOnWriteArrayList<>();
@@ -192,8 +195,8 @@ final class DbzNode {
         registerPreShutdown(() -> services.forEach(Service::beginShutdown));
         registerPostShutdown(() -> services.forEach(Service::completeShutdown));
     }
-    
-    private Producer<byte[],byte[]> createProducer() {
+
+    private Producer<byte[], byte[]> createProducer() {
         ProducerConfig pconf = new ProducerConfig(this.producerConfig);
         return new Producer<byte[], byte[]>(pconf);
     }
@@ -257,11 +260,13 @@ final class DbzNode {
      * @param services one or more services to add
      */
     public void add(Service... services) {
-        Arrays.stream(services).forEach((service) -> {
-            if (service != null && this.services.addIfAbsent(service)) {
-                whenRunning(() -> service.start(this));
-            }
-        });
+        Arrays.stream(services)
+              .filter(Predicates.notNull())
+              .forEach(service -> {
+                  if (this.services.addIfAbsent(service)) {
+                      whenRunning(() -> service.start(this));
+                  }
+              });
     }
 
     /**
@@ -271,14 +276,16 @@ final class DbzNode {
      * @param services one or more services to remove
      */
     public void remove(Service... services) {
-        Arrays.stream(services).forEach((service) -> {
-            if (service != null && this.services.remove(service)) {
-                whenNotRunning(() -> {
-                    service.beginShutdown();
-                    service.completeShutdown();
-                });
-            }
-        });
+        Arrays.stream(services)
+              .filter(Predicates.notNull())
+              .forEach(service -> {
+                  if (this.services.remove(service)) {
+                      whenNotRunning(() -> {
+                          service.beginShutdown();
+                          service.completeShutdown();
+                      });
+                  }
+              });
     }
 
     /**
@@ -321,7 +328,7 @@ final class DbzNode {
     public void start() {
         whenNotRunning(() -> {
             this.running = true;
-            if ( !this.config.get(DbzConfiguration.INIT_PRODUCER_LAZILY,false).convert().asBoolean() ) {
+            if (!this.config.get(DbzConfiguration.INIT_PRODUCER_LAZILY, false).convert().asBoolean()) {
                 this.producer.get();
             }
             this.startListeners.forEach(Callable::call);
@@ -346,7 +353,7 @@ final class DbzNode {
                 } finally {
                     try {
                         // Cancel all of the scheduled tasks ...
-                        scheduledTasks.forEach(f->f.cancel(true));
+                        scheduledTasks.forEach(f -> f.cancel(true));
                     } finally {
                         scheduledTasks.clear();
                         try {
@@ -374,11 +381,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, Object partitionKey, byte[] key, byte[] msg) {
-        if (producer.get() != null) {
-            producer.get().send(new KeyedMessage<>(topic, key, partitionKey, msg));
-            return true;
-        }
-        return false;
+        return producer.execute(p -> p.send(new KeyedMessage<>(topic, key, partitionKey, msg)));
     }
 
     /**
@@ -488,54 +491,52 @@ final class DbzNode {
      */
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
-        if ( numThreads < 1 ) return;
-        
+        if (numThreads < 1) return;
+
         // Create the config for this consumer ...
-        boolean autoCommit = this.config.getBoolean("auto.commmit.enable",true);
+        boolean autoCommit = this.config.getBoolean("auto.commmit.enable", true);
         Properties props = new Properties();
         props.putAll(this.consumerConfig);
         props.put("consumer.id", id());
         props.put("group.id", groupId);
-        props.put("auto.commit.enable", Boolean.toString(autoCommit));
+        // props.put("auto.commit.enable", Boolean.toString(autoCommit));
 
-        // Create the consumer ...
+        // Create the consumer and iterate over the streams and create a thread to process each one ...
         ConsumerConnector connector = getOrCreateConnector(props);
-        List<KafkaStream<byte[], byte[]>> streams = connector.createMessageStreamsByFilter(topicFilter, numThreads, DEFAULT_DECODER,
-                                                                                           DEFAULT_DECODER);
-
-        // Iterate over the streams and create a thread to process each one ...
-        for (KafkaStream<byte[], byte[]> stream : streams) {
-            // Submit a runnable that consumes the topics ...
-            this.executor.get().execute(() -> {
-                ConsumerIterator<byte[], byte[]> iter = stream.iterator();
-                boolean success = false;
-                while (running) {
-                    try {
-                        while (running && iter.hasNext()) {
-                            MessageAndMetadata<byte[], byte[]> msg = iter.next();
-                            success = consumer.consume(msg.topic(), msg.partition(), msg.offset(), keyDecoder.fromBytes(msg.key()),
-                                                       messageDecoder.fromBytes(msg.message()));
-                            if (success && autoCommit) {
-                                connector.commitOffsets();
-                            }
-                        }
-                    } catch (ConsumerTimeoutException e) {
-                        // Keep going ...
-                    }
-                }
-            });
-        }
+        connector.createMessageStreamsByFilter(topicFilter, numThreads, DEFAULT_DECODER, DEFAULT_DECODER)
+                 .forEach(stream -> {
+                     this.executor.get().execute(() -> {
+                         ConsumerIterator<byte[], byte[]> iter = stream.iterator();
+                         boolean success = false;
+                         while (running) {
+                             try {
+                                 while (running && iter.hasNext()) {
+                                     MessageAndMetadata<byte[], byte[]> msg = iter.next();
+                                     success = consumer.consume(msg.topic(), msg.partition(), msg.offset(),
+                                                                keyDecoder.fromBytes(msg.key()),
+                                                                messageDecoder.fromBytes(msg.message()));
+                                     if (success && autoCommit) {
+                                         connector.commitOffsets();
+                                     }
+                                 }
+                             } catch (ConsumerTimeoutException e) {
+                                 // Keep going ...
+                             }
+                         }
+                     });
+                 });
     }
-    
-    private ConsumerConnector getOrCreateConnector( Properties props ) {
+
+    private ConsumerConnector getOrCreateConnector(Properties props) {
         ConsumerConfig config = new ConsumerConfig(props);
         ConsumerConnector connector = connectors.get(props);
-        if ( connector == null ) {
+        if (connector == null) {
             ConsumerConnector newConnector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
+            // It's possible that we and another thread might have concurrently created a consumer with the same config ...
             connector = connectors.putIfAbsent(props, newConnector);
-            if ( connector != null ) {
-                // The new connector we created was not needed ...
-                executor.get().execute(()->newConnector.shutdown());
+            if (connector != null) {
+                // Rare, but the new connector we created was not needed ...
+                executor.get().execute(() -> newConnector.shutdown());
             } else {
                 connector = newConnector;
             }
@@ -564,7 +565,8 @@ final class DbzNode {
      */
     public void execute(long initialDelay, long period, TimeUnit unit, Callable runnable) {
         if (runnable != null) {
-            this.scheduledTasks.add(this.scheduledExecutor.get().scheduleAtFixedRate(()->runnable.call(), initialDelay, period, unit));
+            ScheduledFuture<?> future = this.scheduledExecutor.get().scheduleAtFixedRate(() -> runnable.call(), initialDelay, period, unit);
+            this.scheduledTasks.add(future);
         }
     }
 
@@ -581,41 +583,59 @@ final class DbzNode {
     /**
      * Get a logger for the context with the given classname, where all log messages are sent to the "log" topic.
      * 
-     * @param classname the classname representing the context
+     * @param name the name representing the context
      * @return the logger; never null
      */
-    public Logger logger(String classname) {
+    public Logger logger(String name) {
+        org.slf4j.Logger actual = LoggerFactory.getLogger(name);
         return new Logger() {
             @Override
-            public void log(Level level, String msg, Object... params) {
-                DbzNode.this.log(classname, level, null, msg, params);
+            public void info(String msg, Object... params) {
+                actual.info(msg, params);
             }
 
             @Override
-            public void log(Level level, Throwable error, String msg, Object... params) {
-                DbzNode.this.log(classname, level, error, msg, params);
+            public void warn(String msg, Object... params) {
+                actual.warn(msg, params);
+            }
+
+            @Override
+            public void error(String msg, Object... params) {
+                actual.error(msg, params);
+            }
+
+            @Override
+            public void debug(String msg, Object... params) {
+                actual.debug(msg, params);
+            }
+
+            @Override
+            public void trace(String msg, Object... params) {
+                actual.trace(msg, params);
+            }
+
+            @Override
+            public void log(Level level, String msg, Object... params) {
+                switch (level) {
+                    case INFO:
+                        actual.info(msg, params);
+                        break;
+                    case WARN:
+                        actual.warn(msg, params);
+                        break;
+                    case ERROR:
+                        actual.error(msg, params);
+                        break;
+                    case DEBUG:
+                        actual.debug(msg, params);
+                        break;
+                    case TRACE:
+                        actual.trace(msg, params);
+                        break;
+                }
             }
         };
-    }
-
-    private void log(String classname, Logger.Level level, Throwable t, String msg, Object[] params) {
-        Document doc = Document.create();
-        doc.setString("level", level.toString());
-        doc.setString("msg", msg);
-        if (t != null) {
-            doc.setString("error", t.getMessage());
-            doc.setString("stackTrace", Strings.getStackTrace(t));
-        }
-        doc.setNumber("timestamp", System.currentTimeMillis());
-        doc.set("name", classname);
-        if (params != null) {
-            for (int i = 0; i != params.length; ++i) {
-                Object param = params[i];
-                String paramName = "$" + i;
-                doc.set(paramName, param);
-            }
-        }
-        send("log", "", doc);
+        //return new KafkaLogger(name);
     }
 
     public boolean isRunning() {
@@ -625,6 +645,39 @@ final class DbzNode {
     @Override
     public String toString() {
         return id() + " (" + (running ? "running" : "stopped") + ")";
+    }
+
+    protected final class KafkaLogger implements Logger {
+        private final String name;
+
+        protected KafkaLogger(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public void log(Level level, String msg, Object... params) {
+            log(name, level, null, msg, params);
+        }
+
+        private void log(String classname, Logger.Level level, Throwable t, String msg, Object[] params) {
+            Document doc = Document.create();
+            doc.set("name", classname);
+            doc.setNumber("timestamp", System.currentTimeMillis());
+            doc.setString("level", level.toString());
+            doc.setString("msg", msg);
+            if (t != null) {
+                doc.setString("error", t.getMessage());
+                doc.setString("stackTrace", Strings.getStackTrace(t));
+            }
+            if (params != null) {
+                for (int i = 0; i != params.length; ++i) {
+                    Object param = params[i];
+                    String paramName = "$" + i;
+                    doc.set(paramName, param);
+                }
+            }
+            send("log", "", doc);
+        }
     }
 
 }

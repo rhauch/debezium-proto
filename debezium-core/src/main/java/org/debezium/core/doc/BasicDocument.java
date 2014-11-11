@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Red Hat, Inc. and/or its affiliates.
- *
+ * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
 package org.debezium.core.doc;
@@ -48,12 +48,12 @@ final class BasicDocument implements Document {
         if (this.size() != that.size()) {
             return this.size() - that.size();
         }
-        for (Map.Entry<CharSequence, Value> entry : fields.entrySet()) {
-            Value thatValue = that.get(entry.getKey());
-            int value = entry.getValue().compareTo(thatValue);
-            if (value != 0) return value;
-        }
-        return 0;
+        return fields.entrySet()
+                     .stream()
+                     .mapToInt(e -> e.getValue().compareTo(that.get(e.getKey())))
+                     .filter(i -> i != 0)
+                     .findFirst()
+                     .orElse(0);
     }
 
     @Override
@@ -70,7 +70,7 @@ final class BasicDocument implements Document {
     public void clear() {
         fields.clear();
     }
-    
+
     @Override
     public boolean has(CharSequence fieldName) {
         return fields.containsKey(fieldName);
@@ -83,7 +83,7 @@ final class BasicDocument implements Document {
             // Can't have all of 'that' if 'that' is bigger ...
             return false;
         }
-        return fields.entrySet().stream().allMatch(entry->entry.getValue().equals(that.get(entry.getKey())));
+        return fields.entrySet().stream().allMatch(entry -> entry.getValue().equals(that.get(entry.getKey())));
     }
 
     @Override
@@ -94,7 +94,7 @@ final class BasicDocument implements Document {
 
     @Override
     public Document putAll(Iterable<Field> object) {
-        object.forEach(field->setValue(field));
+        object.forEach(this::setValue);
         return this;
     }
 
@@ -116,7 +116,7 @@ final class BasicDocument implements Document {
         this.fields.put(name, value != null ? value.clone() : Value.nullValue());
         return this;
     }
-    
+
     @Override
     public Document clone() {
         return new BasicDocument().putAll(this);
@@ -144,7 +144,7 @@ final class BasicDocument implements Document {
     public String toString() {
         try {
             return DocumentWriter.prettyWriter().write(this);
-        } catch ( IOException e ) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
