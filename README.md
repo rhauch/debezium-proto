@@ -1,16 +1,20 @@
 Copyright 2014 Red Hat
 Licensed under the Eclipse Public License, Version 1.0.
 
-# Debezium
+This is a work in progress. Some of the functionality is implemented, but there is still much to do. 
 
-# Build
+## Debezium
+
+
+
+## Build
 
 Debezium is written in Java 8 and uses the Maven build system. Use Git to obtain a local clone of this repository, and make sure that you have Java 8 and Maven 3.1.x (or later) installed. Then, run the following from the top-level directory of your local repository:
 
     $ mvn clean install
 
 
-# Run
+## Run
 
 The codebase contains a [sample application](blob/master/debezium-example-app/src/main/java/org/debezium/example/SampleApp.java) that uses the Debezium client library to provision and connect to a new database, read the database's schema, upload entities into the database, and to re-read the databases potentially updated schema.
 
