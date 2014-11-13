@@ -312,7 +312,7 @@ final class Paths {
         }
         @Override
         public String toString() {
-            return Joiner.on("/","/").join(parent.toString(),segment);
+            return Joiner.on("","/").join(parent.toString(),segment);
         }
         @Override
         public String toRelativePath() {

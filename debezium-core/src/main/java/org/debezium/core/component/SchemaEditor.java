@@ -428,7 +428,7 @@ public class SchemaEditor {
         }
         
         private void remove(String path) {
-            patch.remove(path);
+            patch.remove(pathFor(path));
         }
         
         private String pathFor(String relPath) {
