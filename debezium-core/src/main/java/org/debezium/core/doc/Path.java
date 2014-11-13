@@ -75,5 +75,7 @@ public interface Path extends Iterable<String> {
         return append(Path.parse(relPath));
     }
     
+    String toRelativePath();
+    
     Path append( Path relPath );
 }

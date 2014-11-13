@@ -381,6 +381,8 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         protected BasicField(String name, Document fieldDoc) {
             this.name = name;
             this.field = fieldDoc;
+            assert this.field != null;
+            assert this.name != null;
         }
         
         @Override
@@ -488,6 +490,10 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         return FIELDS_PATH.append(fieldPath);
     }
     
+    static Path fieldsPath() {
+        return FIELDS_PATH;
+    }
+    
     private static final String FIELDS_NAME = "fields";
     private static final Path FIELDS_PATH = Path.parse(FIELDS_NAME);
     
@@ -516,7 +522,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
     public Optional<FieldDefinition> field( String name ) {
         Document fields = doc.getDocument(FIELDS_NAME);
         Value value = fields != null ? fields.get(name) : null;
-        return value == null ? Optional.empty() : Optional.of(toFieldDefinition(name,value));
+        return Value.isNull(value) ? Optional.empty() : Optional.of(toFieldDefinition(name,value));
     }
     
     protected boolean isDocument( Field field ) {

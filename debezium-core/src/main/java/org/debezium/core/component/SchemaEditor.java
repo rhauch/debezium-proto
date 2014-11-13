@@ -175,8 +175,8 @@ public class SchemaEditor {
      * @param pathToField the path to the field definition within the entity type representation; may not be null
      * @return the field editor; never null
      */
-    private static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField) {
-        return new BasicFieldEditor(patch, pathToField, false);
+    public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField) {
+        return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), false);
     }
     
     /**
@@ -198,19 +198,20 @@ public class SchemaEditor {
      * @return the field editor; never null
      */
     private static FieldEditor createField(Editor<Patch<EntityType>> patch, Path pathToField) {
-        return new BasicFieldEditor(patch, pathToField, true);
+        return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), true);
     }
     
     
     protected static class BasicFieldEditor implements FieldEditor {
         private final Patch.Editor<?> patch;
-        private final Path pathPrefix;
+        private final Path pathToField;
         private final boolean isNew;
         
-        protected BasicFieldEditor(Patch.Editor<?> patch, Path pathPrefix, boolean isNew) {
+        protected BasicFieldEditor(Patch.Editor<?> patch, Path pathToField, boolean isNew) {
             this.patch = patch;
-            this.pathPrefix = pathPrefix == null ? Path.root() : pathPrefix;
+            this.pathToField = pathToField;
             this.isNew = isNew;
+            assert pathToField != null;
         }
         
         @Override
@@ -431,7 +432,7 @@ public class SchemaEditor {
         }
         
         private String pathFor(String relPath) {
-            return pathPrefix.append(relPath).toString();
+            return pathToField.append(relPath).toString();
         }
     }
     

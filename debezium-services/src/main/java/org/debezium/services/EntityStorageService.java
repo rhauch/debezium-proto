@@ -87,12 +87,16 @@ public class EntityStorageService implements StreamTask, InitableTask {
                 return;
             }
             
-            // Make sure there is an entity document ...
-            if (entity == null) entity = Document.create();
-            
             // Add the patch operations to the response ...
             Message.setOperations(response,request);
-            Message.setBefore(response, entity.clone());
+            
+            // Make sure there is an entity document ...
+            if (entity == null) {
+                entity = Document.create();
+            } else {
+                // and if there capture it as the 'before' ...
+                Message.setBefore(response, entity.clone());
+            }
             
             // Apply the patch, which may create the entity ...
             if (patch.apply(entity, (failedOp) -> record(failedOp, response))) {

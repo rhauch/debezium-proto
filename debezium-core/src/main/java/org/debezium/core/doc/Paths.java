@@ -78,6 +78,11 @@ final class Paths {
             return "/";
         }
         @Override
+        public String toRelativePath() {
+            return "";
+        }
+        
+        @Override
         public Iterator<String> iterator() {
             return Iterators.empty();
         }
@@ -139,6 +144,12 @@ final class Paths {
         public String toString() {
             return "/" + segment.get();
         }
+        
+        @Override
+        public String toRelativePath() {
+            return segment.get();
+        }
+        
         @Override
         public Iterator<String> iterator() {
             return Iterators.with(segment.get());
@@ -215,6 +226,11 @@ final class Paths {
         public String toString() {
             return Joiner.on("/","/").join(segments);
         }
+        @Override
+        public String toRelativePath() {
+            return Joiner.on("","/").join(segments);
+        }
+        
         @Override
         public Iterator<String> iterator() {
             return Iterators.with(segments);
@@ -296,7 +312,11 @@ final class Paths {
         }
         @Override
         public String toString() {
-            return Joiner.on("/","/").join(parent,segment);
+            return Joiner.on("/","/").join(parent.toString(),segment);
+        }
+        @Override
+        public String toRelativePath() {
+            return Joiner.on("","/").join(parent.toRelativePath(),segment);
         }
         @Override
         public String segment(int index) {
