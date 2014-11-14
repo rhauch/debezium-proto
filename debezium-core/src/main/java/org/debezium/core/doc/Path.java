@@ -6,6 +6,7 @@
 package org.debezium.core.doc;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * @author Randall Hauch
@@ -60,6 +61,10 @@ public interface Path extends Iterable<String> {
     default boolean isSingle() {
         return size() == 1;
     }
+    
+    default boolean isMultiple() {
+        return size() > 1;
+    }
 
     int size();
     
@@ -78,4 +83,16 @@ public interface Path extends Iterable<String> {
     String toRelativePath();
     
     Path append( Path relPath );
+    
+    /**
+     * Call the consumer with the path of every ancestor (except root) down to this path.
+     * @param consumer the function to call on each path
+     */
+    default void fromRoot( Consumer<Path> consumer ) {
+        Path path = root();
+        for ( String segment : this ) {
+            path = path.append(segment);
+            consumer.accept(path);
+        }
+    }
 }

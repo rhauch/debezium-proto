@@ -311,7 +311,8 @@ public class LearningEntityTypeModel {
                 Document doc = movedValue.get().asDocument();
                 // Add each of the individual values ...
                 doc.forEach((path, value) -> {
-                    delegate.move(fromPath.append(path), Optional.ofNullable(value), toPath.append(path), Optional.empty(), afterPatch, editor, model);
+                    delegate.move(fromPath.append(path), Optional.ofNullable(value), toPath.append(path), Optional.empty(), afterPatch,
+                                  editor, model);
                 });
                 // finally remove the top-level moved value from it's old place ...
                 delegate.remove(Optional.of(Value.create(Document.create())), fromPath, afterPatch, editor, model);
@@ -361,7 +362,7 @@ public class LearningEntityTypeModel {
 
             // Make sure that the field is already known and the type can handle the value ...
             Optional<FieldDefinition> field = model.field(pathToField);
-            FieldEditor fieldEditor = SchemaEditor.editField(editor, pathToField);
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, pathToField, model);
             if (field.isPresent()) {
                 // The field exists ...
                 Optional<FieldType> knownType = field.get().type();
@@ -427,7 +428,7 @@ public class LearningEntityTypeModel {
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
             Optional<FieldType> knownType = toField.isPresent() ? toField.get().type() : Optional.empty();
-            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath);
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath, model );
             if (movedValueExists) {
                 FieldType bestType = determineBestFieldType(movedValue.get(), knownType);
                 if (!toField.isPresent() || knownType.orElse(bestType) != bestType) {

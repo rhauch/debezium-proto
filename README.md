@@ -18,16 +18,19 @@ Debezium uses [Apache Kafka](http://kafka.apache.org) to read and write the dura
 
 With this architecture, Kafka can handle tremendous amounts of information and be configured to never lose any data. And because consumers are in control of where in the log they read, more options are available to Debezium than with traditional AMPQ or JMS messaging systems.
 
-One goal of Debezium will be easy deployment on [OpenShift](https://www.openshift.com) and in the cloud, and therefore support for [Docker](https://www.docker.com) and [Kubernetes](http://kubernetes.io) will be very important. More important in the short term, however, is verifying the concepts and event-processing architecture can be used for data storage. This prototype uses several other (potentially competing) technologies in the interest of getting something working fast.
+One goal of Debezium will be easy deployment on [OpenShift](https://www.openshift.com) and in the cloud, and therefore support for [Docker](https://www.docker.com) and [Kubernetes](http://kubernetes.io) will be critical. In the short term, however, it is more important to verify the concepts and that an event-processing architecture can be used for data storage. This prototype uses several other (potentially competing) technologies in the interest of getting something working fast.
 
 The prototype's services use [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka streams. Samza offers a few benefits that make prototyping easier and faster, but it also brings with it a dependency upon [Apache Hadoop's YARN](http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/YARN.html). At this point, it is not clear whether Samza can be extended to instead use Kubernetes instead of YARN; if not, then Debezium will likely replace Samza and the limited capabilities it brings.
 
 ## Build
 
-Debezium is written in Java 8 and uses the Maven build system. Use Git to obtain a local clone of this repository, and make sure that you have Java 8 and Maven 3.1.x (or later) installed. Then, run the following from the top-level directory of your local repository:
+Debezium is written in Java 8 and uses Maven 3.1.x for building, so these must be installed before you can build Debezium. To obtain the code and build:
 
-    $ mvn clean install
+    $ git clone https://github.com/rhauch/debezium.git
+	$ cd debezium
+	$ mvn clean install
 
+If anything goes wrong, please let me know.
 
 ## Run
 

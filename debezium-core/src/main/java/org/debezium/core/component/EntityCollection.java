@@ -1,6 +1,6 @@
 /*
  * Copyright 2014 Red Hat, Inc. and/or its affiliates.
- *
+ * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
 package org.debezium.core.component;
@@ -28,11 +28,11 @@ import org.debezium.core.doc.Value.Type;
  *
  */
 public final class EntityCollection implements SchemaComponent<EntityType> {
-    
-    public static EntityCollection with( EntityType id, Document doc ) {
-        return new EntityCollection(id,doc);
+
+    public static EntityCollection with(EntityType id, Document doc) {
+        return new EntityCollection(id, doc);
     }
-    
+
     /**
      * The types of values within an entity's field.
      */
@@ -85,51 +85,59 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         /**
          * A {@link UUID} value.
          */
-        UUID(Type.STRING), BINARY(Type.BINARY);
-        
+        UUID(Type.STRING), BINARY(Type.BINARY),
+        /**
+         * A {@link Document} value.
+         */
+        DOCUMENT(Type.DOCUMENT);
+
         private final Type preferredJsonType;
         private final Set<Type> jsonTypes;
-        
+
         private FieldType(Type t1) {
             preferredJsonType = t1;
             jsonTypes = Collections.unmodifiableSet(EnumSet.of(t1));
         }
-        
+
         private FieldType(Type t1, Type... additional) {
             preferredJsonType = t1;
             jsonTypes = Collections.unmodifiableSet(EnumSet.of(t1, additional));
         }
-        
+
         /**
          * Get the preferred {@link Type JSON value type} for this field type.
+         * 
          * @return the preferred JSON representation type; never null
          */
         public Type preferredJsonType() {
             return preferredJsonType;
         }
-        
+
         /**
          * Get the set of {@link Type JSON value types} that this field type can be represented with.
+         * 
          * @return the set of JSON representation types; never null and never empty
          * @see #jsonTypeIncludes(Type)
          */
         public Set<Type> jsonTypes() {
             return jsonTypes;
         }
-        
+
         /**
          * Determine whether this field type can be represented as the supplied JSON {@link Type JSON value type}.
+         * 
          * @param type the JSON value type
          * @return true if a field with this type can be represented in a JSON field using the given JSON value type, or false
-         * otherwise
+         *         otherwise
          * @see #jsonTypes()
          */
         public boolean jsonTypeIncludes(Type type) {
             return jsonTypes.contains(type);
         }
-        
+
         /**
          * Determine the best field type to represent values of this and the supplied field type.
+         * 
          * @param other the other field type
          * @return the field type that can best represent both types; never null
          */
@@ -184,9 +192,10 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
             }
             return STRING;
         }
-        
+
         /**
          * Infer the best field type to represent the given literal value.
+         * 
          * @param value the value; may be null or may be {@link Value#nullValue()}
          * @return the field type if one can be inferred; never null but possibly empty
          */
@@ -211,7 +220,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
             return Optional.empty();
         }
     }
-    
+
     protected static boolean isUuid(String value) {
         try {
             UUID.fromString(value);
@@ -220,7 +229,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         }
         return false;
     }
-    
+
     protected static boolean isTimestamp(String value) {
         try {
             Instant.parse(value);
@@ -229,11 +238,11 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         }
         return false;
     }
-    
+
     protected static boolean isLocation(String value) {
         return false;
     }
-    
+
     protected static Optional<UUID> parseUuid(String value) {
         try {
             return Optional.of(UUID.fromString(value));
@@ -241,7 +250,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         }
         return Optional.empty();
     }
-    
+
     protected static Optional<Long> parseTimestamp(String value) {
         try {
             Instant instant = Instant.parse(value);
@@ -250,27 +259,30 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         }
         return Optional.empty();
     }
-    
+
     public static interface Enumerated {
         /**
          * Get the optional set of allowed values.
+         * 
          * @return the array of allowed values; never null but possibly empty
          */
         Optional<Array> allowedValues();
     }
-    
+
     /**
      * The constraints for string values.
      */
     public static interface StringConstraints extends Enumerated {
         /**
          * Get the optional regular expression pattern that constraints the allowed values.
+         * 
          * @return the regular expression pattern; never null but possibly empty
          */
         Optional<String> pattern();
-        
+
         /**
          * Get the optional minimum length of string values.
+         * 
          * @return the minimum length; never null but possibly empty
          * @see #minLengthInclusive()
          */
@@ -278,39 +290,42 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
 
         /**
          * Get whether the {@link #minLength() minimum length constraint} is inclusive.
+         * 
          * @return true if inclusive, or false otherwise
          * @see #minLength()
          */
         boolean minLengthInclusive();
-        
+
         /**
          * Get the optional maximum length of string values.
+         * 
          * @return the maximum length; never null but possibly empty
          * @see #maxLengthInclusive()
          */
         Optional<Integer> maxLength();
-        
+
         /**
          * Get whether the {@link #maxLength() maximum length constraint} is inclusive.
+         * 
          * @return true if inclusive, or false otherwise
          * @see #maxLength()
          */
         boolean maxLengthInclusive();
     }
-    
+
     /**
      * The constraints for numeric values.
      */
     public static interface NumberConstraints {
         Optional<Number> minValue();
-        
+
         boolean minValueInclusive();
-        
+
         Optional<Number> maxValue();
-        
+
         boolean maxValueInclusive();
     }
-    
+
     public static interface LocationConstraints {
     }
 
@@ -318,57 +333,66 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
      * A viewer of a field definition.
      */
     public static interface FieldDefinition {
-        
+
         /**
          * Get the name of this field.
+         * 
          * @return the field's name; never null
          */
         String name();
-        
+
         /**
          * Determine if this field definition is empty and has no specifications.
+         * 
          * @return {@code true} if this definition is empty, or false otherwise
          */
         boolean isEmpty();
 
         /**
          * Get the description of this field.
+         * 
          * @return the optional description; never null but possibly empty
          */
         Optional<String> description();
 
         /**
          * Get the type for this field.
+         * 
          * @return the type, if known; never null but possibly empty
          */
         Optional<FieldType> type();
-        
+
         /**
          * Determine if this field is optional.
+         * 
          * @return true if this is an optional field, or false otherwise
          */
         boolean isOptional();
 
         /**
          * Determine if this field is an array of multiple values.
+         * 
          * @return true if this is an array field, or false otherwise
          */
         boolean isArray();
-        
+
         /**
          * Get the constraints for string-based types.
+         * 
          * @return the string constraints; never null (even if the {@link #type()} is not a string type
          */
         StringConstraints stringConstraints();
-        
+
         /**
          * Get the constraints for numeric types.
+         * 
          * @return the numeric constraints; never null (even if the {@link #type()} is not a numeric type
          */
         NumberConstraints numberConstraints();
-        
+
         /**
          * Get the constraints for location fields.
+         * 
          * @return the location constraints; never null (even if the {@link #type()} is not a location type
          */
         LocationConstraints locationConstraints();
@@ -377,50 +401,50 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
     private static class BasicField implements FieldDefinition {
         private final Document field;
         private final String name;
-        
+
         protected BasicField(String name, Document fieldDoc) {
             this.name = name;
             this.field = fieldDoc;
             assert this.field != null;
             assert this.name != null;
         }
-        
+
         @Override
         public String name() {
             return name;
         }
-        
+
         @Override
         public boolean isEmpty() {
             return field.isEmpty();
         }
-        
+
         @Override
         public Optional<String> description() {
             return Optional.ofNullable(field.getString("description"));
         }
-        
+
         @Override
         public boolean isArray() {
             return field.getBoolean("array", false);
         }
-        
+
         @Override
         public boolean isOptional() {
             return field.getBoolean("optional", false);
         }
-        
+
         @Override
         public Optional<FieldType> type() {
             return Optional.ofNullable(FieldType.valueOf(field.getString("type")));
         }
-        
+
         @Override
         public LocationConstraints locationConstraints() {
             return new LocationConstraints() {
             };
         }
-        
+
         @Override
         public NumberConstraints numberConstraints() {
             return new NumberConstraints() {
@@ -428,24 +452,24 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
                 public Optional<Number> minValue() {
                     return Optional.ofNullable(field.getNumber("minValue"));
                 }
-                
+
                 @Override
                 public boolean minValueInclusive() {
                     return field.getBoolean("minValueInclusive", true);
                 }
-                
+
                 @Override
                 public Optional<Number> maxValue() {
                     return Optional.ofNullable(field.getNumber("maxValue"));
                 }
-                
+
                 @Override
                 public boolean maxValueInclusive() {
                     return field.getBoolean("maxValueInclusive", true);
                 }
             };
         }
-        
+
         @Override
         public StringConstraints stringConstraints() {
             return new StringConstraints() {
@@ -453,27 +477,27 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
                 public Optional<Integer> minLength() {
                     return Optional.ofNullable(field.getInteger("minLength"));
                 }
-                
+
                 @Override
                 public boolean minLengthInclusive() {
                     return field.getBoolean("minLengthInclusive", true);
                 }
-                
+
                 @Override
                 public Optional<Integer> maxLength() {
                     return Optional.ofNullable(field.getInteger("maxLength"));
                 }
-                
+
                 @Override
                 public boolean maxLengthInclusive() {
                     return field.getBoolean("maxLengthInclusive", true);
                 }
-                
+
                 @Override
                 public Optional<String> pattern() {
                     return Optional.ofNullable(field.getString("pattern"));
                 }
-                
+
                 @Override
                 public Optional<Array> allowedValues() {
                     return Optional.ofNullable(field.getArray("allowedValues"));
@@ -481,35 +505,42 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
             };
         }
     }
-    
-    static Path pathToField( String fieldName ) {
+
+    static Path pathToField(String fieldName) {
         return FIELDS_PATH.append(fieldName);
     }
-    
-    static Path pathToField( Path fieldPath ) {
-        return FIELDS_PATH.append(fieldPath);
+
+    static Path pathToField(Path fieldPath) {
+        if (fieldPath.isRoot()) return FIELDS_PATH;
+        if (fieldPath.isSingle()) return FIELDS_PATH.append(fieldPath);
+        Path result = Path.root();
+        for (String segment : fieldPath) {
+            result = result.append(FIELDS_NAME);
+            result = result.append(segment);
+        }
+        return result;
     }
-    
+
     static Path fieldsPath() {
         return FIELDS_PATH;
     }
-    
+
     private static final String FIELDS_NAME = "fields";
     private static final Path FIELDS_PATH = Path.parse(FIELDS_NAME);
-    
+
     private final EntityType id;
     private final Document doc;
-    
-    protected EntityCollection( EntityType id, Document doc ) {
+
+    protected EntityCollection(EntityType id, Document doc) {
         this.id = id;
         this.doc = doc;
     }
-    
+
     @Override
     public EntityType id() {
         return id;
     }
-    
+
     @Override
     public Document document() {
         return doc;
@@ -518,36 +549,34 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
     public Stream<FieldDefinition> fields() {
         return doc.children(FIELDS_PATH).filter(this::isDocument).map(this::toFieldDefinition);
     }
-    
-    public Optional<FieldDefinition> field( String name ) {
+
+    public Optional<FieldDefinition> field(String name) {
         Document fields = doc.getDocument(FIELDS_NAME);
         Value value = fields != null ? fields.get(name) : null;
-        return Value.isNull(value) ? Optional.empty() : Optional.of(toFieldDefinition(name,value));
+        return Value.isNull(value) ? Optional.empty() : Optional.of(toFieldDefinition(name, value));
     }
-    
-    public Optional<FieldDefinition> field( Path path ) {
-        Document fields = doc.getDocument(FIELDS_NAME);
-        if ( fields != null ) {
-            Optional<Value> value = fields.find(path);
-            if ( value.isPresent() && value.get().isNotNull() ) {
-                String fieldName = path.lastSegment().get();
-                FieldDefinition defn = toFieldDefinition(fieldName,value.get());
-                return Optional.of(defn);
-            }
+
+    public Optional<FieldDefinition> field(Path path) {
+        if (path.isSingle()) return field(path.lastSegment().get());
+        Optional<Value> value = doc.find(pathToField(path));
+        if (value.isPresent() && value.get().isNotNull()) {
+            String fieldName = path.lastSegment().get();
+            FieldDefinition defn = toFieldDefinition(fieldName, value.get());
+            return Optional.of(defn);
         }
         return Optional.empty();
     }
-    
-    protected boolean isDocument( Field field ) {
+
+    protected boolean isDocument(Field field) {
         return field != null && field.getValue().isDocument();
     }
-    
+
     protected FieldDefinition toFieldDefinition(Field field) {
-        return toFieldDefinition(field.getName().toString(),field.getValue());
+        return toFieldDefinition(field.getName().toString(), field.getValue());
     }
-    
+
     protected FieldDefinition toFieldDefinition(String name, Value value) {
-        return new BasicField(name,value.asDocument());
+        return new BasicField(name, value.asDocument());
     }
-    
+
 }

@@ -8,6 +8,7 @@ package org.debezium.core.component;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
+import org.debezium.core.component.EntityCollection.FieldDefinition;
 import org.debezium.core.component.EntityCollection.FieldType;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
@@ -177,6 +178,33 @@ public class SchemaEditor {
      */
     public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField) {
         return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), false);
+    }
+    
+    /**
+     * Obtain an editor for the field definition with the given name.
+     * 
+     * @param patch the patch editor for modifying the entity type representation; may not be null
+     * @param pathToField the path to the field definition within the entity type representation; may not be null
+     * @param collection the current {@link EntityCollection} that represents the schema; may not be null
+     * @return the field editor; never null
+     */
+    public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField, EntityCollection collection ) {
+        Optional<FieldDefinition> field = collection.field(pathToField);
+        boolean isNew = !field.isPresent();
+        if ( !field.isPresent() && pathToField.isMultiple() ) {
+            // There is not an existing field and this is a field in a nested document, so make sure that all
+            // ancestor fields have a type of DOCUMENT ...
+            pathToField.parent().get().fromRoot(ancestorPath->{
+                Optional<FieldDefinition> ancestorField = collection.field(ancestorPath);
+                if ( !ancestorField.isPresent() || ancestorField.get().type().orElse(FieldType.STRING) != FieldType.DOCUMENT ) {
+                    Path rawPath = EntityCollection.pathToField(ancestorPath);
+                    FieldEditor editor = new BasicFieldEditor(patch, rawPath, !ancestorField.isPresent());
+                    editor.type(FieldType.DOCUMENT);
+                }
+                
+            });
+        }
+        return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), isNew);
     }
     
     /**
