@@ -39,11 +39,15 @@ The codebase also contains a script that will install and run Debezium on a loca
 * optionally start log consumers to show the recorded operations; and
 * stop all running components, including Zookeepr, Kafka, and YARN
 
+### Starting up the grid
+
 To run the sample, first build the software locally. Then, open a shell in the top-level directory of your local Debezium git repository and run this command:
 
     $ bin/grid bootstrap
 
 This downloads, installs, and runs Zookeeper, Kafka, and YARN, and then installs and starts (via YARN) each of the Debezium services as separate Samza jobs. Then go to [http://localhost:8088/cluster]() in a browser to view the status of the YARN services; wait until you see all 4 services in the "`RUNNING`" state before proceeding.
+
+### Watching the topics (optional)
 
 If you want to monitor the Kafka topics that Debezium uses internally, you can use the same `grid` comamnd list or to watch one or more of Debezium's Kafka topics. To see a list of the available topics, use:
 
@@ -63,11 +67,15 @@ where `<topicName` is one of the following:
 * `schema-updates` - The topic that records all changes to schemas.
 * `schema-learning` - The topic onto which all changes to entities and changes to schemas are aggregated. This topic is consumed by Debezium's schema learning service.
 
+### Run the example application
+
 Once all Debezium services are running, you can then run the client application:
 
     $ mvn exec:java -Dexec.mainClass="org.debezium.example.SampleApp"
 
 This application will output information as it uses Debezium to provision (or connect to) a database, get schema information, and upload contacts. You can run the application more than once.
+
+### Shut down the grid
 
 Finally, run the following command to shut down all of the Debezium, Zookeeper, Kafka, and YARN processes:
 
