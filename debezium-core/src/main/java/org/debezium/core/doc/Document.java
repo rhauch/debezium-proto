@@ -144,7 +144,7 @@ public interface Document extends Iterable<Document.Field>, Comparable<Document>
         if (path.isSingle()) {
             // Perform a simple set ...
             set(path.lastSegment().get(), value);
-            return Optional.of(value);
+            return Optional.ofNullable(value);
         }
         // Otherwise, we need to find the parent that will contain the value ...
         Path parentPath = path.parent().get();

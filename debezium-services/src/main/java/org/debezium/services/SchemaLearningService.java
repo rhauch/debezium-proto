@@ -23,6 +23,7 @@ import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
+import org.debezium.core.doc.Path;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Message.Field;
 import org.debezium.core.message.Patch;
@@ -139,12 +140,12 @@ public class SchemaLearningService implements StreamTask, InitableTask {
         }
 
         @Override
-        public boolean markAdded(EntityType type, String fieldPath) {
+        public boolean markAdded(EntityType type, Path fieldPath) {
             return false;
         }
 
         @Override
-        public boolean markRemoved(EntityType type, String fieldPath) {
+        public boolean markRemoved(EntityType type, Path fieldPath) {
             return false;
         }
         

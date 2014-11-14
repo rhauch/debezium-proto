@@ -22,6 +22,7 @@ import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.DocumentReader;
+import org.debezium.core.doc.Path;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Patch;
@@ -57,9 +58,9 @@ public class LearningEntityTypeModelTest implements Testing {
     }
 
     @Test
-    public void shouldLearnFromMultipleCreateRequests() throws IOException {
-        Testing.Print.enable();
-        Testing.Debug.enable();
+    public void shouldLearnFromMultipleCreateRequestsForFlatEntities() throws IOException {
+        // Testing.Print.enable();
+        // Testing.Debug.enable();
         
         EntityType type = Identifier.of("my-db","contacts");
         Document schema = Document.create();
@@ -104,6 +105,55 @@ public class LearningEntityTypeModelTest implements Testing {
         assertField(collection,"age",FieldType.INTEGER,OptionalField.OPTIONAL);
     }
     
+
+    @Test
+    public void shouldLearnFromMultipleCreateRequestsForComplexEntities() throws IOException {
+//        Testing.Print.enable();
+//        Testing.Debug.enable();
+        
+        EntityType type = Identifier.of("my-db","contacts");
+        Document schema = Document.create();
+        student = new LearningEntityTypeModel(type,schema,fieldUsage);
+
+        EntityCollection collection = processChanges("complex-contacts-step1.json", type, schema );
+        assertField(collection,"firstName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"lastName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"phone/home",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"title",FieldType.STRING,OptionalField.OPTIONAL);  // only bill has title
+        assertField(collection,"age",FieldType.INTEGER,OptionalField.OPTIONAL);   // only bill has age
+
+        collection = processChanges("complex-contacts-step2.json", type, schema );
+        assertField(collection,"firstName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"lastName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"phone/home",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"title",FieldType.STRING,OptionalField.OPTIONAL);  // only bill has title
+        assertField(collection,"age",FieldType.INTEGER,OptionalField.REQUIRED);   // both have ages
+
+        collection = processChanges("complex-contacts-step3.json", type, schema );
+        assertField(collection,"firstName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"lastName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"phone/home",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"title",FieldType.STRING,OptionalField.REQUIRED); // both have titles
+        assertField(collection,"age",FieldType.INTEGER,OptionalField.OPTIONAL);
+
+        // Adds Veronica and Charlie with all required fields ...
+        collection = processChanges("complex-contacts-step4.json", type, schema );
+        assertField(collection,"firstName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"lastName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"phone/home",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"title",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"age",FieldType.INTEGER,OptionalField.OPTIONAL);
+
+        // Moves Veronica's 'homePhone' to 'mobilePhone', making both fields optional ...
+        collection = processChanges("complex-contacts-step5.json", type, schema );
+        assertField(collection,"firstName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"lastName",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"phone/home",FieldType.STRING,OptionalField.OPTIONAL);
+        assertField(collection,"phone/mobile",FieldType.STRING,OptionalField.OPTIONAL);
+        assertField(collection,"title",FieldType.STRING,OptionalField.REQUIRED);
+        assertField(collection,"age",FieldType.INTEGER,OptionalField.OPTIONAL);
+    }
+    
     protected EntityCollection processChanges( String filename, EntityType type, Document schema ) throws IOException {
         String json = Testing.Files.readResourceAsString(filename);
         Document requestsDoc = DocumentReader.defaultReader().read(json);
@@ -126,10 +176,11 @@ public class LearningEntityTypeModelTest implements Testing {
     }
     
     protected void assertField(EntityCollection collection, String name, FieldType type, OptionalField isOptional ) {
-        Optional<FieldDefinition> optionalField = collection.field(name);
+        Path path = Path.parse(name);
+        Optional<FieldDefinition> optionalField = collection.field(path);
         assertThat(optionalField.isPresent()).isTrue();
         FieldDefinition field = optionalField.get();
-        assertThat(field.name()).isEqualTo(name);
+        assertThat(field.name()).isEqualTo(path.lastSegment().get());
         if ( type != null ) {
             assertThat(field.type().get()).isEqualTo(type);
         } else {
@@ -152,19 +203,19 @@ public class LearningEntityTypeModelTest implements Testing {
             totalCount.incrementAndGet();
         }
         
-        private String key( EntityType type, String fieldPath ) {
-            return type.asString() + "::" + fieldPath;
+        private String key( EntityType type, Path fieldPath ) {
+            return type.asString() + "::" + fieldPath.toRelativePath();
         }
 
         @Override
-        public boolean markAdded(EntityType type, String fieldPath) {
+        public boolean markAdded(EntityType type, Path fieldPath) {
             long count = fieldCounts.computeIfAbsent(key(type,fieldPath),k->new AtomicLong(0L))
                                     .incrementAndGet();
             return count < totalCount.get();
         }
 
         @Override
-        public boolean markRemoved(EntityType type, String fieldPath) {
+        public boolean markRemoved(EntityType type, Path fieldPath) {
             long count = fieldCounts.computeIfAbsent(key(type,fieldPath),k->new AtomicLong(0L))
                                     .updateAndGet(this::decrementIfPositive);
             return count < totalCount.get();

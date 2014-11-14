@@ -23,12 +23,10 @@ import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Add;
 import org.debezium.core.message.Patch.Copy;
 import org.debezium.core.message.Patch.Editor;
-import org.debezium.core.message.Patch.Increment;
 import org.debezium.core.message.Patch.Move;
 import org.debezium.core.message.Patch.Operation;
 import org.debezium.core.message.Patch.Remove;
 import org.debezium.core.message.Patch.Replace;
-import org.debezium.core.message.Patch.Require;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +54,7 @@ public class LearningEntityTypeModel {
          * @param fieldPath the path of the field; may not be null
          * @return true if the field should be considered optional, or false if all entities seen so far have the field
          */
-        boolean markAdded(EntityType type, String fieldPath);
+        boolean markAdded(EntityType type, Path fieldPath);
 
         /**
          * Record the given field as having been removed from an entity.
@@ -65,7 +63,7 @@ public class LearningEntityTypeModel {
          * @param fieldPath the path of the field; may not be null
          * @return true if the field should be considered optional, or false if all entities seen so far have the field
          */
-        boolean markRemoved(EntityType type, String fieldPath);
+        boolean markRemoved(EntityType type, Path fieldPath);
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LearningEntityTypeModel.class);
@@ -88,7 +86,7 @@ public class LearningEntityTypeModel {
         this.fieldUsage = fieldUsage;
         this.model = EntityCollection.with(type, model);
         this.typeEditor = Patch.edit(type);
-        this.strategy = new SimpleFieldStrategy(fieldUsage, type);
+        this.strategy = new ComplexFieldStrategy(new SimpleFieldStrategy(fieldUsage, type));
     }
 
     /**
@@ -109,14 +107,13 @@ public class LearningEntityTypeModel {
         if (patch.isDeletion()) {
             // Process each of the fields in the document as a removal ...
             beforePatch.forEach((path, value) -> {
-                strategy.remove(beforePatch, path.toString(), afterPatch, typeEditor, model);
+                strategy.remove(Optional.ofNullable(value), path, afterPatch, typeEditor, model);
             });
-        } else if ( patch.isCreation() ) {
+        } else if (patch.isCreation()) {
             // Process each of the fields in the document as an add ...
-            patch.ifCreation(entity->{
+            patch.ifCreation(entity -> {
                 entity.forEach((path, value) -> {
-                    String relativePath = path.toRelativePath();
-                    strategy.add(beforePatch, relativePath, value, afterPatch, typeEditor, model);
+                    strategy.add(Optional.empty(), path, value, afterPatch, typeEditor, model);
                 });
             });
         } else {
@@ -141,40 +138,20 @@ public class LearningEntityTypeModel {
 
     protected static interface Strategy {
 
-        void add(Document beforeOp, String pathToField, Value value, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
+        void add(Optional<Value> removedValue, Path pathToField, Value value, Document afterPatch,
+                 Patch.Editor<Patch<EntityType>> editor,
                  EntityCollection model);
 
-        void remove(Document beforeOp, String pathToField, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
+        void remove(Optional<Value> removedValue, Path pathToField, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
                     EntityCollection model);
 
-        default void handle(Document beforeOp, Add add, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                            EntityCollection model) {
-            add(beforeOp, add.path(), add.value(), afterPatch, editor, model);
-        }
+        void move(Path fromPath, Optional<Value> movedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                  Patch.Editor<Patch<EntityType>> editor,
+                  EntityCollection model);
 
-        default void handle(Document beforeOp, Remove remove, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                            EntityCollection model) {
-            remove(beforeOp, remove.path(), afterPatch, editor, model);
-        }
-
-        default void handle(Document beforeOp, Replace replace, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                            EntityCollection model) {
-            add(beforeOp, replace.path(), replace.value(), afterPatch, editor, model);
-        }
-
-        void handle(Document beforeOp, Move move, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                    EntityCollection model);
-
-        void handle(Document beforeOp, Copy copy, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                    EntityCollection model);
-
-        void handle(Document beforeOp, Increment incr, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                    EntityCollection model);
-
-        default void handle(Document beforeOp, Require require, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                            boolean isFirst, EntityCollection model) {
-            // do nothing ...
-        }
+        void copy(Path fromPath, Optional<Value> copiedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                  Patch.Editor<Patch<EntityType>> editor,
+                  EntityCollection model);
 
         /**
          * 
@@ -189,25 +166,42 @@ public class LearningEntityTypeModel {
                             EntityCollection entityTypeModel) {
             switch (op.action()) {
                 case ADD:
-                    handle(beforeOp, (Add) op, afterPatch, editor, entityTypeModel);
+                    Add add = (Add) op;
+                    Path path = Path.parse(add.path());
+                    Optional<Value> beforeValue = beforeOp != null ? beforeOp.find(path) : Optional.empty();
+                    add(beforeValue, path, add.value(), afterPatch, editor, entityTypeModel);
                     break;
                 case REMOVE:
-                    handle(beforeOp, (Remove) op, afterPatch, editor, entityTypeModel);
+                    Remove remove = (Remove) op;
+                    path = Path.parse(remove.path());
+                    beforeValue = beforeOp != null ? beforeOp.find(path) : Optional.empty();
+                    remove(beforeValue, path, afterPatch, editor, entityTypeModel);
                     break;
                 case REPLACE:
-                    handle(beforeOp, (Replace) op, afterPatch, editor, entityTypeModel);
+                    Replace replace = (Replace) op;
+                    path = Path.parse(replace.path());
+                    beforeValue = beforeOp != null ? beforeOp.find(path) : Optional.empty();
+                    add(beforeValue, path, replace.value(), afterPatch, editor, entityTypeModel);
                     break;
                 case MOVE:
-                    handle(beforeOp, (Move) op, afterPatch, editor, entityTypeModel);
+                    Move move = (Move) op;
+                    Path fromPath = Path.parse(move.fromPath());
+                    Path toPath = Path.parse(move.toPath());
+                    Optional<Value> movedValue = beforeOp.find(fromPath);
+                    Optional<Value> replacedValue = beforeOp.find(toPath);
+                    move(fromPath, movedValue, toPath, replacedValue, afterPatch, editor, entityTypeModel);
                     break;
                 case COPY:
-                    handle(beforeOp, (Copy) op, afterPatch, editor, entityTypeModel);
+                    Copy copy = (Copy) op;
+                    fromPath = Path.parse(copy.fromPath());
+                    toPath = Path.parse(copy.toPath());
+                    Optional<Value> copiedValue = beforeOp.find(fromPath);
+                    replacedValue = beforeOp.find(toPath);
+                    copy(fromPath, copiedValue, toPath, replacedValue, afterPatch, editor, entityTypeModel);
                     break;
                 case INCREMENT:
-                    handle(beforeOp, (Increment) op, afterPatch, editor, entityTypeModel);
                     break;
                 case REQUIRE:
-                    handle(beforeOp, op, afterPatch, editor, entityTypeModel);
                     break;
             }
         }
@@ -224,6 +218,110 @@ public class LearningEntityTypeModel {
         return knownType.get().union(inferred.get());
     }
 
+    protected static class ComplexFieldStrategy implements Strategy {
+        private final Strategy delegate;
+
+        public ComplexFieldStrategy(Strategy delegate) {
+            this.delegate = delegate;
+        }
+
+        protected void whenComplex(Optional<Value> value, Consumer<Document> function) {
+            value.ifPresent(v -> v.ifDocument(function));
+        }
+
+        @Override
+        public void add(Optional<Value> removedValue, Path pathToField, Value newValue, Document afterPatch,
+                        Editor<Patch<EntityType>> editor, EntityCollection model) {
+            // Handle complex removed values ...
+            if (removedValue.isPresent() && removedValue.get().isDocument()) {
+                removedValue.get().asDocument().forEach((path, value) -> {
+                    delegate.remove(Optional.ofNullable(value), pathToField.append(path), afterPatch, editor, model);
+                });
+                removedValue = Optional.empty();
+            }
+            if (newValue != null && newValue.isDocument()) {
+                if (removedValue.isPresent()) {
+                    delegate.remove(removedValue, pathToField, afterPatch, editor, model);
+                }
+                Document doc = newValue.asDocument();
+                // Remove each of the individual values ...
+                doc.forEach((path, value) -> {
+                    delegate.add(Optional.empty(), pathToField.append(path), value, afterPatch, editor, model);
+                });
+            } else {
+                delegate.add(removedValue, pathToField, newValue, afterPatch, editor, model);
+            }
+        }
+
+        @Override
+        public void remove(Optional<Value> removedValue, Path pathToField, Document afterPatch, Editor<Patch<EntityType>> editor,
+                           EntityCollection model) {
+            if (removedValue.isPresent() && removedValue.get().isDocument()) {
+                removedValue.get().asDocument().forEach((path, value) -> {
+                    delegate.remove(Optional.ofNullable(value), pathToField.append(path), afterPatch, editor, model);
+                });
+            } else {
+                delegate.remove(removedValue, pathToField, afterPatch, editor, model);
+            }
+        }
+
+        @Override
+        public void copy(Path fromPath, Optional<Value> copiedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                         Editor<Patch<EntityType>> editor, EntityCollection model) {
+            // If the replaced value is complex, it must be removed piece by piece ...
+            if (replacedValue.isPresent() && replacedValue.get().isDocument()) {
+                replacedValue.get().asDocument().forEach((path, value) -> {
+                    delegate.remove(Optional.ofNullable(value), toPath.append(path), afterPatch, editor, model);
+                });
+                replacedValue = Optional.empty();
+            }
+            // If the copied value is complex, it must be added piece by piece ...
+            if (copiedValue.isPresent() && copiedValue.get().isDocument()) {
+                if (replacedValue.isPresent()) {
+                    // We didn't yet remove the (simple) replaced value ...
+                    delegate.remove(replacedValue, toPath, afterPatch, editor, model);
+                }
+                Document doc = copiedValue.get().asDocument();
+                // Add each of the individual values ...
+                doc.forEach((path, value) -> {
+                    delegate.add(Optional.empty(), toPath.append(path), value, afterPatch, editor, model);
+                });
+            } else {
+                // The copied value is not complex, so just delegate ...
+                delegate.copy(fromPath, copiedValue, toPath, replacedValue, afterPatch, editor, model);
+            }
+        }
+
+        @Override
+        public void move(Path fromPath, Optional<Value> movedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                         Editor<Patch<EntityType>> editor, EntityCollection model) {
+            // If the replaced value is complex, it must be removed piece by piece ...
+            if (replacedValue.isPresent() && replacedValue.get().isDocument()) {
+                replacedValue.get().asDocument().forEach((path, value) -> {
+                    delegate.remove(Optional.ofNullable(value), toPath.append(path), afterPatch, editor, model);
+                });
+                replacedValue = Optional.empty();
+            }
+            // If the moved value is complex, it must be added piece by piece ...
+            if (movedValue.isPresent() && movedValue.get().isDocument()) {
+                if (replacedValue.isPresent()) {
+                    // We didn't yet remove the (simple) replaced value ...
+                    delegate.remove(replacedValue, toPath, afterPatch, editor, model);
+                }
+                Document doc = movedValue.get().asDocument();
+                // Add each of the individual values ...
+                doc.forEach((path, value) -> {
+                    delegate.move(fromPath.append(path), Optional.ofNullable(value), toPath.append(path), Optional.empty(), afterPatch, editor, model);
+                });
+                // finally remove the top-level moved value from it's old place ...
+                delegate.remove(Optional.of(Value.create(Document.create())), fromPath, afterPatch, editor, model);
+            } else {
+                // The moved value is not complex, so just delegate ...
+                delegate.move(fromPath, movedValue, toPath, replacedValue, afterPatch, editor, model);
+            }
+        }
+    }
+
     protected static class SimpleFieldStrategy implements Strategy {
         private final FieldUsage fieldUsage;
         private final EntityType type;
@@ -236,11 +334,10 @@ public class LearningEntityTypeModel {
         }
 
         @Override
-        public void add(Document before, String pathToField, Value after, Document afterPatch, Editor<Patch<EntityType>> editor,
+        public void add(Optional<Value> beforeValue, Path pathToField, Value after, Document afterPatch,
+                        Editor<Patch<EntityType>> editor,
                         EntityCollection model) {
             // See if the field is already in the entity before this operation is applied ...
-            Path path = Path.parse(pathToField);
-            Optional<Value> beforeValue = before != null ? before.find(path) : Optional.empty();
             Optional<Boolean> shouldBeOptional = Optional.empty();
             if (beforeValue.isPresent()) {
                 // There is a before value ...
@@ -264,7 +361,7 @@ public class LearningEntityTypeModel {
 
             // Make sure that the field is already known and the type can handle the value ...
             Optional<FieldDefinition> field = model.field(pathToField);
-            FieldEditor fieldEditor = SchemaEditor.editField(editor, path);
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, pathToField);
             if (field.isPresent()) {
                 // The field exists ...
                 Optional<FieldType> knownType = field.get().type();
@@ -286,21 +383,19 @@ public class LearningEntityTypeModel {
         }
 
         @Override
-        public void remove(Document beforeOp, String pathToField, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
+        public void remove(Optional<Value> beforeValue, Path pathToField, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
                            EntityCollection model) {
             model.field(pathToField).ifPresent(field -> {
                 if (!field.isEmpty()) {
                     // The field is defined on the type, so see if the field is in the entity before this operation is applied ...
-                    Path path = Path.parse(pathToField);
-                    Optional<Value> beforeValue = beforeOp != null ? beforeOp.find(path) : Optional.empty();
                     // We only need to do something if the before state had a field to remove ...
                     beforeValue.ifPresent(value -> {
                         // Figure out if we have to change the optional attribute of the field ...
                         boolean optional = fieldUsage.markRemoved(type, pathToField);
                         if (optional && !field.isOptional()) {
-                            SchemaEditor.editField(editor, path).optional(true);
+                            SchemaEditor.editField(editor, pathToField).optional(true);
                         } else if (!optional && field.isOptional()) {
-                            SchemaEditor.editField(editor, path).optional(false);
+                            SchemaEditor.editField(editor, pathToField).optional(false);
                         }
                     });
                 }
@@ -308,81 +403,79 @@ public class LearningEntityTypeModel {
         }
 
         @Override
-        public void handle(Document beforeOp, Move move, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                           EntityCollection model) {
-            Value movedValue = beforeOp.get(move.fromPath());
-            Value replacedValue = beforeOp.get(move.toPath());
+        public void move(Path fromPath, Optional<Value> movedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                         Patch.Editor<Patch<EntityType>> editor,
+                         EntityCollection model) {
             Optional<Boolean> fromIsOptional = Optional.empty();
-            if (!Value.isNull(movedValue)) {
+            boolean movedValueExists = movedValue.isPresent() && !Value.isNull(movedValue.get());
+            if (movedValueExists) {
                 // There is a value being (re)moved ...
-                fromIsOptional = Optional.of(fieldUsage.markRemoved(type, move.fromPath()));
+                fromIsOptional = Optional.of(fieldUsage.markRemoved(type, fromPath));
             }
 
             // Make sure the 'from' is marked as optional ...
-            Optional<FieldDefinition> toField = model.field(move.toPath());
-            Optional<FieldDefinition> fromField = model.field(move.fromPath());
-            if ( fromField.isPresent() ) {
+            Optional<FieldDefinition> toField = model.field(toPath);
+            Optional<FieldDefinition> fromField = model.field(fromPath);
+            if (fromField.isPresent()) {
                 FieldDefinition field = fromField.get();
-                if (fromIsOptional.isPresent() && field.isOptional() != fromIsOptional.get() ) {
+                if (fromIsOptional.isPresent() && field.isOptional() != fromIsOptional.get()) {
                     // The field is defined, so make sure that it is optional ...
-                    SchemaEditor.editField(editor, move.fromPath()).optional(fromIsOptional.get());
+                    SchemaEditor.editField(editor, fromPath).optional(fromIsOptional.get());
                 }
             }
 
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
             Optional<FieldType> knownType = toField.isPresent() ? toField.get().type() : Optional.empty();
-            FieldEditor fieldEditor = SchemaEditor.editField(editor, move.toPath());
-            if (movedValue != null) {
-                FieldType bestType = determineBestFieldType(movedValue, knownType);
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath);
+            if (movedValueExists) {
+                FieldType bestType = determineBestFieldType(movedValue.get(), knownType);
                 if (!toField.isPresent() || knownType.orElse(bestType) != bestType) {
                     // We have to change the type ...
                     fieldEditor.type(bestType);
                 }
-                boolean toIsOptional = fieldUsage.markAdded(type, move.toPath());
-                if ( toField.isPresent() ) {
-                    if ( toField.get().isOptional() != toIsOptional ) fieldEditor.optional(toIsOptional);
+                boolean toIsOptional = fieldUsage.markAdded(type, toPath);
+                if (toField.isPresent()) {
+                    if (toField.get().isOptional() != toIsOptional) fieldEditor.optional(toIsOptional);
                 } else {
                     fieldEditor.optional(toIsOptional);
                 }
             } else {
-                // If there was a value being replaced with a null value, we have to remove it ...
-                if ( Value.isNull(replacedValue) ) {
-                    boolean toIsOptional = fieldUsage.markRemoved(type, move.toPath());
-                    toField.ifPresent(field->{
-                        if ( field.isOptional() != toIsOptional ) fieldEditor.optional(toIsOptional);
-                    });
-                }
+                // The new value is null ...
+                replacedValue.ifPresent(oldValue -> {
+                    if (Value.notNull(oldValue)) {
+                        boolean toIsOptional = fieldUsage.markRemoved(type, toPath);
+                        toField.ifPresent(field -> {
+                            if (field.isOptional() != toIsOptional) fieldEditor.optional(toIsOptional);
+                        });
+                    }
+                });
             }
         }
 
         @Override
-        public void handle(Document beforeOp, Copy copy, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                           EntityCollection model) {
-            Optional<FieldDefinition> toField = model.field(copy.toPath());
+        public void copy(Path fromPath, Optional<Value> copiedValue, Path toPath, Optional<Value> replacedValue, Document afterPatch,
+                         Patch.Editor<Patch<EntityType>> editor,
+                         EntityCollection model) {
+            Optional<FieldDefinition> toField = model.field(toPath.toRelativePath());
             if (!toField.isPresent() || toField.get().isEmpty()) {
                 // The 'to' field is new to us, but the 'from' field should not be ...
                 // Copy the 'from' field definition ...
-                SchemaEditor.copyField(editor, copy.fromPath(), copy.toPath());
+                SchemaEditor.copyField(editor, fromPath.toRelativePath(), toPath.toRelativePath());
                 return;
             }
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
             Optional<FieldType> knownType = toField.get().type();
-            Value value = beforeOp.get(copy.fromPath());
-            if (value != null) {
-                FieldType bestType = determineBestFieldType(value, knownType);
-                if (knownType.orElse(bestType) != bestType) {
-                    // We have to change the type ...
-                    SchemaEditor.editField(editor, copy.toPath()).type(bestType);
+            copiedValue.ifPresent(newValue -> {
+                if (Value.notNull(newValue)) {
+                    FieldType bestType = determineBestFieldType(newValue, knownType);
+                    if (knownType.orElse(bestType) != bestType) {
+                        // We have to change the type ...
+                        SchemaEditor.editField(editor, toPath).type(bestType);
+                    }
                 }
-            }
-        }
-
-        @Override
-        public void handle(Document beforeOp, Increment incr, Document afterPatch, Patch.Editor<Patch<EntityType>> editor,
-                           EntityCollection model) {
-            // Make sure that the field is a numeric type ...
+            });
         }
     }
 

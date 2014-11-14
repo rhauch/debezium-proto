@@ -43,7 +43,7 @@ To run the sample, first build the software locally. Then, open a shell in the t
 
     $ bin/grid bootstrap
 
-This downloads, installs, and runs Zookeeper, Kafka, and YARN, and then installs and starts (via YARN) each of the Debezium services as separate Samza jobs. Then go to (http://localhost:8088/cluster)[http://localhost:8088/cluster] in a browser to view the status of the YARN services; wait until you see all 4 services in the "`RUNNING`" state before proceeding.
+This downloads, installs, and runs Zookeeper, Kafka, and YARN, and then installs and starts (via YARN) each of the Debezium services as separate Samza jobs. Then go to [http://localhost:8088/cluster]() in a browser to view the status of the YARN services; wait until you see all 4 services in the "`RUNNING`" state before proceeding.
 
 If you want to monitor the Kafka topics that Debezium uses internally, you can use the same `grid` comamnd list or to watch one or more of Debezium's Kafka topics. To see a list of the available topics, use:
 

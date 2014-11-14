@@ -525,6 +525,19 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         return Value.isNull(value) ? Optional.empty() : Optional.of(toFieldDefinition(name,value));
     }
     
+    public Optional<FieldDefinition> field( Path path ) {
+        Document fields = doc.getDocument(FIELDS_NAME);
+        if ( fields != null ) {
+            Optional<Value> value = fields.find(path);
+            if ( value.isPresent() && value.get().isNotNull() ) {
+                String fieldName = path.lastSegment().get();
+                FieldDefinition defn = toFieldDefinition(fieldName,value.get());
+                return Optional.of(defn);
+            }
+        }
+        return Optional.empty();
+    }
+    
     protected boolean isDocument( Field field ) {
         return field != null && field.getValue().isDocument();
     }

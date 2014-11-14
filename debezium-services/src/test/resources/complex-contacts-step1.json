@@ -24,7 +24,7 @@
                 }, 
                 {
                     "op": "add", 
-                    "path": "homePhone", 
+                    "path": "phone/home", 
                     "value": "1-222-555-1234"
                 }
             ], 
@@ -32,8 +32,10 @@
             "before": null,
             "after": {
                 "firstName": "Sally", 
-                "homePhone": "1-222-555-1234", 
-                "lastName": "Anderson"
+                "lastName": "Anderson",
+                "phone": {
+                    "home": "1-222-555-1234"
+                }
             }
         },
         /* Create a new contact for Bill. */
@@ -60,7 +62,7 @@
                 }, 
                 {
                     "op": "add", 
-                    "path": "homePhone", 
+                    "path": "phone/home", 
                     "value": "1-222-555-9876"
                 }
             ], 
@@ -69,7 +71,9 @@
             "after": {
             	"firstName": "William",
             	"lastName": "Johnson",
-            	"homePhone": "1-222-555-9876"
+            	"phone": {
+            	   "home": "1-222-555-9876"
+            	}
             }
         },
         /* Change firstName on Bill's contact. */
@@ -94,12 +98,16 @@
             "before": {
                 "firstName": "William",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876"
+                "phone": {
+                   "home": "1-222-555-9876"
+                }
             },
             "after": {
                 "firstName": "Bill",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876"
+                "phone": {
+                   "home": "1-222-555-9876"
+                }
             }
         },
         /* Add a title to Bill's contact, which should make 'title' an optional field. */
@@ -124,12 +132,16 @@
             "before": {
                 "firstName": "Bill",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876"
+                "phone": {
+                   "home": "1-222-555-9876"
+                }
             },
             "after": {
                 "firstName": "Bill",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876",
+                "phone": {
+                   "home": "1-222-555-9876"
+                },
                 "title": "Lead Forecaster"
             }
         },
@@ -155,13 +167,17 @@
             "before": {
                 "firstName": "Bill",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876",
+                "phone": {
+                   "home": "1-222-555-9876"
+                },
                 "title": "Lead Forecaster"
             },
             "after": {
                 "firstName": "Bill",
                 "lastName": "Johnson",
-                "homePhone": "1-222-555-9876",
+                "phone": {
+                   "home": "1-222-555-9876"
+                },
                 "title": "Lead Forecaster",
                 "age": 42
             }
