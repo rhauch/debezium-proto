@@ -7,7 +7,7 @@ This is a work in progress. Some of the functionality is implemented, but there 
 
 Debezium is a prototype for a distributed storage service for mobile application data. It is designed to be resilient and to never lose data. The Debezium architecture is based upon event streaming: all requests are funneled through durable, partitioned, and replicated logs and processed asynchronously by multiple share-nothing services. If any of the services should fail, when they are restarted they will simply continue where the previous service left off, ensuring that once requests enter the first log no data or requests are ever lost or missed. 
 
-## Technology
+### Technology
 
 Debezium uses [Apache Kafka](http://kafka.apache.org) to read and write the durable, partitioned, and replicated logs. Kafka is very powerful, and has some features that are essential for Debezium:
 
@@ -20,7 +20,7 @@ With this architecture, Kafka can handle tremendous amounts of information and b
 
 One goal of Debezium will be easy deployment on [OpenShift](https://www.openshift.com) and in the cloud, and therefore support for [Docker](https://www.docker.com) and [Kubernetes](http://kubernetes.io) will be very important. More important in the short term, however, is verifying the concepts and event-processing architecture can be used for data storage. This prototype uses several other (potentially competing) technologies in the interest of getting something working fast.
 
-The prototype's services are built on top of [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka streams. Samza offers a few benefits that make prototyping easier and faster, but it also brings with it a dependency upon [Apache Hadoop's YARN](http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/YARN.html). At this point, it is not clear whether Samza can be extended to instead use Kubernetes instead of YARN; if not, then Debezium will likely replace Samza and the limited capabilities it brings.
+The prototype's services use [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka streams. Samza offers a few benefits that make prototyping easier and faster, but it also brings with it a dependency upon [Apache Hadoop's YARN](http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/YARN.html). At this point, it is not clear whether Samza can be extended to instead use Kubernetes instead of YARN; if not, then Debezium will likely replace Samza and the limited capabilities it brings.
 
 ## Build
 
