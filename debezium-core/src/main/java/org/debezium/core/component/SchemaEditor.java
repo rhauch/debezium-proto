@@ -151,11 +151,11 @@ public class SchemaEditor {
      * Obtain an editor for the field definition with the given name.
      * 
      * @param patch the patch editor for modifying the entity type representation; may not be null
-     * @param sourceFieldName the name of the field to be copied; may not be null
-     * @param targetFieldName the name of the new field that results from the copy; may not be null
+     * @param sourceFieldPath the path of the field to be copied; may not be null
+     * @param targetFieldPath the path of the new field that results from the copy; may not be null
      */
-    public static void copyField(Editor<Patch<EntityType>> patch, String sourceFieldName, String targetFieldName) {
-        patch.copy(sourceFieldName, targetFieldName);
+    public static void copyField(Editor<Patch<EntityType>> patch, Path sourceFieldPath, Path targetFieldPath) {
+        patch.copy(sourceFieldPath.toRelativePath(), targetFieldPath.toRelativePath());
     }
     
     /**

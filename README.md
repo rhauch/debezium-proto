@@ -22,7 +22,7 @@ One goal of Debezium will be easy deployment on [OpenShift](https://www.openshif
 
 The prototype's services use [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka streams. Samza offers a few benefits that make prototyping easier and faster, but it also brings with it a dependency upon [Apache Hadoop's YARN](http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/YARN.html). At this point, it is not clear whether Samza can be extended to instead use Kubernetes instead of YARN; if not, then Debezium will likely replace Samza and the limited capabilities it brings.
 
-## Build
+## Building the code
 
 Debezium is written in Java 8 and uses Maven 3.1.x for building, so these must be installed before you can build Debezium. To obtain the code and build:
 
@@ -32,7 +32,7 @@ Debezium is written in Java 8 and uses Maven 3.1.x for building, so these must b
 
 If anything goes wrong, please let me know.
 
-## Run
+## Running the code
 
 The codebase contains a [sample application](blob/master/debezium-example-app/src/main/java/org/debezium/example/SampleApp.java) that uses the Debezium client library to provision and connect to a new database, read the database's schema, upload entities into the database, and to re-read the databases potentially updated schema.
 

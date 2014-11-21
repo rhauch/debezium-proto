@@ -116,7 +116,7 @@ public class LearningEntityTypeModelTest implements Testing {
 
     @Test
     public void shouldLearnFromMultipleCreateRequestsForComplexEntities() throws IOException {
-        // Testing.Print.enable();
+         Testing.Print.enable();
         // Testing.Debug.enable();
 
         EntityType type = Identifier.of("my-db", "contacts");

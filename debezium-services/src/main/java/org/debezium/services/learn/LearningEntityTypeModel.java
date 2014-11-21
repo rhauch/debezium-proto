@@ -423,12 +423,16 @@ public class LearningEntityTypeModel {
                     // The field is defined, so make sure that it is optional ...
                     SchemaEditor.editField(editor, fromPath).optional(fromIsOptional.get());
                 }
+                if (!toField.isPresent()) {
+                    // Copy the field definition ...
+                    SchemaEditor.copyField(editor, fromPath, toPath);
+                }
             }
 
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
             Optional<FieldType> knownType = toField.isPresent() ? toField.get().type() : Optional.empty();
-            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath, model );
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath, model);
             if (movedValueExists) {
                 FieldType bestType = determineBestFieldType(movedValue.get(), knownType);
                 if (!toField.isPresent() || knownType.orElse(bestType) != bestType) {
@@ -462,21 +466,35 @@ public class LearningEntityTypeModel {
             if (!toField.isPresent() || toField.get().isEmpty()) {
                 // The 'to' field is new to us, but the 'from' field should not be ...
                 // Copy the 'from' field definition ...
-                SchemaEditor.copyField(editor, fromPath.toRelativePath(), toPath.toRelativePath());
-                return;
+                SchemaEditor.copyField(editor, fromPath, toPath);
             }
             // The 'to' field either already exists, or is brand new (and the 'from' does not exist).
             // Either way, just make sure the type can handle the value ...
             Optional<FieldType> knownType = toField.get().type();
-            copiedValue.ifPresent(newValue -> {
-                if (Value.notNull(newValue)) {
-                    FieldType bestType = determineBestFieldType(newValue, knownType);
-                    if (knownType.orElse(bestType) != bestType) {
-                        // We have to change the type ...
-                        SchemaEditor.editField(editor, toPath).type(bestType);
-                    }
+            FieldEditor fieldEditor = SchemaEditor.editField(editor, toPath, model);
+            if (copiedValue.isPresent()) {
+                FieldType bestType = determineBestFieldType(copiedValue.get(), knownType);
+                if (!toField.isPresent() || knownType.orElse(bestType) != bestType) {
+                    // We have to change the type ...
+                    fieldEditor.type(bestType);
                 }
-            });
+                boolean toIsOptional = fieldUsage.markAdded(type, toPath);
+                if (toField.isPresent()) {
+                    if (toField.get().isOptional() != toIsOptional) fieldEditor.optional(toIsOptional);
+                } else {
+                    fieldEditor.optional(toIsOptional);
+                }
+            } else {
+                // The copied value is null ...
+                replacedValue.ifPresent(oldValue -> {
+                    if (Value.notNull(oldValue)) {
+                        boolean toIsOptional = fieldUsage.markRemoved(type, toPath);
+                        toField.ifPresent(field -> {
+                            if (field.isOptional() != toIsOptional) fieldEditor.optional(toIsOptional);
+                        });
+                    }
+                });
+            }
         }
     }
 
