@@ -1,15 +1,11 @@
 Copyright 2014 Red Hat
 Licensed under the Eclipse Public License, Version 1.0.
 
-This is a work in progress. Some of the functionality is implemented, but there is still much to do. 
+This is a work in progress. Some of the functionality is implemented, but there is still much to do. The results of this prototype have been summarized [here](Results).
 
 ## Debezium
 
 Debezium is a prototype for a distributed storage service for mobile application data. It is designed to be resilient and to never lose data. The Debezium architecture is based upon event streaming: all requests are funneled through durable, partitioned, and replicated logs and processed asynchronously by multiple share-nothing services. If any of the services should fail, when they are restarted they will simply continue where the previous service left off, ensuring that once requests enter the first log no data or requests are ever lost or missed. 
-
-### Results
-
-The results of this prototype have been summarized [here](Results).
 
 ### Technology
 
