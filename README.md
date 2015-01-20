@@ -7,6 +7,10 @@ This is a work in progress. Some of the functionality is implemented, but there 
 
 Debezium is a prototype for a distributed storage service for mobile application data. It is designed to be resilient and to never lose data. The Debezium architecture is based upon event streaming: all requests are funneled through durable, partitioned, and replicated logs and processed asynchronously by multiple share-nothing services. If any of the services should fail, when they are restarted they will simply continue where the previous service left off, ensuring that once requests enter the first log no data or requests are ever lost or missed. 
 
+### Results
+
+The results of this prototype have been summarized [here](Results).
+
 ### Technology
 
 Debezium uses [Apache Kafka](http://kafka.apache.org) to read and write the durable, partitioned, and replicated logs. Kafka is very powerful, and has some features that are essential for Debezium:
