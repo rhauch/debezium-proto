@@ -37,6 +37,7 @@ If anything goes wrong, please let me know.
 The codebase contains a [sample application](blob/master/debezium-example-app/src/main/java/org/debezium/example/SampleApp.java) that uses the Debezium client library to provision and connect to a new database, read the database's schema, upload entities into the database, and to re-read the databases potentially updated schema.
 
 The codebase also contains a script that will install and run Debezium on a local grid. This script:
+
 * downloads, installs, and run Zookeeper, Kafka, and YARN;
 * installs and starts each of the Debezium services as separate Samza jobs via YARN;
 * optionally start log consumers to show the recorded operations; and
@@ -72,7 +73,8 @@ where `<topicName` is one of the following:
 
 ### Run the example application
 
-Once all Debezium services are running, you can then run the client application:
+Once all Debezium services are running, you can then run the client application.
+In the example application directory (`debezium-example-app`), run the following command:
 
     $ mvn exec:java -Dexec.mainClass="org.debezium.example.SampleApp"
 
