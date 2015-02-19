@@ -60,13 +60,13 @@ final class DbzClient implements Debezium.Client {
     }
     
     @Override
-    public Database connect(DatabaseId id, String username) {
-        return databases.connect(new ExecutionContext(id,username), 10, TimeUnit.SECONDS);
+    public Database connect(DatabaseId id, String username, String device, String appVersion) {
+        return databases.connect(new ExecutionContext(id,username,device,appVersion), 10, TimeUnit.SECONDS);
     }
     
     @Override
-    public Database provision(DatabaseId id, String username) {
-        return databases.provision(new ExecutionContext(id,username), 10, TimeUnit.SECONDS);
+    public Database provision(DatabaseId id, String username, String device, String appVersion) {
+        return databases.provision(new ExecutionContext(id,username,device,appVersion), 10, TimeUnit.SECONDS);
     }
     
     @Override

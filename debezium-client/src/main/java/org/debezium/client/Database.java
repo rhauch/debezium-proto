@@ -27,7 +27,7 @@ import org.debezium.core.message.Patch;
 public interface Database extends Closeable {
     
     DatabaseId databaseId();
-
+    
     Completion readSchema(OutcomeHandler<Schema> handler);
 
     Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler);

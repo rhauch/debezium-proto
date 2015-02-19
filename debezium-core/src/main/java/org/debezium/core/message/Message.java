@@ -7,6 +7,7 @@ package org.debezium.core.message;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -31,6 +32,8 @@ public final class Message {
         public static final String CLIENT_ID = "clientid";
         public static final String REQUEST = "request";
         public static final String USER = "user";
+        public static final String DEVICE = "device";
+        public static final String APPLICATION_VERSION = "appVersion";
         public static final String DATABASE_ID = "db";
         public static final String COLLECTION = "collection";
         public static final String ZONE_ID = "zone";
@@ -272,6 +275,38 @@ public final class Message {
      */
     public static void copyHeaders(Document source, Document target) {
         target.putAll(source, (name) -> HEADER_FIELD_NAMES.contains(name.toString()));
+    }
+    
+    public static Document createConnectionMessage( String clientId, DatabaseId dbId, String user, String device, String appVersion ) {
+        return createConnectionMessage(clientId,dbId,user,device,appVersion,System.currentTimeMillis());
+    }
+    
+    public static Document createConnectionMessage( String clientId, DatabaseId dbId, String user, String device, String appVersion, long timestamp ) {
+        Document doc = Document.create();
+        doc.setString(Field.CLIENT_ID,clientId);
+        doc.setString(Field.DATABASE_ID,dbId.asString());
+        doc.setString(Field.USER,user);
+        doc.setString(Field.DEVICE,device);
+        doc.setString(Field.APPLICATION_VERSION,appVersion);
+        doc.setNumber(Field.BEGUN,timestamp);
+        return doc;
+    }
+    
+    public static String getUser( Document message ) {
+        return message.getString(Field.USER);
+    }
+
+    public static String getDevice( Document message ) {
+        return message.getString(Field.DEVICE);
+    }
+    
+    public static String getAppVersion( Document message ) {
+        return message.getString(Field.APPLICATION_VERSION);
+    }
+    
+    public static OptionalLong getBegun( Document message ) {
+        Value value = message.get(Field.BEGUN);
+        return value.isLong() ? OptionalLong.of(value.asLong()) : OptionalLong.empty();
     }
 
     /**

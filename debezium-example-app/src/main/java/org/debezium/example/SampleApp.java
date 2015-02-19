@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -74,6 +75,8 @@ public class SampleApp {
         String pathToConfigFile = "debezium.json";
         String dbName = "my-db";
         String username = "jsmith";
+        String device = UUID.randomUUID().toString();
+        String appVersion = "1.0";
 
         Configuration config = readConfiguration(pathToConfigFile);
         Debezium.Client client = Debezium.start(config);
@@ -81,11 +84,11 @@ public class SampleApp {
         DatabaseId dbId = Identifier.of(dbName);
         Database db = null;
         try {
-            db = client.connect(dbId, username);
+            db = client.connect(dbId, username,device,appVersion);
         } catch ( DebeziumConnectionException e ) {
             // Connecting failed, so try to provision ...
             try {
-                db = client.provision(dbId,username);
+                db = client.provision(dbId,username,device,appVersion);
             } catch (Throwable e2) {
                 System.out.println("Error connecting to or provisioning Debezium database '" + dbName + "': " + e.getMessage());
                 System.exit(2);

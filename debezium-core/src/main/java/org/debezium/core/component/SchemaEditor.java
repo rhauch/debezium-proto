@@ -277,6 +277,7 @@ public class SchemaEditor {
                         stringConstraints().clear();
                         numberConstraints().clear();
                         break;
+                    case DOCUMENT:
                     case BINARY:
                         // Remove all constraints ...
                         stringConstraints().clear();

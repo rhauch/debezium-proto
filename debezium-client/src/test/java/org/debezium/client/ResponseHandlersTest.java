@@ -5,8 +5,6 @@
  */
 package org.debezium.client;
 
-import static org.fest.assertions.Assertions.assertThat;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,6 +23,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.fest.assertions.Assertions.assertThat;
+
 /**
  * @author Randall Hauch
  *
@@ -32,6 +32,8 @@ import org.junit.Test;
 public class ResponseHandlersTest implements Testing {
     
     private static final String USERNAME = "jsmith";
+    private static final String DEVICE = "jsmith-phone";
+    private static final String APP_VERSION = "1.0";
     
     private ResponseHandlers handlers;
     private DbzNode node;
@@ -50,7 +52,7 @@ public class ResponseHandlersTest implements Testing {
         executor = Executors.newCachedThreadPool();
         scheduledExecutor = Executors.newScheduledThreadPool(1);
         dbId = Identifier.of("my-db");
-        context = new ExecutionContext(dbId, USERNAME);
+        context = new ExecutionContext(dbId, USERNAME, DEVICE, APP_VERSION);
         requestId = null;
         response = null;
         completed = null;

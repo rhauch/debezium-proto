@@ -5,8 +5,6 @@
  */
 package org.debezium.client;
 
-import static org.fest.assertions.Assertions.assertThat;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,6 +29,8 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import static org.fest.assertions.Assertions.assertThat;
+
 /**
  * @author Randall Hauch
  */
@@ -41,6 +41,8 @@ public class DatabaseTest {
     private static Debezium.Client client = null;
 
     private String username = "jsmith";
+    private String device = "jsmith-phone"; // would really be some token
+    private String appVersion = "1.0";
     private DatabaseId databaseId = Identifier.of("firstDatabase");
     private EntityType type = Identifier.of(databaseId, "Address");
     private Database database;
@@ -69,7 +71,7 @@ public class DatabaseTest {
 
     @Before
     public void beforeEach() {
-        database = client.connect(databaseId, username);
+        database = client.connect(databaseId, username, device, appVersion);
         assertThat(database).isNotNull();
     }
 

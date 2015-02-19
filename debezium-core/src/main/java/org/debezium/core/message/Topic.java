@@ -18,6 +18,7 @@ public class Topic {
     public static final String ENTITY_UPDATES = "entity-updates";
     public static final String PARTIAL_RESPONSES = "partial-responses";
     public static final String COMPLETE_RESPONSES = "complete-responses";
+    public static final String CONNECTIONS = "connections";
     
     private Topic() {
     }

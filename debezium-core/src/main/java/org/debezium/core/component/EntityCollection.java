@@ -181,6 +181,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
                 case STRING:
                 case UUID:
                 case LOCATION:
+                case DOCUMENT:
                 case BOOLEAN:
                     // The only non-match with these is STRING ...
                     return STRING;
@@ -188,6 +189,7 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
                     if (other == LONG) return TIMESTAMP;
                     return STRING;
                 case BINARY:
+                    // The only type compatible with BINARY is ...
                     return BINARY;
             }
             return STRING;

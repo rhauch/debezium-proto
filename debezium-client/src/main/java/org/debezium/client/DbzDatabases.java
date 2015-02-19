@@ -114,6 +114,7 @@ final class DbzDatabases extends Service {
                                          this::updateActiveDatabase, notAvailable(dbId))
                                          .orElseThrow(DebeziumConnectionException::new);
         }
+        recordConnection(context, dbId, node);
         assert db != null;
         return db;
     }
@@ -136,6 +137,11 @@ final class DbzDatabases extends Service {
                 throw new DebeziumClientException("Unable to send request to create schema for " + id);
             }
         };
+    }
+    
+    private void recordConnection(ExecutionContext context, DatabaseId id, DbzNode node) {
+        Document msg = Message.createConnectionMessage(node.id(),id, context.username(),context.device(),context.version());
+        node.send(Topic.CONNECTIONS, context.username(), msg);
     }
     
     private ActiveDatabase updateActiveDatabase(Document schemaReadResponse) {

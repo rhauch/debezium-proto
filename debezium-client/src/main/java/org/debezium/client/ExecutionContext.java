@@ -15,10 +15,14 @@ final class ExecutionContext {
 
     private final DatabaseId dbId;
     private final String username;
+    private final String device;
+    private final String version;
     
-    ExecutionContext( DatabaseId dbId, String username ) {
+    ExecutionContext( DatabaseId dbId, String username, String device, String version ) {
         this.username = username;
         this.dbId = dbId;
+        this.device =device;
+        this.version = version;
     }
     
     public DatabaseId databaseId() {
@@ -27,6 +31,14 @@ final class ExecutionContext {
     
     public String username() {
         return username;
+    }
+    
+    public String device() {
+        return device;
+    }
+    
+    public String version() {
+        return version;
     }
     
     @Override

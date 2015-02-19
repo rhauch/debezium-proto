@@ -237,21 +237,25 @@ public interface Debezium {
          * 
          * @param id the database identifier
          * @param username the username
+         * @param device the device identifier or token
+         * @param appVersion the version of the application
          * @return the database connection
          * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
          */
-        Database connect(DatabaseId id, String username);
+        Database connect(DatabaseId id, String username, String device, String appVersion);
         
         /**
          * Provision a new database with the given name.
          * @param id the database identifier
          * @param username the username
+         * @param device the device identifier or token
+         * @param appVersion the version of the application
          * @return the database connection
          * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
          * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
          */
-        Database provision(DatabaseId id, String username);
-
+        Database provision(DatabaseId id, String username, String device, String appVersion);
+        
         /**
          * Shutdown this client and release all resources.
          * @param timeout the maximum time that this method should block before returning; must be positive

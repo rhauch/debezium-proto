@@ -20,7 +20,7 @@ import com.fasterxml.jackson.core.JsonToken;
  * @author Randall Hauch
  *
  */
-final class JacksonReader implements DocumentReader {
+final class JacksonReader implements DocumentReader, ArrayReader {
 
     public static final JacksonReader INSTANCE = new JacksonReader();
     
@@ -64,6 +64,31 @@ final class JacksonReader implements DocumentReader {
         return parse(factory.createParser(rawBytes));
     }
     
+    @Override
+    public Array readArray(InputStream jsonStream) throws IOException {
+        return parseArray(factory.createParser(jsonStream),false);
+    }
+    
+    @Override
+    public Array readArray(Reader jsonReader) throws IOException {
+        return parseArray(factory.createParser(jsonReader),false);
+    }
+    
+    @Override
+    public Array readArray(URL jsonUrl) throws IOException {
+        return parseArray(factory.createParser(jsonUrl),false);
+    }
+    
+    @Override
+    public Array readArray(File jsonFile) throws IOException {
+        return parseArray(factory.createParser(jsonFile),false);
+    }
+    
+    @Override
+    public Array readArray( String jsonArray ) throws IOException {
+        return parseArray(factory.createParser(jsonArray),false);
+    }
+    
     private Document parse( JsonParser parser ) throws IOException {
         try {
             return parseDocument(parser,false);
@@ -94,7 +119,7 @@ final class JacksonReader implements DocumentReader {
                     doc.setDocument(fieldName, parseDocument(parser,true));
                     break;
                 case START_ARRAY:
-                    doc.setArray(fieldName, parseArray(parser));
+                    doc.setArray(fieldName, parseArray(parser,true));
                     break;
                 case VALUE_STRING:
                     doc.setString(fieldName, parser.getValueAsString());
@@ -146,17 +171,25 @@ final class JacksonReader implements DocumentReader {
         return doc;
     }
     
-    private Array parseArray( JsonParser parser ) throws IOException {
-        // Iterate over the fields in the top-level document ...
+    private Array parseArray( JsonParser parser, boolean nested ) throws IOException {
+        // Iterate over the values in the array ...
         BasicArray array = new BasicArray();
-        JsonToken token = parser.nextToken();
+        JsonToken token = null;
+        if ( !nested ) {
+            // We expect the START_ARRAY token ...
+            token = parser.nextToken();
+            if (!nested && token != JsonToken.START_ARRAY) {
+                throw new IOException("Expected data to start with an Array, but was " + token);
+            }
+        }
+        token = parser.nextToken();
         while ( token != JsonToken.END_ARRAY ) {
             switch (token) {
                 case START_OBJECT:
                     array.add(parseDocument(parser,true));
                     break;
                 case START_ARRAY:
-                    array.add(parseArray(parser));
+                    array.add(parseArray(parser,true));
                     break;
                 case VALUE_STRING:
                     array.add(parser.getValueAsString());

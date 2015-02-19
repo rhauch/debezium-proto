@@ -10,6 +10,9 @@ import java.nio.charset.StandardCharsets;
 
 import org.apache.samza.serializers.Serde;
 import org.debezium.core.annotation.Immutable;
+import org.debezium.core.doc.Array;
+import org.debezium.core.doc.ArrayReader;
+import org.debezium.core.doc.ArrayWriter;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.DocumentReader;
 import org.debezium.core.doc.DocumentWriter;
@@ -21,12 +24,19 @@ import org.debezium.core.doc.DocumentWriter;
 public final class Serdes {
     
     private static final DocumentSerde DOCUMENT_SERDE_INSTANCE = new DocumentSerde();
+    private static final ArraySerde ARRAY_SERDE_INSTANCE = new ArraySerde();
     private static final StringSerde STRING_SERDE_INSTANCE = new StringSerde();
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
     private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
+    private static final ArrayReader ARRAY_READER = ArrayReader.defaultReader();
+    private static final ArrayWriter ARRAY_WRITER = ArrayWriter.defaultWriter();
     
     public static Serde<Document> document() {
         return DOCUMENT_SERDE_INSTANCE;
+    }
+
+    public static Serde<Array> array() {
+        return ARRAY_SERDE_INSTANCE;
     }
 
     public static Encoder<Document> documentEncoder() {
@@ -74,6 +84,23 @@ public final class Serdes {
             throw new RuntimeException(e);
         }
     }
+    public static Array bytesToArray( byte[] bytes ) {
+        try {
+            return ARRAY_READER.readArray(bytesToString(bytes));
+        } catch (IOException e) {
+            // Should never see this, but shit if we do ...
+            throw new RuntimeException(e);
+        }
+    }
+    
+    public static byte[] arrayToBytes( Array array ) {
+        try {
+            return stringToBytes(ARRAY_WRITER.write(array));
+        } catch (IOException e) {
+            // Should never see this, but shit if we do ...
+            throw new RuntimeException(e);
+        }
+    }
 
     @Immutable
     private static final class DocumentSerde implements Serde<Document>, Encoder<Document>, Decoder<Document> {
@@ -85,6 +112,19 @@ public final class Serdes {
         @Override
         public byte[] toBytes(Document document) {
             return documentToBytes(document);
+        }
+    }
+
+    @Immutable
+    private static final class ArraySerde implements Serde<Array>, Encoder<Array>, Decoder<Array> {
+        @Override
+        public Array fromBytes(byte[] bytes) {
+            return bytesToArray(bytes);
+        }
+        
+        @Override
+        public byte[] toBytes(Array array) {
+            return arrayToBytes(array);
         }
     }
 

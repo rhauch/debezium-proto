@@ -20,7 +20,7 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
  * @author Randall Hauch
  *
  */
-final class JacksonWriter implements DocumentWriter {
+final class JacksonWriter implements DocumentWriter, ArrayWriter {
     
     public static final JacksonWriter INSTANCE = new JacksonWriter(false);
     public static final JacksonWriter PRETTY_WRITER = new JacksonWriter(true);
@@ -73,6 +73,32 @@ final class JacksonWriter implements DocumentWriter {
         } catch (IOException e ) {
             throw new RuntimeException(e);
         }
+    }
+    
+    @Override
+    public void write(Array array, OutputStream jsonStream ) throws IOException {
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(jsonStream) ) {
+            configure(jsonGenerator);
+            writeArray(array,jsonGenerator);
+        }
+    }
+    
+    @Override
+    public void write(Array array, Writer jsonWriter ) throws IOException {
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(jsonWriter) ) {
+            configure(jsonGenerator);
+            writeArray(array,jsonGenerator);
+        }
+    }
+    
+    @Override
+    public String write(Array array ) throws IOException {
+        StringWriter writer = new StringWriter();
+        try ( JsonGenerator jsonGenerator = factory.createGenerator(writer) ) {
+            configure(jsonGenerator);
+            writeArray(array,jsonGenerator);
+        }
+        return writer.getBuffer().toString();
     }
     
     protected void configure( JsonGenerator generator ) {
