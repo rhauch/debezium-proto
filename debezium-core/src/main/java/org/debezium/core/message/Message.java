@@ -7,6 +7,8 @@ package org.debezium.core.message;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
+import org.debezium.core.component.ZoneId;
+import org.debezium.core.component.ZoneSubscription.Interest;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
@@ -52,6 +56,42 @@ public final class Message {
         public static final String BEFORE = "before";
         public static final String AFTER = "after";
         public static final String RESPONSES = "responses";
+        public static final String ACTION = "action";
+    }
+
+    public static enum Action {
+        CREATED("created", Interest.ON_CREATE.code()),
+        UPDATED("updated", Interest.ON_UPDATE.code()),
+        DELETED("deleted", Interest.ON_DELETE.code());
+        private static final Map<String, Action> BY_DESCRIPTION = new HashMap<>();
+        static {
+            for (Action action : Action.values()) {
+                BY_DESCRIPTION.put(action.description(), action);
+            }
+        }
+        private final String desc;
+        private final int interestCode;
+
+        private Action(String desc, int interestCode) {
+            this.desc = desc;
+            this.interestCode = interestCode;
+        }
+
+        public String description() {
+            return desc;
+        }
+
+        public static Action find(String description) {
+            return description != null ? BY_DESCRIPTION.get(description.toLowerCase()) : null;
+        }
+
+        public boolean satisfies(Interest interest) {
+            return satisfies(interest.code());
+        }
+
+        public boolean satisfies(int interestMask) {
+            return (interestCode & interestMask) == interestCode;
+        }
     }
 
     public static enum Status {
@@ -103,6 +143,7 @@ public final class Message {
         Document response = Document.create();
         Message.copyHeaders(request, response);
         Message.setStatus(response, Status.SUCCESS);
+        Message.setEnded(response,System.currentTimeMillis());
         return response;
     }
 
@@ -220,6 +261,18 @@ public final class Message {
         return patchRequest;
     }
 
+    public static Identifier getId(Document doc, DatabaseId databaseId ) {
+        if ( databaseId == null ) return getId(doc);
+        if (doc == null) return null;
+        String entityType = doc.getString(Field.COLLECTION);
+        if (entityType == null) return databaseId;
+        String zoneId = doc.getString(Field.ZONE_ID);
+        if (zoneId == null) return Identifier.of(databaseId, entityType);
+        String id = doc.getString(Field.ENTITY);
+        if (id == null) return Identifier.zone(databaseId, entityType, zoneId);
+        return Identifier.of(databaseId, entityType, id, zoneId);
+    }
+
     public static Identifier getId(Document doc) {
         if (doc == null) return null;
         String databaseId = doc.getString(Field.DATABASE_ID);
@@ -244,6 +297,16 @@ public final class Message {
     public static DatabaseId getDatabaseId(Document doc) {
         String databaseId = doc.getString(Field.DATABASE_ID);
         return Identifier.of(databaseId);
+    }
+
+    public static ZoneId getZoneId(Document doc, DatabaseId dbId ) {
+        if ( dbId == null ) {
+            String databaseId = doc.getString(Field.DATABASE_ID);
+            dbId = Identifier.of(databaseId);
+        }
+        String entityType = doc.getString(Field.COLLECTION);
+        String zoneId = doc.getString(Field.ZONE_ID);
+        return Identifier.zone(dbId, entityType, zoneId);
     }
 
     public static void addId(Document doc, Identifier id) {
@@ -277,36 +340,58 @@ public final class Message {
         target.putAll(source, (name) -> HEADER_FIELD_NAMES.contains(name.toString()));
     }
     
-    public static Document createConnectionMessage( String clientId, DatabaseId dbId, String user, String device, String appVersion ) {
-        return createConnectionMessage(clientId,dbId,user,device,appVersion,System.currentTimeMillis());
+    /**
+     * Copy into the target document the {@link Field#ENDED ended} time in the source message, which is the time
+     * at which processing was completed on the source. This method does nothing if the source does not have
+     * an {@link Field#ENDED ended} time field.
+     * 
+     * @param source the document with the {@link Field#ENDED ended} time to be copied; may not be null
+     * @param target the document on which the {@link Field#ENDED ended} time should be set; may not be null
+     */
+    public static void copyCompletionTime( Document source, Document target ) {
+        Long timestamp = source.getLong(Field.ENDED);
+        if ( timestamp != null ) target.setNumber(Field.ENDED, timestamp.longValue());
     }
-    
-    public static Document createConnectionMessage( String clientId, DatabaseId dbId, String user, String device, String appVersion, long timestamp ) {
+
+    public static Document createConnectionMessage(String clientId, DatabaseId dbId, String user, String device, String appVersion) {
+        return createConnectionMessage(clientId, dbId, user, device, appVersion, System.currentTimeMillis());
+    }
+
+    public static Document createConnectionMessage(String clientId, DatabaseId dbId, String user, String device, String appVersion,
+                                                   long timestamp) {
         Document doc = Document.create();
-        doc.setString(Field.CLIENT_ID,clientId);
-        doc.setString(Field.DATABASE_ID,dbId.asString());
-        doc.setString(Field.USER,user);
-        doc.setString(Field.DEVICE,device);
-        doc.setString(Field.APPLICATION_VERSION,appVersion);
-        doc.setNumber(Field.BEGUN,timestamp);
+        doc.setString(Field.CLIENT_ID, clientId);
+        doc.setString(Field.DATABASE_ID, dbId.asString());
+        doc.setString(Field.USER, user);
+        doc.setString(Field.DEVICE, device);
+        doc.setString(Field.APPLICATION_VERSION, appVersion);
+        doc.setNumber(Field.BEGUN, timestamp);
         return doc;
     }
-    
-    public static String getUser( Document message ) {
+
+    public static String getUser(Document message) {
         return message.getString(Field.USER);
     }
 
-    public static String getDevice( Document message ) {
+    public static String getDevice(Document message) {
         return message.getString(Field.DEVICE);
     }
-    
-    public static String getAppVersion( Document message ) {
+
+    public static void removeDevice(Document message) {
+        message.remove(Field.DEVICE);
+    }
+
+    public static String getAppVersion(Document message) {
         return message.getString(Field.APPLICATION_VERSION);
     }
-    
-    public static OptionalLong getBegun( Document message ) {
+
+    public static OptionalLong getBegun(Document message) {
         Value value = message.get(Field.BEGUN);
         return value.isLong() ? OptionalLong.of(value.asLong()) : OptionalLong.empty();
+    }
+    
+    public static void setEnded(Document message, long timestamp ) {
+        message.setNumber(Field.ENDED, timestamp);
     }
 
     /**
@@ -369,8 +454,8 @@ public final class Message {
         if (Value.notNull(value)) response.set(Field.OPS, value);
     }
 
-    public static void setOperations(Document message, Patch<?> patch ) {
-        setOperations(message,patch.asDocument());
+    public static void setOperations(Document message, Patch<?> patch) {
+        setOperations(message, patch.asDocument());
     }
 
     public static String getClient(Document message) {
@@ -443,6 +528,15 @@ public final class Message {
         assert parts >= 0;
         message.setNumber(Field.PART, part);
         message.setNumber(Field.PARTS, parts);
+    }
+
+    public static Action determineAction(Document message) {
+        boolean includesBefore = getAfter(message) != null;
+        if (includesBefore) {
+            boolean includesAfter = getBefore(message) != null;
+            return includesAfter ? Action.UPDATED : Action.DELETED;
+        }
+        return Action.CREATED;
     }
 
     private Message() {

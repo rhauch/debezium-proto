@@ -77,11 +77,13 @@ public class EntityStorageService implements StreamTask, InitableTask {
                     // The entity does not exist ...
                     Message.setStatus(response, Status.DOES_NOT_EXIST);
                     Message.addFailureReason(response, "Entity '" + id + "' does not exist.");
+                    Message.setEnded(response, System.currentTimeMillis());
                     sendResponse(response, idStr, collector);
                 } else {
                     // We're reading an existing entity ...
                     assert entity != null;
                     Message.setAfter(response, entity);
+                    Message.setEnded(response, System.currentTimeMillis());
                     sendResponse(response, idStr, collector);
                 }
                 return;
@@ -103,6 +105,7 @@ public class EntityStorageService implements StreamTask, InitableTask {
                 // The entity was successfully changed, so store the changes ...
                 store.put(idStr, entity);
                 Message.setAfter(response, entity.clone());
+                Message.setEnded(response, System.currentTimeMillis());
 
                 // Output the result ...
                 collector.send(new OutgoingMessageEnvelope(Streams.entityUpdates(dbId), idStr, idStr, response));
@@ -111,6 +114,7 @@ public class EntityStorageService implements StreamTask, InitableTask {
                 if (sendResponseUponUpdate) sendResponse(response, idStr, collector);
             } else {
                 // Could not apply the patch, so just output it as unchanged (with the failure recorded) ...
+                Message.setEnded(response, System.currentTimeMillis());
                 sendResponse(response, idStr, collector);
             }
 

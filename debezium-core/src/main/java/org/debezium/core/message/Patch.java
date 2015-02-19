@@ -925,9 +925,12 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return from(doc);
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <IdType extends Identifier> Patch<IdType> from(Document doc) {
-        Identifier id = Message.getId(doc);
+        return from(doc,null);
+    }
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static <IdType extends Identifier> Patch<IdType> from(Document doc, DatabaseId databaseId ) {
+        Identifier id = Message.getId(doc,databaseId);
         if (id == null) return null;
         Array ops = doc.getArray("ops");
         List<Operation> operations = ops.streamValues().filter(Value::isDocument)

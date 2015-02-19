@@ -29,8 +29,8 @@ public class Streams {
     private static final SystemStream ENTITY_UPDATES = new SystemStream(SYSTEM_NAME, Topic.ENTITY_UPDATES);
     private static final SystemStream PARTIAL_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.PARTIAL_RESPONSES);
     private static final SystemStream COMPLETE_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.COMPLETE_RESPONSES);
+    private static final SystemStream SCHEMA_LEARNING = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_LEARNING);
     private static final SystemStream CONNECTIONS = new SystemStream(SYSTEM_NAME, Topic.CONNECTIONS);
-    private static final SystemStream SCHEMA_LEARNING = new SystemStream(SYSTEM_NAME, "schema-learning");
 
     // At this time, none of the stream names are a function of database ID. However, we may want to do this so that individual
     // database info is stored in Kafka within files with database-specific names, making it easier to completely remove all

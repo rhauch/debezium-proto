@@ -13,6 +13,7 @@ public class Topic {
 
     public static final String SCHEMA_PATCHES = "schema-patches";
     public static final String SCHEMA_UPDATES = "schema-updates";
+    public static final String SCHEMA_LEARNING = "schema-learning";
     public static final String ENTITY_BATCHES = "entity-batches";
     public static final String ENTITY_PATCHES = "entity-patches";
     public static final String ENTITY_UPDATES = "entity-updates";

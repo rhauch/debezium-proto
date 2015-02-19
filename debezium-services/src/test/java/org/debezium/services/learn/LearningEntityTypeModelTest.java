@@ -5,8 +5,6 @@
  */
 package org.debezium.services.learn;
 
-import static org.fest.assertions.Assertions.assertThat;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,10 +24,13 @@ import org.debezium.core.doc.Path;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Patch;
+import org.debezium.core.message.Topic;
 import org.debezium.services.learn.LearningEntityTypeModel.FieldUsage;
 import org.fest.assertions.Fail;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.fest.assertions.Assertions.assertThat;
 
 /**
  * @author Randall Hauch
@@ -37,6 +38,8 @@ import org.junit.Test;
  */
 public class LearningEntityTypeModelTest implements Testing {
 
+    private static final String FOLDER_NAME = Topic.SCHEMA_LEARNING;
+    
     public static enum OptionalField {
         OPTIONAL, REQUIRED
     }
@@ -69,7 +72,7 @@ public class LearningEntityTypeModelTest implements Testing {
 
     @Test
     public void shouldLearnFromMultipleCreateRequestsForFlatEntities() throws IOException {
-        // Testing.Print.enable();
+        Testing.Print.enable();
         // Testing.Debug.enable();
 
         EntityType type = Identifier.of("my-db", "contacts");
@@ -162,7 +165,7 @@ public class LearningEntityTypeModelTest implements Testing {
     }
 
     protected EntityCollection processChanges(String filename, EntityType type) throws IOException {
-        String json = Testing.Files.readResourceAsString(filename);
+        String json = Testing.Files.readResourceAsString(FOLDER_NAME + "/" + filename);
         Document requestsDoc = DocumentReader.defaultReader().read(json);
 
         schemaPatch = null;

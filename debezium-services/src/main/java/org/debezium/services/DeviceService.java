@@ -61,7 +61,10 @@ public class DeviceService implements StreamTask, InitableTask {
                 store.put(username, devices);
             }
             // Record this device ...
-            addDevice(devices, device, timestamp, dbId, version);
+            if ( addDevice(devices, device, timestamp, dbId, version) ) {
+                // Record that the device is new ...
+                // TODO
+            }
 
         } catch (RuntimeException t) {
             t.printStackTrace();

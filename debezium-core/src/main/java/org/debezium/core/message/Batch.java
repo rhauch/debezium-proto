@@ -281,9 +281,10 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
     public static <IdType extends Identifier> Batch<IdType> from( Document doc ) {
         Array array = doc.getArray("patches");
         if ( array == null ) return null;
+        DatabaseId dbId = Message.getDatabaseId(doc);
         List<Patch<IdType>> patches = array.streamValues().filter(Value::isDocument)
                                                           .map(Value::asDocument)
-                                                          .map(d->Patch.<IdType>from(d))
+                                                          .map(d->Patch.<IdType>from(d,dbId))
                                                           .filter(Predicates.notNull())
                                                           .collect(Collectors.toList());
         return new Batch<IdType>(patches);

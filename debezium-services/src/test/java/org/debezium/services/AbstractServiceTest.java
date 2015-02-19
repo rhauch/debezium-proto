@@ -5,8 +5,7 @@
  */
 package org.debezium.services;
 
-import static org.fest.assertions.Assertions.assertThat;
-
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,12 +29,15 @@ import org.debezium.Testing;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Array;
 import org.debezium.core.doc.Document;
+import org.debezium.core.doc.DocumentReader;
 import org.debezium.core.doc.Path;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Message;
 import org.debezium.core.util.Collect;
 import org.debezium.services.util.MemoryKeyValueStore;
 import org.fest.assertions.Fail;
+
+import static org.fest.assertions.Assertions.assertThat;
 
 /**
  * @author Randall Hauch
@@ -50,6 +52,18 @@ public abstract class AbstractServiceTest implements Testing {
         return UUID.randomUUID().toString();
     }
     
+    protected Document readMessage(String streamName, String filename) throws IOException {
+        String json = Testing.Files.readResourceAsString(streamName + "/" + filename);
+        Document message = DocumentReader.defaultReader().read(json);
+        return message;
+    }
+    
+    protected OutputMessages processMessage(StreamTask service, Document message) {
+        Testing.debug("processing message:");
+        Testing.debug(message);
+        return process(service, random(), message);
+    }
+
     protected OutputMessages process(StreamTask service, Object key, Object message) {
         OutputMessages output = new OutputMessages();
         try {
@@ -220,11 +234,18 @@ public abstract class AbstractServiceTest implements Testing {
             @Override
             public OutputMessageValidator hasMessage(Document expectedMessage) {
                 Document actual = (Document)env.getMessage();
-                Document actualWithoutParts = actual;
+                Document actualWithoutParts = actual.clone();
+                boolean removeParts = false;
                 if ( actualWithoutParts.has(Message.Field.PARTS) && !expectedMessage.has(Message.Field.PARTS)) {
                     actualWithoutParts = actualWithoutParts.clone();
                     actualWithoutParts.remove(Message.Field.PARTS);
+                    expectedMessage.remove(Message.Field.PARTS);
+                    removeParts = true;
+                }
+                if ( removeParts || (actualWithoutParts.has(Message.Field.PART) && !expectedMessage.has(Message.Field.PART))) {
+                    actualWithoutParts = actualWithoutParts.clone();
                     actualWithoutParts.remove(Message.Field.PART);
+                    expectedMessage.remove(Message.Field.PART);
                 }
                 assertThat(actualWithoutParts.equals(expectedMessage)).isTrue();
                 return this;

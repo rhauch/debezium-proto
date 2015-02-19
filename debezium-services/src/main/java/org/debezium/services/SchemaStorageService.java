@@ -84,6 +84,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                     // The entity did not exist ...
                     Message.setStatus(response, Status.DOES_NOT_EXIST);
                     Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
+                    Message.setEnded(response, System.currentTimeMillis());
                     sendResponse(response, dbIdStr, collector);
                     System.out.println("SchemaStorageService.process(...) completed with DOES_NOT_EXIST");
                     return;
@@ -94,6 +95,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 // We're reading an existing schema ...
                 assert schema != null;
                 Message.setAfter(response, schema);
+                Message.setEnded(response, System.currentTimeMillis());
                 sendResponse(response, dbIdStr, collector);
                 System.out.println("SchemaStorageService.process(...) completed read request");
                 return;
@@ -104,6 +106,7 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 // The schema was successfully changed, so store the changes ...
                 store.put(dbIdStr, schema);
                 Message.setAfter(response, schema);
+                Message.setEnded(response, System.currentTimeMillis());
 
                 // Output the result ...
                 collector.send(new OutgoingMessageEnvelope(Streams.schemaUpdates(dbId), dbIdStr, dbIdStr, response));

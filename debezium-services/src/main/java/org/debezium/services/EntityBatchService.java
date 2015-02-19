@@ -35,31 +35,33 @@ import org.debezium.core.message.Patch;
  */
 @NotThreadSafe
 public class EntityBatchService implements StreamTask {
-    
+
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
         // The key is a random request number ...
         Document batchRequest = (Document) env.getMessage();
-        
+        DatabaseId dbId = Message.getDatabaseId(batchRequest);
+
         // Construct the batch from the request ...
         Batch<EntityId> batch = Batch.from(batchRequest);
-        
+
         // Fire off a separate request for each patch ...
         int parts = batch.patchCount();
         AtomicInteger partCounter = new AtomicInteger(0);
         batch.forEach(patch -> {
             // Construct the response message and fire it off ...
             Document patchRequest = Message.createPatchRequest(batchRequest, patch);
-            
+
             // Set the headers and the request parts ...
             Message.copyHeaders(batchRequest, patchRequest);
             Message.setParts(patchRequest, partCounter.incrementAndGet(), parts);
-            
-            // Send the message for this patch ...
+
             EntityId entityId = patch.target();
-            DatabaseId dbId = entityId.databaseId();
-            String msgId = entityId.asString();
-            collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), msgId, patchRequest));
+            if (dbId.equals(entityId.databaseId())) {
+                // Send the message for this patch (only if the patched entity is in the same database as the batch request) ...
+                String msgId = entityId.asString();
+                collector.send(new OutgoingMessageEnvelope(Streams.entityPatches(dbId), msgId, patchRequest));
+            }
         });
     }
 }
