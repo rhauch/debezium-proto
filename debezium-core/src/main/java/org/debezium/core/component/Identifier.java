@@ -95,6 +95,14 @@ public interface Identifier extends Stringifiable, Comparable<Identifier> {
         return new ZoneId( entityType, zoneId.toString());
     }
     
+    static SubscriptionId newSubscription(DatabaseId databaseId) {
+        return new SubscriptionId(databaseId,UUID.randomUUID().toString());
+    }
+
+    static SubscriptionId subscription(DatabaseId databaseId, String id) {
+        return new SubscriptionId(databaseId,id);
+    }
+
     default String asString() {
         StringJoiner joiner = new StringJoiner("/");
         asString(joiner);

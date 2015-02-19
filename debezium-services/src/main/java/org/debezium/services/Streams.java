@@ -9,6 +9,7 @@ import org.apache.samza.system.SystemStream;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
+import org.debezium.core.component.ZoneId;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message.Field;
 import org.debezium.core.message.Patch;
@@ -31,6 +32,9 @@ public class Streams {
     private static final SystemStream COMPLETE_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.COMPLETE_RESPONSES);
     private static final SystemStream SCHEMA_LEARNING = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_LEARNING);
     private static final SystemStream CONNECTIONS = new SystemStream(SYSTEM_NAME, Topic.CONNECTIONS);
+    private static final SystemStream ZONE_CHANGES = new SystemStream(SYSTEM_NAME, Topic.ZONE_CHANGES);
+    private static final SystemStream CHANGES_BY_DEVICE = new SystemStream(SYSTEM_NAME, Topic.CHANGES_BY_DEVICE);
+    private static final SystemStream REQUEST_NOTIFICATIONS = new SystemStream(SYSTEM_NAME, Topic.REQUEST_NOTIFICATIONS);
 
     // At this time, none of the stream names are a function of database ID. However, we may want to do this so that individual
     // database info is stored in Kafka within files with database-specific names, making it easier to completely remove all
@@ -107,6 +111,40 @@ public class Streams {
     }
 
     /**
+     * Get the stream for the given database ID that is partitioned by {@link ZoneId} and used to record what's changed within
+     * each zone.
+     * 
+     * @param id the database ID; may not be null
+     * @return the stream; never null
+     */
+    public static SystemStream zoneChanges(DatabaseId id) {
+        return ZONE_CHANGES;
+    }
+
+    /**
+     * Get the stream for the given database ID that is partitioned by device and used to record for each device the changes
+     * that are to be delivered to it. Note that the changes are simply summaries of whether entities were created, updated,
+     * or removed.
+     * 
+     * @param id the database ID; may not be null
+     * @return the stream; never null
+     */
+    public static SystemStream changesByDevice(DatabaseId id) {
+        return CHANGES_BY_DEVICE;
+    }
+
+    /**
+     * Get the stream for the given database ID that is partitioned by device and used to record requests to obtain the which
+     * entities were created, updated, and deleted since the last request.
+     * 
+     * @param id the database ID; may not be null
+     * @return the stream; never null
+     */
+    public static SystemStream requestNotifications(DatabaseId id) {
+        return REQUEST_NOTIFICATIONS;
+    }
+
+    /**
      * Get the stream for the given database ID that is partitioned by username and used to record connections of users with
      * particular devices.
      * 
@@ -146,6 +184,14 @@ public class Streams {
 
     public static boolean isSchemaUpdates(SystemStream stream) {
         return stream.getStream().equals(Topic.SCHEMA_UPDATES);
+    }
+
+    public static boolean isChangesByDevice(SystemStream stream) {
+        return stream.getStream().equals(Topic.CHANGES_BY_DEVICE);
+    }
+
+    public static boolean isRequestNotifications(SystemStream stream) {
+        return stream.getStream().equals(Topic.REQUEST_NOTIFICATIONS);
     }
 
     private Streams() {

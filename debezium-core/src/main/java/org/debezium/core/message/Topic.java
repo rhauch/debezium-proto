@@ -20,6 +20,9 @@ public class Topic {
     public static final String PARTIAL_RESPONSES = "partial-responses";
     public static final String COMPLETE_RESPONSES = "complete-responses";
     public static final String CONNECTIONS = "connections";
+    public static final String ZONE_CHANGES = "zone-changes";
+    public static final String CHANGES_BY_DEVICE = "changes-by-device";
+    public static final String REQUEST_NOTIFICATIONS = "request-notifications";
     
     private Topic() {
     }
