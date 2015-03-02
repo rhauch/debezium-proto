@@ -61,7 +61,7 @@ To watch a specific topic, use this command in a separate shell:
 
     $ bin/grid watch <topicName>
 
-where `<topicName` is one of the following:
+where `<topicName>` is one of the following:
 
 * `entities-batches` - The topic that records all batch requests to read and/or change multiple entities. The Debezium client submits each batch request to this topic. One of the Debezium services consumes this topic, splits out the patches for each entity, and submits each patch request to `entities-patches`.
 * `entities-patches` - The topic that records all patch requests to read or change entities. One of the Debezium services consumes this topic and, for each patch, attempts to apply the patches and submits the results to `partial-responses`. Any changes to the entities are also written to `entity-updates`.

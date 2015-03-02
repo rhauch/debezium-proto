@@ -2,7 +2,7 @@
 <assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
-  <id>dist</id>
+  <id>contents</id>
   <formats>
     <format>tar.gz</format>
   </formats>
@@ -16,42 +16,20 @@
         <include>NOTICE*</include>
       </includes>
     </fileSet>
+    <!-- create an empty 'log' directory -->
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory>logs</outputDirectory>
+      <excludes>
+        <exclude>*</exclude>
+      </excludes>
+    </fileSet>
   </fileSets>
   <files>
     <!-- filtered=true, so we do variable expansion -->
     <file>
       <source>${basedir}/src/main/resources/log4j.xml</source>
       <outputDirectory>lib</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/entity-batch-service.properties</source>
-      <outputDirectory>config</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/entity-storage-service.properties</source>
-      <outputDirectory>config</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/response-accumulator-service.properties</source>
-      <outputDirectory>config</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/schema-learning-partitioner-service.properties</source>
-      <outputDirectory>config</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/schema-learning-service.properties</source>
-      <outputDirectory>config</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-    <file>
-      <source>${basedir}/src/main/config/schema-storage-service.properties</source>
-      <outputDirectory>config</outputDirectory>
       <filtered>true</filtered>
     </file>
   </files>
@@ -63,6 +41,13 @@
       </includes>
       <fileMode>0744</fileMode>
       <unpack>true</unpack>
+      <unpackOptions>
+        <!-- Exclude the YARN-related files -->
+        <excludes>
+            <exclude>run-am.sh</exclude>
+            <exclude>kill-yarn-job.sh</exclude>
+        </excludes>
+      </unpackOptions>
     </dependencySet>
     <dependencySet>
       <outputDirectory>lib</outputDirectory>
@@ -70,12 +55,13 @@
         <include>org.apache.samza:samza-core_${scala.label.version}</include>
         <include>org.apache.samza:samza-kafka_${scala.label.version}</include>
         <include>org.apache.samza:samza-serializers_${scala.label.version}</include>
-        <include>org.apache.samza:samza-yarn_${scala.label.version}</include>
         <include>org.apache.samza:samza-kv_${scala.label.version}</include>
         <include>org.apache.kafka:kafka_${scala.label.version}</include>
-        <include>org.apache.hadoop:hadoop-hdfs</include>
         <include>org.slf4j:slf4j-log4j12</include>
-        <include>${project.groupId}:debezium-services</include>
+        <!-- Exclude the YARN-related files
+        <include>org.apache.samza:samza-yarn_${scala.label.version}</include>
+        <include>org.apache.hadoop:hadoop-hdfs</include>
+        -->
       </includes>
       <useTransitiveFiltering>true</useTransitiveFiltering>
     </dependencySet>

@@ -13,21 +13,14 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>debezium-services-job-package</artifactId>
-    <name>Debezium Services Packaging for Samza+YARN</name>
+    <artifactId>debezium-dockerfile-samza</artifactId>
+    <name>Debezium Docker base image for Samza-based services</name>
     <packaging>jar</packaging>
     <properties>
-        <module-name>org.debezium.service</module-name>
+        <samza.log.dir>/debezium/log</samza.log.dir>
+        <samza.container.name>debezium-service</samza.container.name>
     </properties>
     <dependencies>
-        <dependency>
-            <groupId>org.debezium</groupId>
-            <artifactId>debezium-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.debezium</groupId>
-            <artifactId>debezium-services</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-shell</artifactId>
@@ -43,11 +36,6 @@
         <dependency>
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-serializers_${scala.label.version}</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.samza</groupId>
-            <artifactId>samza-yarn_${scala.label.version}</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -70,41 +58,82 @@
             <artifactId>slf4j-log4j12</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- We are not using Samza services with YARN
+        <dependency>
+            <groupId>org.apache.samza</groupId>
+            <artifactId>samza-yarn_${scala.label.version}</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
             <version>2.2.0</version>
             <scope>runtime</scope>
         </dependency>
+        -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
-            <scope>compile</scope>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
     <build>
+        <resources>
+            <resource>
+                <directory>${project.basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
-            <!-- plugin to build the tar.gz file used by Samza+YARN -->
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <configuration>
-                    <descriptors>
-                        <descriptor>src/main/assembly/src.xml</descriptor>
-                    </descriptors>
-                </configuration>
                 <executions>
                     <execution>
+                        <!-- plugin to collect the files needed to build the Samza base Docker image -->
                         <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
+                        <configuration>
+                            <finalName>debezium-samza-service-baseline</finalName>
+                            <attach>false</attach>
+                            <outputDirectory>${project.build.directory}/docker</outputDirectory>
+                            <descriptors>
+                                <descriptor>src/main/assembly/samza-base.xml</descriptor>
+                            </descriptors>
+                        </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Generate the Docker images -->
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <configuration>
+                    <imageName>debezium-samza</imageName>
+                    <dockerDirectory>src/main/docker</dockerDirectory>
+                </configuration>
+            </plugin>
+            <!-- Skip install and deployment altogether (this only builds local resources) -->
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-install-plugin</artifactId>
+              <configuration>
+                <skip>true</skip>
+              </configuration>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-deploy-plugin</artifactId>
+              <configuration>
+                <skip>true</skip>
+              </configuration>
             </plugin>
             <!-- skip the source, test, and JAR assemblies -->
             <plugin>

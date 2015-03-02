@@ -31,7 +31,6 @@
         <scala.label.version>2.10</scala.label.version>
         <curator.version>2.4.0</curator.version>
         <zookeeper.version>3.4.6</zookeeper.version>
-        <avro.version>1.7.7</avro.version>
         <junit.version>4.11</junit.version>
         <fest.version>1.4</fest.version>
         <jackson.version>2.4.0</jackson.version>
@@ -45,11 +44,11 @@
         <jboss.slf4j.logmanager.version>1.0.3.GA</jboss.slf4j.logmanager.version>
 
         <!-- Maven Plugins -->
+        <version.resources.plugin>2.4.2</version.resources.plugin>
         <version.assembly.plugin>2.4</version.assembly.plugin>
-        <version.resourceStates.plugin>2.4.2</version.resourceStates.plugin>
-        <version.vertx.plugin>2.0.1-final</version.vertx.plugin>
         <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
         <version.google.formatter.plugin>0.3.1</version.google.formatter.plugin>
+        <version.spotify.docker.plugin>0.1.2</version.spotify.docker.plugin>
 
         <maven.compiler.argument.source>1.8</maven.compiler.argument.source>
         <maven.compiler.argument.target>1.8</maven.compiler.argument.target>
@@ -59,10 +58,18 @@
     </properties>
     <modules>
         <module>debezium-core</module>
-        <module>debezium-services</module>
+        <module>debezium-dockerfile-samza</module>
+        <module>debezium-service-testing</module>
+        <module>debezium-service-entity-batch</module>
+        <module>debezium-service-entity-storage</module>
+        <module>debezium-service-schema-storage</module>
+        <module>debezium-service-schema-learning-partitioner</module>
+        <module>debezium-service-schema-learning</module>
+        <module>debezium-service-response-accumulator</module>
+        <!--module>debezium-services</module>
         <module>debezium-services-job-package</module>
         <module>debezium-client</module>
-        <module>debezium-example-app</module>
+        <module>debezium-example-app</module-->
     </modules>
     <developers>
         <developer>
@@ -234,6 +241,36 @@
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
+                <artifactId>debezium-entity-batch-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-entity-storage-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-storage-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-learning-partitioner-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-learning-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-response-accumulator-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
                 <artifactId>debezium-services</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -243,6 +280,12 @@
                 <version>${project.version}</version>
             </dependency>
             <!-- Debezium test artifacts -->
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-service-testing</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+            </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-core</artifactId>
@@ -321,11 +364,6 @@
                     <version>${version.failsafe.plugin}</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-resourceStates-plugin</artifactId>
-                    <version>${version.resourceStates.plugin}</version>
-                </plugin>
-                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
                     <version>${version.codehaus.helper.plugin}</version>
@@ -336,14 +374,9 @@
                     <version>${version.google.formatter.plugin}</version>
                 </plugin>
                 <plugin>
-                    <groupId>io.vertx</groupId>
-                    <artifactId>vertx-maven-plugin</artifactId>
-                    <version>${version.vertx.plugin}</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.avro</groupId>
-                    <artifactId>avro-maven-plugin</artifactId>
-                    <version>${avro.version}</version>
+                    <groupId>com.spotify</groupId>
+                    <artifactId>docker-maven-plugin</artifactId>
+                    <version>${version.spotify.docker.plugin}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -379,7 +412,7 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resourceStates-plugin</artifactId>
+                <artifactId>maven-resources-plugin</artifactId>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
