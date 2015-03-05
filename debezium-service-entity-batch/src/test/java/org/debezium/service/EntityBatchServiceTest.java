@@ -16,6 +16,7 @@ import org.debezium.core.doc.Value;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
 import org.debezium.core.message.Topic;
+import org.debezium.samza.AbstractServiceTest;
 import org.junit.Before;
 import org.junit.Test;
 

@@ -1,20 +1,15 @@
-FROM debezium-samza
+FROM debezium-service
 
 MAINTAINER rhauch
 
 #
 # Add this service's files to the Debezium service installation
 #
-ADD debezium-service-contents.tar.gz $DEBEZIUM_HOME
-
-#
-# Set up the ENV for the Kakfa and ZK host and ports
-#
-
-#
-# Set up the data volume ?
-#
+USER root
+ADD debezium-service-dist.tar.gz $DEBEZIUM_HOME
+USER debezium
 
 #
 # Start the service
 #
+CMD ["$DEBEZIUM_HOME/bin/start-service.sh"]

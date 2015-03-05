@@ -25,7 +25,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Major dependencies -->
-        <samza.version>0.7.0</samza.version>
+        <samza.version>0.8.0</samza.version>
         <kafka.version>0.8.1.1</kafka.version>
         <scala.version>2.10.4</scala.version>
         <scala.label.version>2.10</scala.label.version>
@@ -58,8 +58,8 @@
     </properties>
     <modules>
         <module>debezium-core</module>
-        <module>debezium-dockerfile-samza</module>
-        <module>debezium-service-testing</module>
+        <module>debezium-jre8</module>
+        <module>debezium-service</module>
         <module>debezium-service-entity-batch</module>
         <module>debezium-service-entity-storage</module>
         <module>debezium-service-schema-storage</module>
@@ -123,6 +123,26 @@
                 <version>${samza.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kv-rocksdb_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kv-leveldb_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kv-inmemory_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kafka_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
               <groupId>com.fasterxml.jackson.core</groupId>
               <artifactId>jackson-core</artifactId>
               <version>${jackson.version}</version>
@@ -149,11 +169,6 @@
             <dependency>
                 <groupId>org.apache.samza</groupId>
                 <artifactId>samza-yarn_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kafka_${scala.label.version}</artifactId>
                 <version>${samza.version}</version>
             </dependency>
 
@@ -228,6 +243,7 @@
                 <version>${curator.version}</version>
                 <scope>test</scope>
             </dependency>
+
             <!-- Debezium artifacts -->
             <dependency>
                 <groupId>org.debezium</groupId>
@@ -237,6 +253,11 @@
             <dependency>
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-client</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -269,29 +290,20 @@
                 <artifactId>debezium-response-accumulator-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.debezium</groupId>
-                <artifactId>debezium-services</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.debezium</groupId>
-                <artifactId>debezium-services-job-package</artifactId>
-                <version>${project.version}</version>
-            </dependency>
             <!-- Debezium test artifacts -->
-            <dependency>
-                <groupId>org.debezium</groupId>
-                <artifactId>debezium-service-testing</artifactId>
-                <version>${project.version}</version>
-                <scope>test</scope>
-            </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-core</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-service</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
             </dependency>
 
         </dependencies>
@@ -460,6 +472,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Generate the Docker images; by default, skip -->
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <configuration>
+                    <skipDockerBuild>true</skipDockerBuild>
+                </configuration>
             </plugin>
         </plugins>
     </build>

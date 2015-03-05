@@ -14,8 +14,7 @@
 	<name>Debezium Entity Batch Service</name>
 	<packaging>jar</packaging>
     <properties>
-        <samza.log.dir>/debezium/log</samza.log.dir>
-        <samza.container.name>debezium-service</samza.container.name>
+        <samza.job.name>entity-batch-service</samza.job.name>
     </properties>
 	<dependencies>
 		<dependency>
@@ -26,19 +25,11 @@
 			<groupId>org.apache.samza</groupId>
 			<artifactId>samza-api</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-		</dependency>
-		<!-- START all dependencies used for local key-value storage inside the service -->
-		<!--dependency>
-			<groupId>org.apache.samza</groupId>
-			<artifactId>samza-kv_${scala.label.version}</artifactId>
-		</dependency-->
 		<!-- START all dependencies used in the tests -->
 		<dependency>
 			<groupId>org.debezium</groupId>
-			<artifactId>debezium-service-testing</artifactId>
+            <artifactId>debezium-service</artifactId>
+			<type>test-jar</type>
 		</dependency>
 		<dependency>
 			<groupId>org.debezium</groupId>
@@ -80,27 +71,10 @@
 			<plugin>
 				<groupId>com.spotify</groupId>
 				<artifactId>docker-maven-plugin</artifactId>
-				<version>0.1.2</version>
 				<configuration>
+                    <skipDockerBuild>false</skipDockerBuild>
 					<imageName>${project.artifactId}</imageName>
-					<dockerDirectory>src/main/docker</dockerDirectory>
-			        <resources>
-			           <resource>
-			             <targetPath>/</targetPath>
-			             <directory>${project.build.directory}</directory>
-			             <include>${project.build.finalName}.jar</include>
-			           </resource>
-			           <resource>
-			             <targetPath>/</targetPath>
-			             <directory>${project.build.directory}/classes</directory>
-			             <include>log4j.xml</include>
-			           </resource>
-			           <resource>
-			             <targetPath>/</targetPath>
-			             <directory>${project.build.directory}/classes</directory>
-			             <include>debezium-service.properties</include>
-			           </resource>
-			        </resources>
+					<dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
 				</configuration>
 			</plugin>
 		</plugins>

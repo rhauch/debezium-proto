@@ -18,6 +18,7 @@ import org.debezium.core.message.Message.Status;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Topic;
 import org.debezium.core.util.Collect;
+import org.debezium.samza.AbstractServiceTest;
 import org.fest.assertions.Fail;
 import org.junit.Before;
 import org.junit.Test;

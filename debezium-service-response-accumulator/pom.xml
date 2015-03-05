@@ -29,14 +29,11 @@
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-kv_${scala.label.version}</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <!-- Test dependencies -->
+        <!-- START all dependencies used in the tests -->
         <dependency>
             <groupId>org.debezium</groupId>
-            <artifactId>debezium-service-testing</artifactId>
+            <artifactId>debezium-service</artifactId>
+            <type>test-jar</type>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
