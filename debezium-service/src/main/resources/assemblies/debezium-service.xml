@@ -9,23 +9,32 @@
   <includeBaseDirectory>false</includeBaseDirectory>
   <files>
     <!-- filtered=true, so we do variable expansion -->
-    <!--file>
-      <source>${basedir}/src/main/resources/log4j.xml</source>
-      <outputDirectory>lib</outputDirectory>
-      <filtered>true</filtered>
-    </file-->
     <file>
-      <source>${basedir}/src/main/resources/service.properties</source>
+      <source>src/main/resources/service.properties</source>
       <outputDirectory>config</outputDirectory>
       <filtered>true</filtered>
     </file>
   </files>
+  <fileSets>
+    <fileSet>
+      <!-- Include any README, LICENSE, or NOTICE file at the top of the directory structure -->
+      <directory>src/main/resources</directory>
+      <includes>
+        <include>README*</include>
+        <include>LICENSE*</include>
+        <include>NOTICE*</include>
+      </includes>
+    </fileSet>
+  </fileSets>
   <dependencySets>
     <dependencySet>
       <outputDirectory>lib</outputDirectory>
       <includes>
-        <include>${project.groupId}:${project.artifactId}</include>
+        <include>${project.groupId}:*</include>
       </includes>
+      <excludes>
+        <exclude>org.apache.samza:samza-api</exclude>
+      </excludes>
       <useTransitiveFiltering>true</useTransitiveFiltering>
     </dependencySet>
   </dependencySets>

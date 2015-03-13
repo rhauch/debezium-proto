@@ -13,9 +13,6 @@
 	<artifactId>debezium-entity-batch-service</artifactId>
 	<name>Debezium Entity Batch Service</name>
 	<packaging>jar</packaging>
-    <properties>
-        <samza.job.name>entity-batch-service</samza.job.name>
-    </properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.debezium</groupId>
@@ -49,6 +46,13 @@
 		<plugins>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
+                <dependencies>
+					<dependency>
+						<groupId>org.debezium</groupId>
+						<artifactId>debezium-service</artifactId>
+						<version>${project.version}</version>
+					</dependency>
+		        </dependencies>
                 <executions>
                     <execution>
                         <!-- plugin to collect the files needed to build the Samza base Docker image -->
@@ -61,9 +65,9 @@
                             <finalName>debezium-service</finalName>
                             <attach>false</attach>
                             <outputDirectory>${project.build.directory}/docker</outputDirectory>
-                            <descriptors>
-                                <descriptor>src/main/assembly/debezium-service.xml</descriptor>
-                            </descriptors>
+                            <descriptorRefs>
+                                <descriptorRef>debezium-service</descriptorRef>
+                            </descriptorRefs>
                         </configuration>
                     </execution>
                 </executions>

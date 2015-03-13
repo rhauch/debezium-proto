@@ -20,3 +20,43 @@ entitybatch:
   environment:
     KAFKA: kafka:9092
     ZOOKEEPER: zookeeper:2181/
+entitystorage:
+  image: debezium-entity-storage-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
+schemastorage:
+  image: debezium-schema-storage-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
+responseaccumulator:
+  image: debezium-response-accumulator-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
+schemalearningpartitioner:
+  image: debezium-schema-learning-partitioner-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
+schemalearning:
+  image: debezium-schema-learning-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
