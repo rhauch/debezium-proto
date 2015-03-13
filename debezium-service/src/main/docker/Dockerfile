@@ -13,24 +13,19 @@ ENV DEBEZIUM_USER debezium
 #    rm -rf /var/lib/apt/lists/*
 
 #
-# Add the binaries, configuration files, and libraries required to run the Debezium service (via Samza without YARN)
+# Add the binaries, configuration files, and libraries required to run the Debezium service (via Samza without YARN),
+# and remove the Hadoop/YARN lines from the 'run-class.sh' script ...
 #
 ADD debezium-service-baseline-dist.tar.gz $DEBEZIUM_HOME
+RUN sed -i '/HADOOP/d' $DEBEZIUM_HOME/bin/run-class.sh
 
-# Set up a user to run Debezium
+# Set up a user to run Debezium and own all of its files
 RUN groupadd $DEBEZIUM_USER -g 1000 && \
     useradd -d $DEBEZIUM_HOME -u 1000 -g $DEBEZIUM_USER -s /bin/false -c "Debezium user" $DEBEZIUM_USER && \
-    chown -R $DEBEZIUM_USER:$DEBEZIUM_USER $DEBEZIUM_HOME/config $DEBEZIUM_HOME/logs 
+    chown -R $DEBEZIUM_USER:$DEBEZIUM_USER $DEBEZIUM_HOME
 
 # Set the working directory to the Debezium home directory
 WORKDIR $DEBEZIUM_HOME
-
-# Specify the user which should be used to execute all commands below
-USER $DEBEZIUM_USER
-
-#
-# Set up the ENV for the Kakfa and ZK host and ports
-#
 
 #
 # Set up the volume for state data and for logs

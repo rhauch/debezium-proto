@@ -41,7 +41,26 @@ fi
 
 if [[ -n "$JOB_ID" ]]; then
   export DEBEZIUM_TASK_JOB_ID=$JOB_ID
+else
+  export JOB_ID=$(sed -n 's/^job.id*=*//p' $DEBEZIUM_HOME/config/service.properties)
 fi
+
+if [[ -z "$SAMZA_CONTAINER_NAME" ]]; then
+  export SAMZA_CONTAINER_NAME=$(sed -n 's/^job.name*=*//p' $DEBEZIUM_HOME/config/service.properties)
+fi
+
+if [[ -z "$LOG_CONFIG" ]]; then
+  export LOG_CONFIG=$DEBEZIUM_HOME/config/log4j.xml
+fi
+
+if [[ -n "$ZOOKEEPER" ]]; then
+  export DEBEZIUM_SYSTEMS_DEBEZIUM_CONSUMER_ZOOKEEPER_CONNECT=$ZOOKEEPER
+fi
+
+if [[ -n "$KAFKA" ]]; then
+  export DEBEZIUM_SYSTEMS_DEBEZIUM_PRODUCER_METADATA_BROKER_LIST=$KAFKA
+fi
+
 
 for VAR in `env`
 do
@@ -59,6 +78,9 @@ done
 
 # Start the service ...
 
+export JAVA_OPTS="-Xloggc:$DEBEZIUM_HOME/logs/gc.log -Dlog4j.configuration=file:$LOG_CONFIG -Dsamza.log.dir=$DEBEZIUM_HOME/logs -Dsamza.container.name=$SAMZA_CONTAINER_NAME"
+
 $DEBEZIUM_HOME/bin/run-job.sh \
-  --config-factory=samza.config.factories.PropertiesConfigFactory \
-  --config-path=file:$DEBEZIUM_HOME/config/server.properties
+  --config-factory=org.apache.samza.config.factories.PropertiesConfigFactory \
+  --config-path=file:$DEBEZIUM_HOME/config/service.properties \
+  

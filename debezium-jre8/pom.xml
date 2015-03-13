@@ -14,7 +14,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>debezium-jre8</artifactId>
-    <name>Debezium's base Docker image with JRE 8</name>
+    <name>Debezium base Docker image with JRE 8</name>
     <packaging>jar</packaging>
     <dependencies>
     </dependencies>

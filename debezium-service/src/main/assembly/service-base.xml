@@ -45,13 +45,14 @@
     <!-- filtered=true, so we do variable expansion -->
     <file>
       <source>${basedir}/src/main/resources/log4j.xml</source>
-      <outputDirectory>lib</outputDirectory>
+      <outputDirectory>config</outputDirectory>
       <filtered>true</filtered>
     </file>
     <file>
       <source>${basedir}/src/main/resources/start-service.sh</source>
-      <outputDirectory>lib</outputDirectory>
+      <outputDirectory>bin</outputDirectory>
       <filtered>true</filtered>
+      <fileMode>0755</fileMode>
     </file>
   </files>
   <dependencySets>
@@ -73,14 +74,19 @@
     <dependencySet>
       <outputDirectory>lib</outputDirectory>
       <includes>
-        <include>${project.groupId}:${project.artifactId}</include>
+        <!-- Include the Debezium modules required by every service -->
+        <include>${project.groupId}:debezium-samza</include>
+        <!-- Include the optional dependencies -->
+        <include>org.slf4j:*</include>
+        <include>log4j:*</include>
+        <!-- Include the Samza dependencies -->
+        <include>org.apache.samza:samza-api</include>
         <include>org.apache.samza:samza-core_${scala.label.version}</include>
         <include>org.apache.samza:samza-kafka_${scala.label.version}</include>
         <include>org.apache.samza:samza-serializers_${scala.label.version}</include>
         <include>org.apache.samza:samza-kv_${scala.label.version}</include>
         <include>org.apache.kafka:kafka_${scala.label.version}</include>
-        <include>org.slf4j:slf4j-log4j12</include>
-        <!-- Exclude the YARN-related files
+        <!-- Exclude the YARN-related Samza dependencies
         <include>org.apache.samza:samza-yarn_${scala.label.version}</include>
         <include>org.apache.hadoop:hadoop-hdfs</include>
         -->

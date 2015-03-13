@@ -49,6 +49,7 @@
         <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
         <version.google.formatter.plugin>0.3.1</version.google.formatter.plugin>
         <version.spotify.docker.plugin>0.1.2</version.spotify.docker.plugin>
+        <version.scala.plugin>2.15.2</version.scala.plugin>
 
         <maven.compiler.argument.source>1.8</maven.compiler.argument.source>
         <maven.compiler.argument.target>1.8</maven.compiler.argument.target>
@@ -59,6 +60,7 @@
     <modules>
         <module>debezium-core</module>
         <module>debezium-jre8</module>
+        <module>debezium-samza</module>
         <module>debezium-service</module>
         <module>debezium-service-entity-batch</module>
         <module>debezium-service-entity-storage</module>
@@ -67,9 +69,9 @@
         <module>debezium-service-schema-learning</module>
         <module>debezium-service-response-accumulator</module>
         <!--module>debezium-services</module>
-        <module>debezium-services-job-package</module>
-        <module>debezium-client</module>
-        <module>debezium-example-app</module-->
+        <module>debezium-services-job-package</module-->
+        <module>debezium-driver</module>
+        <!--module>debezium-example-app</module-->
     </modules>
     <developers>
         <developer>
@@ -243,6 +245,13 @@
                 <version>${curator.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-core_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
 
             <!-- Debezium artifacts -->
             <dependency>
@@ -252,7 +261,12 @@
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
-                <artifactId>debezium-client</artifactId>
+                <artifactId>debezium-driver</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-samza</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -390,6 +404,11 @@
                     <artifactId>docker-maven-plugin</artifactId>
                     <version>${version.spotify.docker.plugin}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.scala-tools</groupId>
+                    <artifactId>maven-scala-plugin</artifactId>
+                    <version>${version.scala.plugin}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -402,6 +421,12 @@
                         <phase>verify</phase>
                         <goals>
                             <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>attach-test-sources</id>
+                        <goals>
+                            <goal>test-jar-no-fork</goal>
                         </goals>
                     </execution>
                 </executions>

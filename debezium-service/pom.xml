@@ -17,11 +17,6 @@
     <name>Debezium baseline for service</name>
     <packaging>jar</packaging>
     <dependencies>
-        <!-- Our Samza extension needs only the API artifact -->
-        <dependency>
-            <groupId>org.apache.samza</groupId>
-            <artifactId>samza-api</artifactId>
-        </dependency>
         <!-- Test-related dependencies -->
         <dependency>
             <groupId>org.debezium</groupId>
@@ -44,14 +39,24 @@
         <!-- Dependencies for the artifacts we put into the Docker image -->
         <dependency>
             <groupId>org.apache.samza</groupId>
-            <artifactId>samza-shell</artifactId>
-            <classifier>dist</classifier>
-            <type>tgz</type>
+            <artifactId>samza-api</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-core_${scala.label.version}</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.debezium</groupId>
+            <artifactId>debezium-samza</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.samza</groupId>
+            <artifactId>samza-shell</artifactId>
+            <classifier>dist</classifier>
+            <type>tgz</type>
             <scope>runtime</scope>
         </dependency>
         <dependency>
