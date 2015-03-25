@@ -34,10 +34,13 @@
         <junit.version>4.11</junit.version>
         <fest.version>1.4</fest.version>
         <jackson.version>2.4.0</jackson.version>
+        <!-- Kafka uses Metrics 2.2.0, but Metrics 3.x uses a different package
+             structure so it can be used alongside 2.x within the same classloader -->
+        <metrics.version>3.1.0</metrics.version>
 
         <!-- Logging stuff -->
-        <jboss.logging.version>3.1.4.GA</jboss.logging.version>
-        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version>
+        <!--jboss.logging.version>3.1.4.GA</jboss.logging.version>
+        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version-->
         <log4j.version>1.2.16</log4j.version>
         <org.slf4j.version>1.7.2</org.slf4j.version>
         <slf4j.log4j.version>1.7.2</slf4j.log4j.version>
@@ -174,10 +177,19 @@
                 <artifactId>samza-yarn_${scala.label.version}</artifactId>
                 <version>${samza.version}</version>
             </dependency>
-
+            <dependency>
+                <groupId>io.dropwizard.metrics</groupId>
+                <artifactId>metrics-core</artifactId>
+                <version>${metrics.version}</version>
+            </dependency>
 
             <!-- Logging dependencies -->
             <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${org.slf4j.version}</version>
+            </dependency>
+            <!--dependency>
                 <groupId>org.jboss.msc</groupId>
                 <artifactId>jboss-msc</artifactId>
                 <version>${jboss.msc.version}</version>
@@ -193,15 +205,10 @@
                 <version>${jboss.logmanager.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${org.slf4j.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.jboss.slf4j</groupId>
                 <artifactId>slf4j-jboss-logmanager</artifactId>
                 <version>${jboss.slf4j.logmanager.version}</version>
-            </dependency>
+            </dependency-->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-log4j12</artifactId>

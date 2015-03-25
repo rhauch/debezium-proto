@@ -60,3 +60,11 @@ schemalearning:
   environment:
     KAFKA: kafka:9092
     ZOOKEEPER: zookeeper:2181/
+metrics:
+  image: debezium-metrics-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/

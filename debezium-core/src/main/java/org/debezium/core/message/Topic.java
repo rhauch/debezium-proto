@@ -23,6 +23,7 @@ public class Topic {
     public static final String ZONE_CHANGES = "zone-changes";
     public static final String CHANGES_BY_DEVICE = "changes-by-device";
     public static final String REQUEST_NOTIFICATIONS = "request-notifications";
+    public static final String METRICS = "metrics";
     
     private Topic() {
     }

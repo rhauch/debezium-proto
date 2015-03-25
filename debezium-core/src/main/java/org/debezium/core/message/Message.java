@@ -513,6 +513,14 @@ public final class Message {
     public static boolean includeBefore(Document message) {
         return message.getBoolean(Field.INCLUDE_BEFORE, false);
     }
+    
+    public static long getDurationInMillis( Document message ) {
+        long begun = message.getLong(Field.BEGUN,-1);
+        long ended = message.getLong(Field.ENDED, -1);
+        if ( begun <= 0L || ended <= 0L ) return -1;
+        assert ended >= begun;
+        return ended - begun;
+    }
 
     public static int getParts(Document message) {
         return message.getInteger(Field.PARTS, 1);
@@ -528,6 +536,15 @@ public final class Message {
         assert parts >= 0;
         message.setNumber(Field.PART, part);
         message.setNumber(Field.PARTS, parts);
+    }
+    
+    public static boolean hasOps( Document message ) {
+        Array array = message.getArray(Field.OPS);
+        return array == null || array.isEmpty();
+    }
+    
+    public static boolean isReadOnly( Document message ) {
+        return !hasOps(message);
     }
 
     public static Action determineAction(Document message) {
