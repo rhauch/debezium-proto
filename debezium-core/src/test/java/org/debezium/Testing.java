@@ -5,8 +5,6 @@
  */
 package org.debezium;
 
-import static org.fest.assertions.Assertions.assertThat;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileSystems;
@@ -21,6 +19,8 @@ import java.util.Set;
 import org.debezium.core.util.IoUtil;
 import org.fest.assertions.Fail;
 import org.junit.Before;
+
+import static org.fest.assertions.Assertions.assertThat;
 
 /**
  * A set of utility methods for test cases.

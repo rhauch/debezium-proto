@@ -72,10 +72,9 @@
         <module>debezium-service-schema-learning</module>
         <module>debezium-service-response-accumulator</module>
         <module>debezium-service-metrics</module>
-        <!--module>debezium-services</module>
-        <module>debezium-services-job-package</module-->
         <module>debezium-driver</module>
-        <!--module>debezium-example-app</module-->
+        <module>debezium-example-app</module>
+        <module>debezium-example-load-app</module>
     </modules>
     <developers>
         <developer>
