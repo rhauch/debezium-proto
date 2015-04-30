@@ -24,11 +24,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.debezium.Stopwatch;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.util.CommandLineOptions;
+import org.debezium.core.util.Stopwatch;
 import org.debezium.driver.Configuration;
 import org.debezium.driver.Database;
 import org.debezium.driver.Debezium;
@@ -74,7 +74,7 @@ public class LoadApp {
         final String device = options.getOption("-D", "--device", UUID.randomUUID().toString());
         final String entityTypeName = options.getOption("-e", "--entity-type", "contact");
         final int numThreads = options.getOption("-t", "--threads", 1);
-        final int numRequestsPerThread = options.getOption("-r", "--requests", 10000);
+        final int numRequestsPerThread = options.getOption("-r", "--requests-per-thread", 10000);
         verbose = options.getOption("-v", "--verbose", false);
         if (options.hasUnknowns()) {
             print("Unknown option: " + options.getFirstUnknownOptionName());
@@ -229,7 +229,7 @@ public class LoadApp {
         print("usage:  " + LoadApp.class.getSimpleName() + " [--version] [-?|--help] [-c|--config <path>]");
         print("          [-d|--db <database-name>] [-D|--device <device-id>]");
         print("          [-e|--entity-type <entity-type-name>] [-t|--threads <num-threads>]");
-        print("          [-r|--requests <num-requests-per-thread>] [-v|--verbose]");
+        print("          [-r|--requests-per-thread <num-requests-per-thread>] [-v|--verbose]");
         print("");
     }
 

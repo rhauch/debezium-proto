@@ -43,7 +43,7 @@ import com.codahale.metrics.Snapshot;
  * @author Randall Hauch
  */
 @NotThreadSafe
-public class MetricService implements StreamTask, InitableTask, WindowableTask {
+public final class MetricService implements StreamTask, InitableTask, WindowableTask {
 
     private static final SystemStream METRICS = new SystemStream("debezium", Topic.METRICS);
     private static final String ENTITY_READ_DURATIONS = "debezium.entity.reads.time";
@@ -56,7 +56,33 @@ public class MetricService implements StreamTask, InitableTask, WindowableTask {
     private static final String ENTITY_COUNT = "debezium.entity.count";
     private static final String RESPONSE_PARTS_PREFIX = "debezium.entity.response.count.";
     
-    private static final MetricRegistry metrics = new MetricRegistry();
+    protected static final class MetricFields {
+        public static final String ENTITY_COUNT = "entity-count";
+        public static final String ENTITY_OPS = "entity-ops";
+        public static final String CREATES = "creates";
+        public static final String UPDATES = "updates";
+        public static final String DELETES = "deletes";
+        public static final String ENTITY_BATCHES = "entity-batches";
+        public static final String ENTITY_READS = "entity-reads";
+        public static final String ENTITY_WRITES = "entity-writes";
+        public static final String RATES_PER_SECOND = "rates-per-second";
+        public static final String RATES_1MIN = "1min";
+        public static final String RATES_5MIN = "5min";
+        public static final String RATES_15MIN = "15min";
+        public static final String TIMES_IN_MILLIS = "times-in-millis";
+        public static final String TIMES_MIN = "min";
+        public static final String TIMES_MAX = "max";
+        public static final String TIMES_STD_DEV = "stddev";
+        public static final String TIMES_MEAN = "mean";
+        public static final String TIMES_MEDIAN = "median";
+        public static final String TIMES_75P = "75p";
+        public static final String TIMES_95P = "95p";
+        public static final String TIMES_98P = "98p";
+        public static final String TIMES_99P = "99p";
+        public static final String TIMES_999P = "999p";
+    }
+    
+    private final MetricRegistry metrics = new MetricRegistry();
 
     private Histogram entityReadDurations;
     private Histogram entityWriteDurations;
@@ -69,7 +95,7 @@ public class MetricService implements StreamTask, InitableTask, WindowableTask {
     private Counter entities;
 
     @Override
-    public void init(Config config, TaskContext context) throws Exception {
+    public void init(Config config, TaskContext context) {
         // Register all of the metrics that we'll use ...
         entityReadDurations = metrics.register(ENTITY_READ_DURATIONS, new Histogram(new ExponentiallyDecayingReservoir()));
         entityWriteDurations = metrics.histogram(ENTITY_WRITE_DURATIONS);
@@ -89,44 +115,44 @@ public class MetricService implements StreamTask, InitableTask, WindowableTask {
         Snapshot writeDurations = entityWriteDurations.getSnapshot();
 
         Document report = Document.create();
-        report.setNumber("entity-count",entities.getCount());
-        report.setDocument("entity-ops")
-              .setNumber("creates", creates.getCount())
-              .setNumber("updates", updates.getCount())
-              .setNumber("deletes", deletes.getCount());
-        parts.write(report.setDocument("entity-batches"));
-        Document reads = report.setDocument("entity-reads");
-        reads.setDocument("rates-per-second")
-             .setNumber("1min", entityReadRatePerSecond.getOneMinuteRate())
-             .setNumber("5min", entityReadRatePerSecond.getFiveMinuteRate())
-             .setNumber("15min", entityReadRatePerSecond.getFifteenMinuteRate());
-        reads.setDocument("times-in-millis")
-             .setNumber("min", readDurations.getMin())
-             .setNumber("max", readDurations.getMax())
-             .setNumber("stddev", readDurations.getStdDev())
-             .setNumber("mean", readDurations.getMean())
-             .setNumber("median", readDurations.getMedian())
-             .setNumber("75p", readDurations.get75thPercentile())
-             .setNumber("95p", readDurations.get95thPercentile())
-             .setNumber("98p", readDurations.get98thPercentile())
-             .setNumber("99p", readDurations.get99thPercentile())
-             .setNumber("999p", readDurations.get999thPercentile());
-        Document writes = report.setDocument("entity-writes");
-        writes.setDocument("rates-per-second")
-              .setNumber("1min", entityWriteRatePerSecond.getOneMinuteRate())
-              .setNumber("5min", entityWriteRatePerSecond.getFiveMinuteRate())
-              .setNumber("15min", entityWriteRatePerSecond.getFifteenMinuteRate());
-        writes.setDocument("times-in-millis")
-              .setNumber("min", writeDurations.getMin())
-              .setNumber("max", writeDurations.getMax())
-              .setNumber("stddev", writeDurations.getStdDev())
-              .setNumber("mean", writeDurations.getMean())
-              .setNumber("median", writeDurations.getMedian())
-              .setNumber("75p", writeDurations.get75thPercentile())
-              .setNumber("95p", writeDurations.get95thPercentile())
-              .setNumber("98p", writeDurations.get98thPercentile())
-              .setNumber("99p", writeDurations.get99thPercentile())
-              .setNumber("999p", writeDurations.get999thPercentile());
+        report.setNumber(MetricFields.ENTITY_COUNT,entities.getCount());
+        report.setDocument(MetricFields.ENTITY_OPS)
+              .setNumber(MetricFields.CREATES, creates.getCount())
+              .setNumber(MetricFields.UPDATES, updates.getCount())
+              .setNumber(MetricFields.DELETES, deletes.getCount());
+        parts.write(report.setDocument(MetricFields.ENTITY_BATCHES));
+        Document reads = report.setDocument(MetricFields.ENTITY_READS);
+        reads.setDocument(MetricFields.RATES_PER_SECOND)
+             .setNumber(MetricFields.RATES_1MIN, entityReadRatePerSecond.getOneMinuteRate())
+             .setNumber(MetricFields.RATES_5MIN, entityReadRatePerSecond.getFiveMinuteRate())
+             .setNumber(MetricFields.RATES_15MIN, entityReadRatePerSecond.getFifteenMinuteRate());
+        reads.setDocument(MetricFields.TIMES_IN_MILLIS)
+             .setNumber(MetricFields.TIMES_MIN, readDurations.getMin())
+             .setNumber(MetricFields.TIMES_MAX, readDurations.getMax())
+             .setNumber(MetricFields.TIMES_STD_DEV, readDurations.getStdDev())
+             .setNumber(MetricFields.TIMES_MEAN, readDurations.getMean())
+             .setNumber(MetricFields.TIMES_MEDIAN, readDurations.getMedian())
+             .setNumber(MetricFields.TIMES_75P, readDurations.get75thPercentile())
+             .setNumber(MetricFields.TIMES_95P, readDurations.get95thPercentile())
+             .setNumber(MetricFields.TIMES_98P, readDurations.get98thPercentile())
+             .setNumber(MetricFields.TIMES_99P, readDurations.get99thPercentile())
+             .setNumber(MetricFields.TIMES_999P, readDurations.get999thPercentile());
+        Document writes = report.setDocument(MetricFields.ENTITY_WRITES);
+        writes.setDocument(MetricFields.RATES_PER_SECOND)
+              .setNumber(MetricFields.RATES_1MIN, entityWriteRatePerSecond.getOneMinuteRate())
+              .setNumber(MetricFields.RATES_5MIN, entityWriteRatePerSecond.getFiveMinuteRate())
+              .setNumber(MetricFields.RATES_15MIN, entityWriteRatePerSecond.getFifteenMinuteRate());
+        writes.setDocument(MetricFields.TIMES_IN_MILLIS)
+              .setNumber(MetricFields.TIMES_MIN, writeDurations.getMin())
+              .setNumber(MetricFields.TIMES_MAX, writeDurations.getMax())
+              .setNumber(MetricFields.TIMES_STD_DEV, writeDurations.getStdDev())
+              .setNumber(MetricFields.TIMES_MEAN, writeDurations.getMean())
+              .setNumber(MetricFields.TIMES_MEDIAN, writeDurations.getMedian())
+              .setNumber(MetricFields.TIMES_75P, writeDurations.get75thPercentile())
+              .setNumber(MetricFields.TIMES_95P, writeDurations.get95thPercentile())
+              .setNumber(MetricFields.TIMES_98P, writeDurations.get98thPercentile())
+              .setNumber(MetricFields.TIMES_99P, writeDurations.get99thPercentile())
+              .setNumber(MetricFields.TIMES_999P, writeDurations.get999thPercentile());
 
         collector.send(new OutgoingMessageEnvelope(METRICS, report));
 
@@ -142,7 +168,7 @@ public class MetricService implements StreamTask, InitableTask, WindowableTask {
         Document compositeResponse = (Document) env.getMessage();
 
         // Process the composite response ...
-        int partCount = Message.getParts(compositeResponse);
+        int partCount = Message.getParts(compositeResponse,0);
         if (partCount > 0) {
             parts.record(partCount);
             Message.forEachPartialResponse(compositeResponse, (id, partialNumber, request, response) -> {

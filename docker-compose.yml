@@ -52,19 +52,19 @@ metrics:
   environment:
     KAFKA: kafka:9092
     ZOOKEEPER: zookeeper:2181/
-schemalearningpartitioner:
-  image: debezium-schema-learning-partitioner-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-schemalearning:
-  image: debezium-schema-learning-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
+# schemalearningpartitioner:
+#   image: debezium-schema-learning-partitioner-service
+#   links:
+#     - zookeeper:zookeeper
+#     - kafka:kafka
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/
+# schemalearning:
+#   image: debezium-schema-learning-service
+#   links:
+#     - zookeeper:zookeeper
+#     - kafka:kafka
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/

@@ -526,8 +526,16 @@ public final class Message {
         return message.getInteger(Field.PARTS, 1);
     }
 
+    public static int getParts(Document message, int defaultParts ) {
+        return message.getInteger(Field.PARTS, defaultParts);
+    }
+
     public static int getPart(Document message) {
         return message.getInteger(Field.PART, 1);
+    }
+
+    public static int getPart(Document message, int defaultPart) {
+        return message.getInteger(Field.PART, defaultPart);
     }
 
     public static void setParts(Document message, int part, int parts) {
@@ -540,17 +548,18 @@ public final class Message {
     
     public static boolean hasOps( Document message ) {
         Array array = message.getArray(Field.OPS);
-        return array == null || array.isEmpty();
+        return array != null && !array.isEmpty();
     }
     
     public static boolean isReadOnly( Document message ) {
-        return !hasOps(message);
+        Array array = message.getArray(Field.OPS);
+        return array == null || array.isEmpty();
     }
 
     public static Action determineAction(Document message) {
-        boolean includesBefore = getAfter(message) != null;
+        boolean includesBefore = getBefore(message) != null;
         if (includesBefore) {
-            boolean includesAfter = getBefore(message) != null;
+            boolean includesAfter = getAfter(message) != null;
             return includesAfter ? Action.UPDATED : Action.DELETED;
         }
         return Action.CREATED;

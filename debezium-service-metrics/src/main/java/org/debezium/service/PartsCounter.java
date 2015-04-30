@@ -35,7 +35,7 @@ public final class PartsCounter {
     }
     
     public void record( int partCount ) {
-        if ( partCount > 1 ) findCounter(partCount).inc();
+        if ( partCount > 0 ) findCounter(partCount).inc();
     }
     
     public void reset() {
@@ -72,6 +72,13 @@ public final class PartsCounter {
     
     private void reset( Counter counter ) {
         counter.dec(counter.getCount());
+    }
+    
+    @Override
+    public String toString() {
+        Document doc = Document.create();
+        write(doc);
+        return doc.toString();
     }
 
 }

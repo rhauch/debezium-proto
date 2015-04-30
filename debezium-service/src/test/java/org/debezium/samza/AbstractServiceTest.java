@@ -26,6 +26,7 @@ import org.apache.samza.task.StreamTask;
 import org.apache.samza.task.TaskContext;
 import org.apache.samza.task.TaskCoordinator;
 import org.apache.samza.task.TaskCoordinator.RequestScope;
+import org.apache.samza.task.WindowableTask;
 import org.debezium.Testing;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Array;
@@ -69,11 +70,21 @@ public abstract class AbstractServiceTest implements Testing {
         try {
             service.process(input(key, message), output, coordinator());
         } catch (Throwable t) {
-            Fail.fail("Error invoking service", t);
+            Fail.fail("Error invoking 'process' on service", t);
         }
         return output;
     }
-    
+
+    protected OutputMessages window(WindowableTask service) {
+        OutputMessages output = new OutputMessages();
+        try {
+            service.window(output, coordinator());
+        } catch (Throwable t) {
+            Fail.fail("Error invoking 'window' on service", t);
+        }
+        return output;
+    }
+
     protected IncomingMessageEnvelope input(Object key, Object message) {
         return input("inputTopic", key, message);
     }
@@ -200,6 +211,7 @@ public abstract class AbstractServiceTest implements Testing {
     
     protected OutputMessageValidator assertNextMessage(OutputMessages messages) {
         OutgoingMessageEnvelope env = messages.removeFirst();
+        Testing.print(env.getMessage());
         return new OutputMessageValidator() {
             @Override
             public OutputMessageValidator hasKey(Object key) {

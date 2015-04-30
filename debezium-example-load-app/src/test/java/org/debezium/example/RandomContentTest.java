@@ -12,13 +12,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.DoubleAccumulator;
 
-import org.debezium.Stopwatch;
 import org.debezium.Testing;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
+import org.debezium.core.util.Stopwatch;
 import org.debezium.example.RandomContent.ContentGenerator;
 import org.debezium.example.RandomContent.IdGenerator;
 import org.junit.Before;

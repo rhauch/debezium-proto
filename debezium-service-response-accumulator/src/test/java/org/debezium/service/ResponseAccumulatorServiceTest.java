@@ -8,6 +8,7 @@ package org.debezium.service;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.debezium.Testing;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
@@ -54,6 +55,7 @@ public class ResponseAccumulatorServiceTest extends AbstractServiceTest {
     
     @Test
     public void shouldStoreFirstResponseForMultipleParts() {
+        Testing.Print.enable();
         // Fire the first of 2 messages, so nothing will be output ...
         Document msg1 = Document.create();
         Message.addId(msg1, ID1);
