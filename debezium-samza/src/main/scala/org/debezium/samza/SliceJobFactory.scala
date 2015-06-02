@@ -11,10 +11,12 @@ import org.apache.samza.SamzaException
 import org.apache.samza.config.Config
 import org.apache.samza.config.ShellCommandConfig._
 import org.apache.samza.config.TaskConfig._
-import org.apache.samza.container.{TaskNamesToSystemStreamPartitions, SamzaContainer}
+import org.apache.samza.container.SamzaContainer
 import org.apache.samza.job.{StreamJob, StreamJobFactory}
+import org.apache.samza.job.model.ContainerModel
 import org.apache.samza.util.Util
 import org.apache.samza.config.JobConfig._
+import org.apache.samza.coordinator.JobCoordinator
 
 /**
  * Creates a new SliceJob job with the given config. A SliceJob is a special form of StreamJob that operates upon a 
@@ -34,29 +36,17 @@ class SliceJobFactory extends StreamJobFactory with Logging {
     val partitionRange = config.get("job.partition.range","ALL")
     info("Job '%s' will use partitions '%s' and %s threads/containers" format (config.get("job.name"),config.get("job.partition.range"),numContainers))
 
-    // Figure out the task names and partitions for each container in this job (as specified by job name and ID) ...
-    val taskToTaskNames: Map[Int, TaskNamesToSystemStreamPartitions] = Util.assignContainerToSSPTaskNames(config, numContainers)
-    if (taskToTaskNames.size <= 0) {
-      val streams = config.getInputStreams
-      throw new SamzaException("No SystemStreamPartitions to process were detected for your input streams in slice %s. It's likely that the system(s) specified don't know about the input streams: %s" format (partitionRange, streams))
-    }
-
-    // Give developers a nice friendly warning if they've specified task.opts and are using a threaded job.
-    config.getTaskOpts match {
-      case Some(taskOpts) => warn("%s was specified in config, but is not being used because job is being executed with SliceJob that does not start another process." format TASK_JVM_OPTS)
-      case _ => None
-    }
-
-    // Determine all of the change log partitions for each task in this job (as specified by job name and ID) ...
-    val taskNameToChangeLogPartitionMapping = Util.getTaskNameToChangeLogPartitionMapping(config, taskToTaskNames).map(kv => kv._1 -> Integer.valueOf(kv._2))
-
-    // Create the list of slice containers ...
-    val containers = taskToTaskNames.toList.map{kv => 
-      val containerName = "partition-slice-"+kv._1
-      new SliceContainer(containerName, SamzaContainer(containerName,kv._2,taskNameToChangeLogPartitionMapping,config))
+    val coordinator = JobCoordinator(config, 1)
+    val containerModels:Iterable[ContainerModel] = scala.collection.JavaConversions.collectionAsScalaIterable(coordinator.jobModel.getContainers.values)
+    val sliceContainers = containerModels.map{ containerModel:ContainerModel =>
+      new SliceContainer(containerModel.getContainerId(),SamzaContainer(containerModel,config)) 
     }
     
-    // Create the job ...
-    new SliceJob(containers)
+    try {
+      coordinator.start
+      new SliceJob(sliceContainers)
+    } finally {
+      coordinator.stop
+    }
   }
 }

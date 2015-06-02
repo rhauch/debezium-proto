@@ -13,7 +13,7 @@ import org.apache.samza.job.ApplicationStatus.Running
 import org.apache.samza.job.ApplicationStatus.SuccessfulFinish
 import org.apache.samza.job.ApplicationStatus.UnsuccessfulFinish
 
-class SliceJob(private val containers: Seq[SliceContainer]) extends StreamJob with Logging {
+class SliceJob(private val containers: Iterable[SliceContainer]) extends StreamJob with Logging {
 
   def submit: StreamJob = {
 

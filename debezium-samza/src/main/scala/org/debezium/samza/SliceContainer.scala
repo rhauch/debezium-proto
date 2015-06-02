@@ -14,7 +14,7 @@ import org.apache.samza.job.ApplicationStatus.UnsuccessfulFinish
 import org.apache.samza.util.Logging
 
 class SliceContainer(
-  val name: String, 
+  val containerId: Int, 
   private val container: Runnable) extends Logging {
   var thread: Thread = null
   @volatile var jobStatus: Option[ApplicationStatus] = None
@@ -39,7 +39,7 @@ class SliceContainer(
         }
       }
     }
-    thread.setName(name)
+    thread.setName("SliceContainer" + containerId)
     thread.start
     jobStatus = Some(Running)
   }

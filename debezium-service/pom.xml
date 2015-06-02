@@ -61,11 +61,6 @@
         </dependency>
         <dependency>
             <groupId>org.apache.samza</groupId>
-            <artifactId>samza-serializers_${scala.label.version}</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.samza</groupId>
             <artifactId>samza-kv_${scala.label.version}</artifactId>
             <scope>runtime</scope>
         </dependency>

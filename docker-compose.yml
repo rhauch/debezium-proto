@@ -3,13 +3,13 @@ zookeeper:
   ports:
     - "2181:2181"
 kafka:
-  image: wurstmeister/kafka:0.8.2.0
+  image: wurstmeister/kafka:0.8.2.1
   ports:
     - "9092:9092"
   links:
     - zookeeper:zk
-  environment:
-    KAFKA_ADVERTISED_HOST_NAME: 10.0.1.8
+#  environment:
+#    KAFKA_ADVERTISED_HOST_NAME: 172.17.0.119
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
 entitybatch:
@@ -20,51 +20,52 @@ entitybatch:
   environment:
     KAFKA: kafka:9092
     ZOOKEEPER: zookeeper:2181/
-entitystorage:
-  image: debezium-entity-storage-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-schemastorage:
-  image: debezium-schema-storage-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-responseaccumulator:
-  image: debezium-response-accumulator-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-metrics:
-  image: debezium-metrics-service
-  links:
-    - zookeeper:zookeeper
-    - kafka:kafka
-  environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-# schemalearningpartitioner:
-#   image: debezium-schema-learning-partitioner-service
+    CHECKPOINT_REPLICATION: 1
+# entitystorage:
+#   image: debezium-entity-storage-service
 #   links:
 #     - zookeeper:zookeeper
 #     - kafka:kafka
 #   environment:
 #     KAFKA: kafka:9092
 #     ZOOKEEPER: zookeeper:2181/
-# schemalearning:
-#   image: debezium-schema-learning-service
+# schemastorage:
+#   image: debezium-schema-storage-service
 #   links:
 #     - zookeeper:zookeeper
 #     - kafka:kafka
 #   environment:
 #     KAFKA: kafka:9092
 #     ZOOKEEPER: zookeeper:2181/
+# responseaccumulator:
+#   image: debezium-response-accumulator-service
+#   links:
+#     - zookeeper:zookeeper
+#     - kafka:kafka
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/
+# metrics:
+#   image: debezium-metrics-service
+#   links:
+#     - zookeeper:zookeeper
+#     - kafka:kafka
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/
+# # schemalearningpartitioner:
+# #   image: debezium-schema-learning-partitioner-service
+# #   links:
+# #     - zookeeper:zookeeper
+# #     - kafka:kafka
+# #   environment:
+# #     KAFKA: kafka:9092
+# #     ZOOKEEPER: zookeeper:2181/
+# # schemalearning:
+# #   image: debezium-schema-learning-service
+# #   links:
+# #     - zookeeper:zookeeper
+# #     - kafka:kafka
+# #   environment:
+# #     KAFKA: kafka:9092
+# #     ZOOKEEPER: zookeeper:2181/

@@ -48,10 +48,7 @@ public class KafkaTestCluster {
     }
 
     private static KafkaConfig getKafkaConfig(final String zkConnectString, File kafkaLogDir) {
-        scala.collection.Iterator<Properties> propsI =
-                TestUtils.createBrokerConfigs(1).iterator();
-        assert propsI.hasNext();
-        Properties props = propsI.next();
+        Properties props = TestUtils.createBrokerConfig(1,TestUtils.choosePort(),true);
         assert props.containsKey("zookeeper.connect");
         props.put("zookeeper.connect", zkConnectString);
         props.put("log.dir", kafkaLogDir.getAbsolutePath());

@@ -8,6 +8,7 @@ package org.debezium.example;
 import org.debezium.driver.Configuration;
 import org.debezium.driver.Debezium;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class LoadAppTest {
@@ -19,11 +20,13 @@ public class LoadAppTest {
         LoadApp.clientFactory = this::mock;
     }
     
+    @Ignore
     @Test
     public void testVerbose() {
         LoadApp.main(args("-v","-r","1000003","-t","1"));
     }
 
+    @Ignore
     @Test
     public void testNonVerbose() {
         LoadApp.main(args("-r","1000003","-t","3"));

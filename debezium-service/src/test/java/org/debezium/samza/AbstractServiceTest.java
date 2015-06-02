@@ -385,6 +385,10 @@ public abstract class AbstractServiceTest implements Testing {
             public MetricsRegistry getMetricsRegistry() {
                 return null;
             }
+
+            @Override
+            public void setStartingOffset(SystemStreamPartition ssp, String offset) {
+            }
         };
     }
     

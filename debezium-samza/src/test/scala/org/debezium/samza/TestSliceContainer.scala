@@ -25,7 +25,7 @@ import org.apache.samza.job.ApplicationStatus
 class TestSliceContainer {
   @Test
   def testSliceContainerShouldFinishOnItsOwn {
-    val job = new SliceContainer("jobX",new Runnable {
+    val job = new SliceContainer(1,new Runnable {
       override def run {
       }
     })
@@ -35,7 +35,7 @@ class TestSliceContainer {
 
   @Test
   def testSliceContainerKillShouldWork {
-    val job = new SliceContainer("jobX",new Runnable {
+    val job = new SliceContainer(1,new Runnable {
       override def run {
         Thread.sleep(999999)
       }

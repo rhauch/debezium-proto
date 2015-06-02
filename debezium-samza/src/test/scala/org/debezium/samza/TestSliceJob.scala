@@ -25,7 +25,7 @@ import org.apache.samza.job.ApplicationStatus
 class TestSliceJob {
   @Test
   def testSliceJobWithOneContainerShouldFinishOnItsOwn {
-    val container = new SliceContainer("doneImmediately",new Runnable {
+    val container = new SliceContainer(1,new Runnable {
       override def run {
       }
     })
@@ -36,7 +36,7 @@ class TestSliceJob {
 
   @Test
   def testSliceJobKillShouldWork {
-    val container = new SliceContainer("neverEnding",new Runnable {
+    val container = new SliceContainer(1,new Runnable {
       override def run {
         Thread.sleep(999999)
       }
@@ -52,11 +52,11 @@ class TestSliceJob {
   
   @Test
   def testSliceJobWithTwoContainersShouldHaveCorrectStatus {
-    val container1 = new SliceContainer("doneImmediately",new Runnable {
+    val container1 = new SliceContainer(1,new Runnable {
       override def run {
       }
     })
-    val container2 = new SliceContainer("neverEnding",new Runnable {
+    val container2 = new SliceContainer(1,new Runnable {
       override def run {
         Thread.sleep(999999)
       }
