@@ -14,4 +14,4 @@ USER $DEBEZIUM_USER
 #
 # Start the service
 #
-CMD bin/start-service.sh
+#CMD bin/start-service.sh

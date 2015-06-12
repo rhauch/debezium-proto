@@ -65,10 +65,11 @@
         <module>debezium-docker-jre8</module>
         <module>debezium-docker-zookeeper</module>
         <module>debezium-docker-kafka</module>
-        <!--module>debezium-samza</module>
+        <module>debezium-samza</module>
+        <module>debezium-assembly-descriptors</module>
         <module>debezium-service</module>
         <module>debezium-service-entity-batch</module>
-        <module>debezium-service-entity-storage</module>
+        <!--module>debezium-service-entity-storage</module>
         <module>debezium-service-schema-storage</module>
         <module>debezium-service-schema-learning-partitioner</module>
         <module>debezium-service-schema-learning</module>

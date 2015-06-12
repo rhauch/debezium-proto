@@ -19,22 +19,22 @@ kafka:
   environment:
     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     KAFKA_ADVERTISED_PORT: 9092
-    KAFKA_EXTRA_PROPERTY: 1234
+    KAFKA_CREATE_TOPICS: "entity-batches:1:1,entity-patches:1:1,entity-updates:1:1"
     #KAFKA_ADVERTISED_HOST_NAME: 10.3.229.109
   volumes:
     - ./data/kafka/:/kafka/data
     - ./logs/kafka/:/kafka/logs
 #    - /var/run/docker.sock:/var/run/docker.sock
-#entitybatch:
-#  image: debezium-entity-batch-service
-#  links:
-#    - zookeeper:zookeeper
-#    - kafka:kafka
-#  environment:
-#    KAFKA: kafka:9092
-#    ZOOKEEPER: zookeeper:2181/
-#    CHECKPOINT_REPLICATION: 1
-# entitystorage:
+entitybatch:
+  image: debezium-entity-batch-service
+  links:
+    - zookeeper:zookeeper
+    - kafka:kafka
+  environment:
+    KAFKA: kafka:9092
+    ZOOKEEPER: zookeeper:2181/
+    CHECKPOINT_REPLICATION: 1
+#entitystorage:
 #   image: debezium-entity-storage-service
 #   links:
 #     - zookeeper:zookeeper

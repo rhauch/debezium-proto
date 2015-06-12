@@ -49,7 +49,7 @@
                 <dependencies>
 					<dependency>
 						<groupId>org.debezium</groupId>
-						<artifactId>debezium-service</artifactId>
+						<artifactId>debezium-assembly-descriptors</artifactId>
 						<version>${project.version}</version>
 					</dependency>
 		        </dependencies>
