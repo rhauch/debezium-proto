@@ -13,8 +13,8 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>debezium-jre8</artifactId>
-    <name>Debezium base Docker image with JRE 8</name>
+    <artifactId>debezium-docker-kafka</artifactId>
+    <name>Debezium Docker image of Kafka</name>
     <packaging>jar</packaging>
     <dependencies>
     </dependencies>
@@ -32,7 +32,7 @@
                 <artifactId>docker-maven-plugin</artifactId>
                 <configuration>
                     <skipDockerBuild>false</skipDockerBuild>
-                    <imageName>debezium-jre8</imageName>
+                    <imageName>debezium-kafka</imageName>
                     <dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
                 </configuration>
             </plugin>

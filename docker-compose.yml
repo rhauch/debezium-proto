@@ -1,26 +1,39 @@
 zookeeper:
-  image: wurstmeister/zookeeper
+  #image: wurstmeister/zookeeper
+  image: debezium-zookeeper
   ports:
     - "2181:2181"
+  environment:
+    ZK_LOG_LEVEL_CONSOLE: INFO
+    ZK_LOG_LEVEL_FILE: INFO
+  volumes:
+    - ./data/zk:/zookeeper/data
+    - ./logs/zk:/zookeeper/logs
 kafka:
-  image: wurstmeister/kafka:0.8.2.1
+  #image: wurstmeister/kafka:0.8.2.1
+  image: debezium-kafka
   ports:
     - "9092:9092"
   links:
-    - zookeeper:zk
-#  environment:
-#    KAFKA_ADVERTISED_HOST_NAME: 172.17.0.119
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-entitybatch:
-  image: debezium-entity-batch-service
-  links:
     - zookeeper:zookeeper
-    - kafka:kafka
   environment:
-    KAFKA: kafka:9092
-    ZOOKEEPER: zookeeper:2181/
-    CHECKPOINT_REPLICATION: 1
+    KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    KAFKA_ADVERTISED_PORT: 9092
+    KAFKA_EXTRA_PROPERTY: 1234
+    #KAFKA_ADVERTISED_HOST_NAME: 10.3.229.109
+  volumes:
+    - ./data/kafka/:/kafka/data
+    - ./logs/kafka/:/kafka/logs
+#    - /var/run/docker.sock:/var/run/docker.sock
+#entitybatch:
+#  image: debezium-entity-batch-service
+#  links:
+#    - zookeeper:zookeeper
+#    - kafka:kafka
+#  environment:
+#    KAFKA: kafka:9092
+#    ZOOKEEPER: zookeeper:2181/
+#    CHECKPOINT_REPLICATION: 1
 # entitystorage:
 #   image: debezium-entity-storage-service
 #   links:

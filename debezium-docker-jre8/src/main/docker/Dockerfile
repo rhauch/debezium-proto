@@ -1,16 +1,23 @@
-FROM debian:wheezy
+FROM debian:jessie
+#FROM fedora:22
 
 MAINTAINER rhauch
 
-# Java Version
-ENV JAVA_VERSION_MAJOR 8
-ENV JAVA_VERSION_MINOR 31
-ENV JAVA_VERSION_BUILD 13
-ENV JAVA_VERSION_MINOR 40
-ENV JAVA_VERSION_BUILD 25
-ENV JAVA_PACKAGE       server-jre
+# Fedora 22: Install necessary libraries ...
+#RUN dnf -y update && \
+#    dnf -y install tar gzip &&\
+#    dnf clean all
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Debian: Install curl and wget ...
+RUN apt-get update && \
+    apt-get install -y curl wget &&\
+    rm -rf /var/lib/apt/lists/*
+
+# Java Version (8u31b13, 8u40b25, 8u45b14) with package ("server-jre" or "jdk")
+ENV JAVA_VERSION_MAJOR=8 \
+    JAVA_VERSION_MINOR=45 \
+    JAVA_VERSION_BUILD=14 \
+    JAVA_PACKAGE=server-jre
 
 # Download and unarchive Java
 RUN curl -kLOH "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" \
