@@ -53,12 +53,12 @@ You can either use use Debezium's Driver in one of your server applications (cre
 
 For example, use the following commands (from within the `debezium` directory) to run the sample application against Debezium running locally:
 
-    $ cd debeziume-example-app
+    $ cd debezium-example-app
     $ mvn exec:java -Dexec.mainClass="org.debezium.example.SampleApp"
 
 Or use the following commands (from within the `debezium` directory) to run the load application against Debezium running locally:
 
-    $ cd debeziume-example-app
+    $ cd debezium-example-load-app
     $ mvn exec:java -Dexec.mainClass="org.debezium.example.LoadApp" -Dexec.args="--verbose --threads 2 --requests-per-thread 1000000"
 
 To shut down the local Debezium cluster:

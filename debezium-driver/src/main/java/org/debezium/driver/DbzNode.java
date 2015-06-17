@@ -93,7 +93,7 @@ final class DbzNode {
             try {
                 this.startLock.writeLock().lock();
                 if (this.node.get() == null) {
-                    this.logger = node.logger(getClass());
+                    this.logger = DbzNode.logger(getClass());
                     onStart(node);
                     this.node.set(node); // do this *after* calling 'onStart', in case the call fails
                 }
@@ -180,6 +180,7 @@ final class DbzNode {
     private final CopyOnWriteArrayList<Callable> postShutdownListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> startListeners = new CopyOnWriteArrayList<>();
     private final Lock runningLock = new ReentrantLock();
+    private final Logger logger = DbzNode.logger(getClass());
     private volatile boolean running = false;
 
     public DbzNode(Document config, Supplier<Executor> executor, Supplier<ScheduledExecutorService> scheduledExecutor) {
@@ -197,8 +198,13 @@ final class DbzNode {
     }
 
     private Producer<byte[], byte[]> createProducer() {
-        ProducerConfig pconf = new ProducerConfig(this.producerConfig);
-        return new Producer<byte[], byte[]>(pconf);
+        logger.debug("Creating producer with config: {}", this.producerConfig);
+        try {
+            ProducerConfig pconf = new ProducerConfig(this.producerConfig);
+            return new Producer<byte[], byte[]>(pconf);
+        } finally {
+            logger.debug("Created producer");
+        }
     }
 
     /**
@@ -229,7 +235,9 @@ final class DbzNode {
      * @param notified the function to be invoked
      */
     public void registerStart(Callable notified) {
-        if (notified != null) this.startListeners.addIfAbsent(notified);
+        if (notified != null && this.startListeners.addIfAbsent(notified)) {
+            logger.debug("Registering start listener: {}", notified);
+        }
     }
 
     /**
@@ -239,7 +247,9 @@ final class DbzNode {
      * @param notified the function to be invoked
      */
     public void registerPreShutdown(Callable notified) {
-        if (notified != null) this.preShutdownListeners.addIfAbsent(notified);
+        if (notified != null && this.preShutdownListeners.addIfAbsent(notified)) {
+            logger.debug("Registering pre-shutdown listener: {}", notified);
+        }
     }
 
     /**
@@ -249,7 +259,9 @@ final class DbzNode {
      * @param notified the function to be invoked
      */
     public void registerPostShutdown(Callable notified) {
-        if (notified != null) this.postShutdownListeners.addIfAbsent(notified);
+        if (notified != null && this.postShutdownListeners.addIfAbsent(notified) ) {
+            logger.debug("Registering post-shutdown listener: {}", notified);
+        }
     }
 
     /**
@@ -264,6 +276,7 @@ final class DbzNode {
               .filter(Predicates.notNull())
               .forEach(service -> {
                   if (this.services.addIfAbsent(service)) {
+                      logger.debug("Added service {}", service);
                       whenRunning(() -> service.start(this));
                   }
               });
@@ -280,9 +293,12 @@ final class DbzNode {
               .filter(Predicates.notNull())
               .forEach(service -> {
                   if (this.services.remove(service)) {
+                      logger.debug("Removed service {}", service);
                       whenNotRunning(() -> {
+                          logger.debug("Beginning shutdown of service {}", service);
                           service.beginShutdown();
                           service.completeShutdown();
+                          logger.debug("Completed shutdown of service {}", service);
                       });
                   }
               });
@@ -512,14 +528,18 @@ final class DbzNode {
                              try {
                                  while (running && iter.hasNext()) {
                                      MessageAndMetadata<byte[], byte[]> msg = iter.next();
+                                     logger.debug("Consuming next message on topic '{}', partition {}, offset {}",msg.topic(), msg.partition(), msg.offset());
                                      success = consumer.consume(msg.topic(), msg.partition(), msg.offset(),
                                                                 keyDecoder.fromBytes(msg.key()),
                                                                 messageDecoder.fromBytes(msg.message()));
+                                     logger.debug("Consume message: {}",success);
                                      if (success && autoCommit) {
+                                         logger.debug("Committing offsets: {}",success);
                                          connector.commitOffsets();
                                      }
                                  }
                              } catch (ConsumerTimeoutException e) {
+                                 logger.debug("Consumer timed out and continuing");
                                  // Keep going ...
                              }
                          }
@@ -531,13 +551,16 @@ final class DbzNode {
         ConsumerConfig config = new ConsumerConfig(props);
         ConsumerConnector connector = connectors.get(props);
         if (connector == null) {
+            logger.debug("Creating new consumer with config: {}", props);
             ConsumerConnector newConnector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
             // It's possible that we and another thread might have concurrently created a consumer with the same config ...
             connector = connectors.putIfAbsent(props, newConnector);
             if (connector != null) {
                 // Rare, but the new connector we created was not needed ...
+                logger.debug("New consumer was not needed, so shutting down");
                 executor.get().execute(() -> newConnector.shutdown());
             } else {
+                logger.debug("Created new consumer with config: {}", props);
                 connector = newConnector;
             }
         }
@@ -576,7 +599,7 @@ final class DbzNode {
      * @param clazz the class representing the context
      * @return the logger; never null
      */
-    public Logger logger(Class<?> clazz) {
+    public static Logger logger(Class<?> clazz) {
         return logger(clazz.getName());
     }
 
@@ -586,7 +609,7 @@ final class DbzNode {
      * @param name the name representing the context
      * @return the logger; never null
      */
-    public Logger logger(String name) {
+    public static Logger logger(String name) {
         org.slf4j.Logger actual = LoggerFactory.getLogger(name);
         return new Logger() {
             @Override
@@ -635,7 +658,7 @@ final class DbzNode {
                 }
             }
         };
-        //return new KafkaLogger(name);
+        // return new KafkaLogger(name);
     }
 
     public boolean isRunning() {

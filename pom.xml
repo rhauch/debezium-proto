@@ -59,9 +59,11 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
+        <docker.maintainer>Debezium community</docker.maintainer>
+
     </properties>
     <modules>
-        <!--module>debezium-core</module-->
+        <module>debezium-core</module>
         <module>debezium-docker-jre8</module>
         <module>debezium-docker-zookeeper</module>
         <module>debezium-docker-kafka</module>
@@ -69,16 +71,16 @@
         <module>debezium-assembly-descriptors</module>
         <module>debezium-service</module>
         <module>debezium-service-entity-batch</module>
-        <!--module>debezium-service-entity-storage</module>
+        <module>debezium-service-entity-storage</module>
         <module>debezium-service-schema-storage</module>
-        <module>debezium-service-schema-learning-partitioner</module>
+        <!--module>debezium-service-schema-learning-partitioner</module>
         <module>debezium-service-schema-learning</module>
+        <module>debezium-service-metrics</module-->
         <module>debezium-service-response-accumulator</module>
-        <module>debezium-service-metrics</module>
-        <module>debezium-driver</module-->
+        <module>debezium-driver</module>
         <!--module>debezium-docker-mini</module-->
-        <!--module>debezium-example-app</module>
-        <module>debezium-example-load-app</module-->
+        <module>debezium-example-app</module>
+        <module>debezium-example-load-app</module>
     </modules>
     <developers>
         <developer>
@@ -134,11 +136,6 @@
             <dependency>
                 <groupId>org.apache.samza</groupId>
                 <artifactId>samza-kv-rocksdb_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kv-leveldb_${scala.label.version}</artifactId>
                 <version>${samza.version}</version>
             </dependency>
             <dependency>

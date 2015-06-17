@@ -4,34 +4,53 @@
 set -e
 
 usage() {
-    echo "When a container is started, it can be run with several commands. To following command"
-    echo "starts the Debezium service:"
+    echo "The following command is used to start the Debezium service in a new Docker container:"
     echo ""
-    echo "    debezium [start|help]"
+    echo "   start"
     echo ""
-    echo "This message is displayed with the following command:"
+    echo "This is the default command that is used when you don't provide a command. The following"
+    echo "command will display the help for this image:"
     echo ""
     echo "    help"
     echo ""
-    echo "Finally, the container can run arbitrary commands. For example, to start a new container"
-    echo "or attach to a running container and obtain a bash shell:"
+    echo "The container can also run arbitrary commands. For example, to obtain a bash shell in a new"
+    echo "container or in an already-running container:"
     echo ""
     echo "    bash"
-    echo ""
-    echo "If none of these are used, then the container will start the Debezium service in the foreground"
-    echo "and is equivalent to:"
-    echo ""
-    echo "    debezium start"
     echo ""
     echo ""
     echo "Environment variables"
     echo "---------------------"
     echo ""
-    echo "You can easily control the level of logging used by Debezium by optionally setting these"
-    echo "environment variables to 'INFO', 'WARN', 'ERROR', 'DEBUG', or 'TRACE':"
+    echo "You can pass multiple environment variables to alter the Kafka configuration:"
     echo ""
-    echo "   LOG_LEVEL_CONSOLE      Set the level for the console log; defaults to 'INFO'."
-    echo "   LOG_LEVEL_FILE         Set the level for the rolling append-only log files; defaults to 'INFO'."
+    echo "   KAFKA                         Recommended. Set this to the list of addresses for the Kafka brokers."
+    echo "                                 This list is simply used to establish the proper connections to the"
+    echo "                                 leaders for the required partitions. If this container is started with"
+    echo "                                 a link to another container running Kafka on port 9092, then this environment"
+    echo "                                 variable need not be set since it can be determined automatically."
+    echo "                                 Otherwise, it should be set with an explicit value."
+    echo "   ZOOKEEPER                     Recommended. Set this to the list of addresses for the Zookeeper service."
+    echo "                                 If this container is started with a link to another container running"
+    echo "                                 Zookeeper on port 2181, then this environment variable need not be set"
+    echo "                                 since it can be determined automatically. Otherwise, it should be set"
+    echo "                                 with an explicit value."
+    echo "   JOB_ID                        Recommended. Set this to a unique number for each instance of the Debezium"
+    echo "                                 service running in the cluster. The job ID is used within the checkpoints"
+    echo "                                 for failure recovery. The default is '1', which is fine if only one instance"
+    echo "                                 of this service is run; otherwise it should be explicitly set."
+    echo "   CHECKPOINT_INTERVAL_SECONDS   Recommended. Set this to the time between checkpoint commits in seconds."
+    echo "                                 The default is to checkpoint every 60 seconds. The frequency of checkpointing"
+    echo "                                 affects failure recovery: if a container fails unexpectedly (e.g. due to"
+    echo "                                 crash or machine failure) and is restarted, it resumes processing at the"
+    echo "                                 last checkpoint. Any messages processed since the last checkpoint on the"
+    echo "                                 failed container are processed again. Checkpointing more frequently reduces"
+    echo "                                 the number of messages that may be processed twice, but also uses more resources."
+    echo "   CHECKPOINT_REPLICATION        Recommended. Set this to the number of Kafka nodes to which you want the "
+    ehco "                                 checkpoint topic replicated for durability. The default is '1'."
+    echo "   LOG_LEVEL                     Optional. Set the level of detail for Zookeeper's application log"
+    echo "                                 written to STDOUT and STDERR. Valid values are 'INFO' (default), 'WARN',"
+    echo "                                 'ERROR', 'DEBUG', or 'TRACE'."
     echo ""
     echo "Environment variables that start with 'DEBEZIUM_' will apply to the service configuration file."
     echo "Each environment variable name to a configuration variable name by:"
@@ -60,32 +79,38 @@ usage() {
     echo ""
 }
 
-loglevel_to_value() {
-    case $1 in
-       ERROR)   echo "1";;
-       WARN)    echo "2";;
-       INFO|*)  echo "3";;
-       DEBUG)   echo "4";;
-       TRACE)   echo "5";;
-    esac
-}
-
-min_loglevel() {
-    LEVEL1=$(loglevel_to_value $1)
-    LEVEL2=$(loglevel_to_value $2)
-    if [[ "$LEVEL1" -eq "$LEVEL2" ]] || [[ "$LEVEL1" -gt "$LEVEL2" ]]; then
-       echo $1
-    else
-       echo $2
-    fi
-}
-
+if [[ -z "$ZOOKEEPER" ]]; then
+    # Look for any environment variables set by Docker container linking. For example, if the container
+    # running Zookeeper were named 'zoo' in this container, then Docker should have created several envs,
+    # such as 'ZOO_PORT_2181_TCP'. If so, then use that to automatically set the 'ZOOKEEPER' env varg.
+    export ZOOKEEPER=$(env | grep .*PORT_2181_TCP= | sed -e 's|.*tcp://||' | paste -sd ,)
+fi
+if [[ "x$ZOOKEEPER" = "x" ]]; then
+    echo "The ZOOKEEPER variable must be set, or the container must be linked to one that runs Zookeeper."
+    exit 1
+else
+    echo "Using ZOOKEEPER=$ZOOKEEPER"
+fi
 if [[ -n "$ZOOKEEPER" ]]; then
   export DEBEZIUM_SYSTEMS_KAFKA_CONSUMER_ZOOKEEPER_CONNECT=$ZOOKEEPER
+  unset ZOOKEEPER
 fi
 
+if [[ -z "$KAFKA" ]]; then
+    # Look for any environment variables set by Docker container linking. For example, if the container
+    # running Kafka were named 'kafka' in this container, then Docker should have created several envs,
+    # such as 'KAFKA_PORT_9092_TCP'. If so, then use that to automatically set the 'KAFKA' env var.
+    export KAFKA=$(env | grep .*PORT_9092_TCP= | sed -e 's|.*tcp://||' | uniq | paste -sd ,)
+fi
+if [[ "x$KAFKA" = "x" ]]; then
+    echo "The KAFKA variable must be set, or the container must be linked to one that runs Kafka."
+    #exit 1
+else
+    echo "Using KAFKA=$KAFKA"
+fi
 if [[ -n "$KAFKA" ]]; then
   export DEBEZIUM_SYSTEMS_KAFKA_PRODUCER_BOOTSTRAP_SERVERS=$KAFKA
+  unset KAFKA
 fi
 
 if [[ -n "$CHECKPOINT_INTERVAL_SECONDS" ]]; then
@@ -94,6 +119,8 @@ fi
 
 if [[ -n "$CHECKPOINT_REPLICATION" ]]; then
   export DEBEZIUM_TASK_CHECKPOINT_REPLICATION_FACTOR=$CHECKPOINT_REPLICATION
+else
+  export DEBEZIUM_TASK_CHECKPOINT_REPLICATION_FACTOR=1
 fi
 
 if [[ -n "$JOB_ID" ]]; then
@@ -114,32 +141,16 @@ if [[ -z "$LOG_DIR" ]]; then
   export LOG_DIR=$DEBEZIUM_HOME/logs
 fi
 
-# If the first argument is 'debezium' or "*-service", then shift the arguments
-if [[ $1 = "debezium" ]] || [[ $1 == *"-service" ]]; then
-    shift;
-fi
-
 # Process the argument to this container ...
 case $1 in
     start)
         #
-        # Process the logging-related environment variables. Zookeeper's log configuration allows *some* variables to be
-        # set via environment variables, and more via system properties (e.g., "-Dzookeeper.console.threshold=INFO").
-        # However, in the interest of keeping things straightforward and in the spirit of the immutable image, 
-        # we don't use these and instead directly modify the Log4J configuration file (replacing the variables).
+        # Process the logging-related environment variables.
         #
-        if [[ -z "$LOG_LEVEL_CONSOLE" ]]; then
-            LOG_LEVEL_CONSOLE="INFO"
+        if [[ -z "$LOG_LEVEL" ]]; then
+            LOG_LEVEL="INFO"
         fi
-        if [[ -z "$LOG_LEVEL_FILE" ]]; then
-            LOG_LEVEL_FILE="INFO"
-        fi
-        MIN_LOG_LEVEL=$(min_loglevel $LOG_LEVEL_FILE $LOG_LEVEL_CONSOLE)
-        ROOT_LOGGER="$MIN_LOG_LEVEL, console, rolling"
-        sed -i -r -e "s|\\$\\{debezium.root.logger\\}|$ROOT_LOGGER|g" \
-                     "s|\\$\\{debezium.console.threshold\\}|$LOG_LEVEL_CONSOLE|g" \
-                     "s|\\$\\{debezium.rolling.threshold\\}|$LOG_LEVEL_FILE|g" \
-                     $DEBEZIUM_HOME/config/log4j.properties
+        ROOT_LOGGER="$LOG_LEVEL,console"
         #
         # Process all environment variables that start with 'DEBEZIUM_' 
         # (but not 'DEBEZIUM_HOME', 'DEBEZIUM_VERSION', or 'DEBEZIUM_USER'):
@@ -158,15 +169,17 @@ case $1 in
           fi
         done
         #
-        # Start the service ...        
+        # Set up the Java options ...
         #
         export JAVA_OPTS="-Xloggc:$LOG_DIR/gc.log "`
                         `"-Dlog4j.configuration=file:$LOG_CONFIG "`
                         `"-Ddebezium.logs.dir=$LOG_DIR "`
-                        `"-Ddebezium.root.logger=\"$ROOT_LOGGER\" "`
-                        `"-Ddebezium.console.threshold=LOG_LEVEL_CONSOLE "`
-                        `"-Ddebezium.rolling.threshold=LOG_LEVEL_FILE "`
+                        `"-Ddebezium.root.logger=${ROOT_LOGGER} "`
+                        `"-Ddebezium.console.threshold=$LOG_LEVEL "`
                         `"-Dsamza.container.name=$CONTAINER_NAME"
+        #
+        # Start the service ...        
+        #
         exec $DEBEZIUM_HOME/bin/run-job.sh \
              --config-factory=org.apache.samza.config.factories.PropertiesConfigFactory \
              --config-path=file:$DEBEZIUM_HOME/config/service.properties

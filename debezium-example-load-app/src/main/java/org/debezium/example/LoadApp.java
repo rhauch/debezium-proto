@@ -76,6 +76,7 @@ public class LoadApp {
         final int numThreads = options.getOption("-t", "--threads", 1);
         final int numRequestsPerThread = options.getOption("-r", "--requests-per-thread", 10000);
         verbose = options.getOption("-v", "--verbose", false);
+        System.out.println("**** verbose = " + verbose );
         if (options.hasUnknowns()) {
             print("Unknown option: " + options.getFirstUnknownOptionName());
             printUsage();
@@ -86,6 +87,7 @@ public class LoadApp {
         final Configuration config = readConfiguration(pathToConfigFile);
         printVerbose("Starting Debezium client with configuration: \n" + config);
         final Debezium.Client client = clientFactory.apply(config);
+        printVerbose("Started Debezium client");
         final RandomContent randomContent = RandomContent.load();
 
         // Connect to the database ...

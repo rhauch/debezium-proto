@@ -5,13 +5,6 @@ MAINTAINER rhauch
 ENV DEBEZIUM_HOME=/debezium \
     DEBEZIUM_USER=debezium
 
-# Install Docker.io so that we can reuse the docker process running on the host
-#RUN echo "deb http://get.docker.io/ubuntu docker main" > /etc/apt/sources.list.d/docker.list && \
-#    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9 && \
-#    apt-get update && \
-#    apt-get install -y lxc-docker && \
-#    rm -rf /var/lib/apt/lists/*
-
 #
 # Add the binaries, configuration files, and libraries required to run the Debezium service (via Samza without YARN),
 # and remove the Hadoop/YARN lines from the 'run-class.sh' script ...
@@ -37,4 +30,14 @@ VOLUME ["$DEBEZIUM_HOME/data", "$DEBEZIUM_HOME/logs"]
 #
 COPY ./docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["debezium","start"]
+CMD ["start"]
+
+#
+# When the child image is built:
+# - add this service's files to the Debezium service installation and make sure they're owned by the Debezium user
+# - change the ownership of the files to the debezium user
+# - change the user
+#
+ONBUILD ADD debezium-service-dist.tar.gz $DEBEZIUM_HOME
+ONBUILD RUN chown -R $DEBEZIUM_USER:$DEBEZIUM_USER $DEBEZIUM_HOME
+ONBUILD USER $DEBEZIUM_USER

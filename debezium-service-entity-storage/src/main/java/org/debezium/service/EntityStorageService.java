@@ -44,7 +44,7 @@ import org.debezium.core.message.Topic;
 public class EntityStorageService implements StreamTask, InitableTask {
 
     public static final String SEND_RESPONSE_WITH_UDATE = "task.send.response.with.update";
-    private static final String SYSTEM_NAME = "debezium";
+    private static final String SYSTEM_NAME = "kafka";
     private static final SystemStream ENTITY_UPDATES = new SystemStream(SYSTEM_NAME, Topic.ENTITY_UPDATES);
     private static final SystemStream PARTIAL_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.PARTIAL_RESPONSES);
 

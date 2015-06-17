@@ -1,12 +1,6 @@
 FROM debian:jessie
-#FROM fedora:22
 
 MAINTAINER rhauch
-
-# Fedora 22: Install necessary libraries ...
-#RUN dnf -y update && \
-#    dnf -y install tar gzip &&\
-#    dnf clean all
 
 # Debian: Install curl and wget ...
 RUN apt-get update && \

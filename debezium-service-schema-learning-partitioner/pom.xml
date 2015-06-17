@@ -25,10 +25,6 @@
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-api</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.apache.samza</groupId>
-            <artifactId>samza-kv_${scala.label.version}</artifactId>
-        </dependency>
         <!-- START all dependencies used in the tests -->
         <dependency>
             <groupId>org.debezium</groupId>
@@ -60,7 +56,7 @@
                 <dependencies>
                     <dependency>
                         <groupId>org.debezium</groupId>
-                        <artifactId>debezium-service</artifactId>
+                        <artifactId>debezium-assembly-descriptors</artifactId>
                         <version>${project.version}</version>
                     </dependency>
                 </dependencies>
@@ -89,7 +85,10 @@
                 <configuration>
                     <skipDockerBuild>false</skipDockerBuild>
                     <imageName>${project.artifactId}</imageName>
-                    <dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
+                    <baseImage>debezium-service</baseImage>
+                    <maintainer>${docker.maintainer}</maintainer>
+                    <entryPoint>["/docker-entrypoint.sh"]</entryPoint>
+                    <cmd>["start"]</cmd>
                 </configuration>
             </plugin>
         </plugins>

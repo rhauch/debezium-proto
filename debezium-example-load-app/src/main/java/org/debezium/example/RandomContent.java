@@ -83,7 +83,7 @@ public final class RandomContent {
      */
     public static RandomContent load() {
         try {
-            return load(ClassLoader.getSystemResource("load-data.txt").toURI());
+            return load(RandomContent.class.getClassLoader().getResource("load-data.txt").toURI());
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }

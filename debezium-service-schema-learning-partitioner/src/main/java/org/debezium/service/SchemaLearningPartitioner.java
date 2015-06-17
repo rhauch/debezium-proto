@@ -47,7 +47,7 @@ import org.debezium.core.message.Topic;
 @NotThreadSafe
 public class SchemaLearningPartitioner implements StreamTask {
 
-    private static final SystemStream SCHEMA_LEARNING = new SystemStream("debezium", Topic.SCHEMA_LEARNING);
+    private static final SystemStream SCHEMA_LEARNING = new SystemStream("kafka", Topic.SCHEMA_LEARNING);
 
     @Override
     public void process(IncomingMessageEnvelope envelope, MessageCollector collector, TaskCoordinator coordinator) throws Exception {

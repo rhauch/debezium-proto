@@ -2,13 +2,13 @@
 	"response.partitions" : 10,
 	"response.max.backlog" : 10,
 	"producers" : {
-		"metadata.broker.list" : "172.17.0.140:9092",
+		"metadata.broker.list" : "172.17.1.159:9092",
 		"producer.type" : "sync",
 		"compression.codec" : "none",
 		"serializer.class" : "kafka.serializer.DefaultEncoder"
 	},
 	"consumers" : {
-		"zookeeper.connect" : "172.17.0.138:2181",
+		"zookeeper.connect" : "172.17.1.157:2181",
 		"zookeeper.connection.timeout.ms" : 1000000
 	}
 }

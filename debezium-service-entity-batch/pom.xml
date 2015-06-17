@@ -78,7 +78,10 @@
 				<configuration>
                     <skipDockerBuild>false</skipDockerBuild>
 					<imageName>${project.artifactId}</imageName>
-					<dockerDirectory>${basedir}/src/main/docker</dockerDirectory>
+					<baseImage>debezium-service</baseImage>
+					<maintainer>${docker.maintainer}</maintainer>
+					<entryPoint>["/docker-entrypoint.sh"]</entryPoint>
+                    <cmd>["start"]</cmd>
 				</configuration>
 			</plugin>
 		</plugins>

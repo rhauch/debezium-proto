@@ -63,7 +63,7 @@ public class SchemaLearningService implements StreamTask, InitableTask {
 
     public static final String CLIENT_ID = SchemaLearningService.class.getSimpleName();
 
-    private static final SystemStream SCHEMA_PATCHES = new SystemStream("debezium", Topic.SCHEMA_PATCHES);
+    private static final SystemStream SCHEMA_PATCHES = new SystemStream("kafka", Topic.SCHEMA_PATCHES);
 
     private KeyValueStore<String, Document> entityTypesCache;
     private Map<EntityType, LearningEntityTypeModel> models = new HashMap<>();

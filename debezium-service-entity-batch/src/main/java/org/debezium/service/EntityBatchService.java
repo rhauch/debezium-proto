@@ -36,16 +36,17 @@ import org.debezium.core.message.Topic;
 @NotThreadSafe
 public class EntityBatchService implements StreamTask {
 
-    private static final SystemStream ENTITY_PATCHES = new SystemStream("debezium", Topic.ENTITY_PATCHES);
+    private static final SystemStream ENTITY_PATCHES = new SystemStream("kafka", Topic.ENTITY_PATCHES);
 
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
         // The key is a random request number ...
         Document batchRequest = (Document) env.getMessage();
-        DatabaseId dbId = Message.getDatabaseId(batchRequest);
 
         // Construct the batch from the request ...
         Batch<EntityId> batch = Batch.from(batchRequest);
+        if ( batch.isEmpty() ) return;
+        DatabaseId dbId = batch.stream().findFirst().get().target().databaseId();
 
         // Fire off a separate request for each patch ...
         int parts = batch.patchCount();

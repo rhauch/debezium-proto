@@ -45,7 +45,7 @@ import com.codahale.metrics.Snapshot;
 @NotThreadSafe
 public final class MetricService implements StreamTask, InitableTask, WindowableTask {
 
-    private static final SystemStream METRICS = new SystemStream("debezium", Topic.METRICS);
+    private static final SystemStream METRICS = new SystemStream("kfka", Topic.METRICS);
     private static final String ENTITY_READ_DURATIONS = "debezium.entity.reads.time";
     private static final String ENTITY_WRITE_DURATIONS = "debezium.entity.writes.time";
     private static final String ENTITY_READ_RATE_PER_SECOND = "debezium.entity.read.rate";

@@ -30,7 +30,7 @@ import org.debezium.core.message.Topic;
 @NotThreadSafe
 public class ResponseAccumulatorService implements StreamTask, InitableTask {
     
-    private static final SystemStream COMPLETE_RESPONSES = new SystemStream("debezium", Topic.COMPLETE_RESPONSES);
+    private static final SystemStream COMPLETE_RESPONSES = new SystemStream("kafka", Topic.COMPLETE_RESPONSES);
 
     private KeyValueStore<String, Document> cache;
     
