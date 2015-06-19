@@ -118,7 +118,7 @@ public class LoadApp {
         // We have a valid connection, so create the threads that will talk to the database ...
         final MetricRegistry registry = new MetricRegistry();
         Meter batchMeter = registry.meter("BatchesPerSecond");
-        Stopwatch sw = Stopwatch.simple();
+        Stopwatch sw = Stopwatch.reusable();
         sw.start();
         ExecutorService executors = Executors.newFixedThreadPool(numThreads);
         try {
@@ -137,7 +137,7 @@ public class LoadApp {
             print(results);
         } finally {
             sw.stop();
-            print("Completed with the following request rates over " + numThreads + " thread(s) in " + sw.totalDuration().getSeconds() + " seconds");
+            print("Completed with the following request rates over " + numThreads + " thread(s) in " + sw.durations().totalAsString());
             print("  Mean rate:   " + new DecimalFormat("#,###,##0.0").format(batchMeter.getMeanRate()) + " batch/sec");
             print("  1 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getOneMinuteRate()) + " batch/sec");
             print("  5 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getFiveMinuteRate()) + " batch/sec");

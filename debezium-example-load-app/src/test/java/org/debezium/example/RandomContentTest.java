@@ -101,10 +101,10 @@ public class RandomContentTest implements Testing {
     @Test
     public void shouldGenerateManyBatches() {
         generateBatches(null, 100);
-        Stopwatch sw = Stopwatch.simple();
+        Stopwatch sw = Stopwatch.reusable();
         generateBatches(sw, 1000);
         Testing.Print.enable();
-        Testing.print("1000 batches in " + asString(sw.totalDuration()) + " (" + asString(sw.averageDuration()) + " per batch)");
+        Testing.print("1000 batches in " + asString(sw.durations().total()) + " (" + asString(sw.durations().average()) + " per batch)");
     }
 
     @Test
@@ -119,7 +119,7 @@ public class RandomContentTest implements Testing {
         for (int i = 0; i != numThreads; ++i) {
             String threadName = "Thread" + (i + 1);
             Thread t = new Thread(() -> {
-                Stopwatch sw = Stopwatch.restartable();
+                Stopwatch sw = Stopwatch.reusable();
                 try {
                     generateBatches(null, numberOfWarmupBatches);
                     Testing.print("Waiting to start " + threadName);
@@ -152,11 +152,11 @@ public class RandomContentTest implements Testing {
     }
     
     protected String total( Stopwatch sw ) {
-        return asString(sw.totalDuration());
+        return asString(sw.durations().total());
     }
     
     protected String average( Stopwatch sw) {
-        return asString(sw.averageDuration());
+        return asString(sw.durations().average());
     }
     
     protected String batchesPerSecondString( Stopwatch sw, int totalCount ) {
@@ -164,7 +164,7 @@ public class RandomContentTest implements Testing {
     }
     
     protected double batchesPerSecond( Stopwatch sw, int totalCount ) {
-        Duration duration = sw.totalDuration();
+        Duration duration = sw.durations().total();
         double seconds = duration.getSeconds() + (duration.getNano() / 1e9);
         return totalCount / seconds;
     }

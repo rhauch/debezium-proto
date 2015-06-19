@@ -226,7 +226,7 @@ public interface Debezium {
          * Specify whether the producer connections should be initialized lazily. The default is 'false'.
          * 
          * @param immediately {@code true} if the initialization should be done immediately upon startup, or false if the
-         * connections should be done only when needed
+         *            connections should be done only when needed (which may make debugging connectivity problems more difficult)
          * @return this instance for chaining together methods; never null
          */
         Configure initializeProducerImmediately(boolean immediately);

@@ -65,10 +65,10 @@ import org.slf4j.LoggerFactory;
  * key-value stores used in the services), so the information is not durable (making cleanup easy) and is limited to the available
  * memory.
  * <p>
- * Be sure to call {@link #shutdown(long, TimeUnit)} when finished with an {@link InMemorySystem} instance. Doing so will
+ * Be sure to call {@link #shutdown(long, TimeUnit)} when finished with an {@link EmbeddedDebezium} instance. Doing so will
  * properly clean up all threads and resources.
  */
-public class InMemorySystem implements Debezium.Client {
+public class EmbeddedDebezium implements Debezium.Client {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String systemName = "kafka";
@@ -85,7 +85,7 @@ public class InMemorySystem implements Debezium.Client {
     private final MetricsRegistry metricsRegistry = null;
     private final ConcurrentMap<String, KeyValueStore<String, Document>> storesByName = new ConcurrentHashMap<>();
 
-    public InMemorySystem() {
+    public EmbeddedDebezium() {
         // Wire up the services to the foundation, which uses a separate thread for each service ...
         Config serviceConfig = new MapConfig();
         addService(new EntityBatchService(), serviceConfig, "entity-batch-service", Topic.ENTITY_BATCHES);
