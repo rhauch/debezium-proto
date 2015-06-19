@@ -7,11 +7,8 @@ package org.debezium.driver;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,17 +22,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.ConsumerTimeoutException;
 import kafka.consumer.TopicFilter;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.javaapi.producer.Producer;
-import kafka.message.MessageAndMetadata;
 import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
-import kafka.serializer.DefaultDecoder;
-import kafka.utils.VerifiableProperties;
 
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
@@ -43,8 +31,7 @@ import org.debezium.core.function.Callable;
 import org.debezium.core.function.Predicates;
 import org.debezium.core.serde.Decoder;
 import org.debezium.core.serde.Serdes;
-import org.debezium.core.util.LazyReference;
-import org.debezium.core.util.Strings;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -55,27 +42,6 @@ import org.slf4j.LoggerFactory;
 final class DbzNode {
 
     /**
-     * A function that consumes a message from a topic.
-     *
-     * @param <KeyType> the type of key
-     * @param <MessageType> the type of message
-     */
-    @FunctionalInterface
-    public static interface MessageConsumer<KeyType, MessageType> {
-        /**
-         * Consume a message at the given offset in the given partition from the named topic.
-         * 
-         * @param topic the name of the topic
-         * @param partition the partition number
-         * @param offset the logical offset within the partition
-         * @param key the key for the message
-         * @param message the message
-         * @return {@code true} if the message was fully consumed, or {@code false} if the message was not fully consumed
-         */
-        boolean consume(String topic, int partition, long offset, KeyType key, MessageType message);
-    }
-
-    /**
      * A component that can run within a {@link DbzNode}.
      */
     public static abstract class Service {
@@ -83,6 +49,8 @@ final class DbzNode {
         private final ReadWriteLock startLock = new ReentrantReadWriteLock();
         private final AtomicReference<DbzNode> node = new AtomicReference<>();
         private Logger logger = null;
+        
+        public abstract String getName();
 
         /**
          * Start the service running within the given {@link DbzNode}.
@@ -164,17 +132,12 @@ final class DbzNode {
         }
     }
 
-    private static final DefaultDecoder DEFAULT_DECODER = new DefaultDecoder(new VerifiableProperties());
-
     private final String nodeId = UUID.randomUUID().toString();
-    private final Properties producerConfig;
-    private final Properties consumerConfig;
     private final Document config;
+    private final Supplier<Foundation> foundation;
     private final Supplier<Executor> executor;
     private final Supplier<ScheduledExecutorService> scheduledExecutor;
     private final List<ScheduledFuture<?>> scheduledTasks = new CopyOnWriteArrayList<>();
-    private final Map<Properties, ConsumerConnector> connectors = new ConcurrentHashMap<>();
-    private final LazyReference<Producer<byte[], byte[]>> producer;
     private final CopyOnWriteArrayList<Service> services = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> preShutdownListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<Callable> postShutdownListeners = new CopyOnWriteArrayList<>();
@@ -183,28 +146,16 @@ final class DbzNode {
     private final Logger logger = DbzNode.logger(getClass());
     private volatile boolean running = false;
 
-    public DbzNode(Document config, Supplier<Executor> executor, Supplier<ScheduledExecutorService> scheduledExecutor) {
+    DbzNode(Document config, Environment env ) {
         this.config = config;
-        this.producerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.PRODUCER_SECTION));
-        this.consumerConfig = DbzConfiguration.asProperties(config.getDocument(DbzConfiguration.CONSUMER_SECTION));
-        this.executor = executor;
-        this.scheduledExecutor = scheduledExecutor;
-        this.producer = LazyReference.create(this::createProducer);
+        this.foundation = env::getFoundation;
+        this.executor = env::getExecutor;
+        this.scheduledExecutor = env::getScheduledExecutor;
         // On node startup, start all registered services ...
         registerStart(() -> services.forEach((service) -> service.start(this)));
         // On node shutdown, stop all registered services ...
         registerPreShutdown(() -> services.forEach(Service::beginShutdown));
         registerPostShutdown(() -> services.forEach(Service::completeShutdown));
-    }
-
-    private Producer<byte[], byte[]> createProducer() {
-        logger.debug("Creating producer with config: {}", this.producerConfig);
-        try {
-            ProducerConfig pconf = new ProducerConfig(this.producerConfig);
-            return new Producer<byte[], byte[]>(pconf);
-        } finally {
-            logger.debug("Created producer");
-        }
     }
 
     /**
@@ -259,7 +210,7 @@ final class DbzNode {
      * @param notified the function to be invoked
      */
     public void registerPostShutdown(Callable notified) {
-        if (notified != null && this.postShutdownListeners.addIfAbsent(notified) ) {
+        if (notified != null && this.postShutdownListeners.addIfAbsent(notified)) {
             logger.debug("Registering post-shutdown listener: {}", notified);
         }
     }
@@ -276,7 +227,7 @@ final class DbzNode {
               .filter(Predicates.notNull())
               .forEach(service -> {
                   if (this.services.addIfAbsent(service)) {
-                      logger.debug("Added service {}", service);
+                      logger.debug("Added service {}", service.getName());
                       whenRunning(() -> service.start(this));
                   }
               });
@@ -344,9 +295,6 @@ final class DbzNode {
     public void start() {
         whenNotRunning(() -> {
             this.running = true;
-            if (!this.config.get(DbzConfiguration.INIT_PRODUCER_LAZILY, false).convert().asBoolean()) {
-                this.producer.get();
-            }
             this.startListeners.forEach(Callable::call);
         });
     }
@@ -364,21 +312,15 @@ final class DbzNode {
                 preShutdownListeners.forEach(Callable::call);
             } finally {
                 try {
-                    // Shutdown the producer if it was accessed ...
-                    producer.release(Producer::close);
+                    // Cancel all of the scheduled tasks ...
+                    scheduledTasks.forEach(f -> f.cancel(true));
                 } finally {
+                    scheduledTasks.clear();
                     try {
-                        // Cancel all of the scheduled tasks ...
-                        scheduledTasks.forEach(f -> f.cancel(true));
+                        // Shutdown the producer if it was accessed ...
+                        foundation.get().shutdown();
                     } finally {
-                        scheduledTasks.clear();
-                        try {
-                            // Shutdown each of the consumer connectors ...
-                            connectors.values().forEach(ConsumerConnector::shutdown);
-                        } finally {
-                            connectors.clear();
-                            postShutdownListeners.forEach(Callable::call);
-                        }
+                        postShutdownListeners.forEach(Callable::call);
                     }
                 }
             }
@@ -397,7 +339,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, Object partitionKey, byte[] key, byte[] msg) {
-        return producer.execute(p -> p.send(new KeyedMessage<>(topic, key, partitionKey, msg)));
+        return foundation.get().producer().send(new KeyedMessage<>(topic, key, partitionKey, msg));
     }
 
     /**
@@ -507,67 +449,10 @@ final class DbzNode {
      */
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
-        if (numThreads < 1) return;
-
-        // Create the config for this consumer ...
-        boolean autoCommit = this.config.getBoolean("auto.commmit.enable", true);
-        Properties props = new Properties();
-        props.putAll(this.consumerConfig);
-        props.put("consumer.id", id());
-        props.put("group.id", groupId);
-        // props.put("auto.commit.enable", Boolean.toString(autoCommit));
-
-        // Create the consumer and iterate over the streams and create a thread to process each one ...
-        ConsumerConnector connector = getOrCreateConnector(props);
-        connector.createMessageStreamsByFilter(topicFilter, numThreads, DEFAULT_DECODER, DEFAULT_DECODER)
-                 .forEach(stream -> {
-                     this.executor.get().execute(() -> {
-                         ConsumerIterator<byte[], byte[]> iter = stream.iterator();
-                         boolean success = false;
-                         while (running) {
-                             try {
-                                 while (running && iter.hasNext()) {
-                                     MessageAndMetadata<byte[], byte[]> msg = iter.next();
-                                     logger.debug("Consuming next message on topic '{}', partition {}, offset {}",msg.topic(), msg.partition(), msg.offset());
-                                     success = consumer.consume(msg.topic(), msg.partition(), msg.offset(),
-                                                                keyDecoder.fromBytes(msg.key()),
-                                                                messageDecoder.fromBytes(msg.message()));
-                                     logger.debug("Consume message: {}",success);
-                                     if (success && autoCommit) {
-                                         logger.debug("Committing offsets: {}",success);
-                                         connector.commitOffsets();
-                                     }
-                                 }
-                             } catch (ConsumerTimeoutException e) {
-                                 logger.debug("Consumer timed out and continuing");
-                                 // Keep going ...
-                             }
-                         }
-                     });
-                 });
+        logger.debug("NODE: subscribing {} in group '{}' to topics {}",consumer,groupId,topicFilter);
+        foundation.get().subscribe(groupId, topicFilter, numThreads, keyDecoder, messageDecoder, consumer);
     }
-
-    private ConsumerConnector getOrCreateConnector(Properties props) {
-        ConsumerConfig config = new ConsumerConfig(props);
-        ConsumerConnector connector = connectors.get(props);
-        if (connector == null) {
-            logger.debug("Creating new consumer with config: {}", props);
-            ConsumerConnector newConnector = kafka.consumer.Consumer.createJavaConsumerConnector(config);
-            // It's possible that we and another thread might have concurrently created a consumer with the same config ...
-            connector = connectors.putIfAbsent(props, newConnector);
-            if (connector != null) {
-                // Rare, but the new connector we created was not needed ...
-                logger.debug("New consumer was not needed, so shutting down");
-                executor.get().execute(() -> newConnector.shutdown());
-            } else {
-                logger.debug("Created new consumer with config: {}", props);
-                connector = newConnector;
-            }
-        }
-        assert connector != null;
-        return connector;
-    }
-
+    
     /**
      * Call the supplied runnable using this node's {@link Executor executor}.
      * 
@@ -600,7 +485,7 @@ final class DbzNode {
      * @return the logger; never null
      */
     public static Logger logger(Class<?> clazz) {
-        return logger(clazz.getName());
+        return LoggerFactory.getLogger(clazz.getName());
     }
 
     /**
@@ -610,55 +495,7 @@ final class DbzNode {
      * @return the logger; never null
      */
     public static Logger logger(String name) {
-        org.slf4j.Logger actual = LoggerFactory.getLogger(name);
-        return new Logger() {
-            @Override
-            public void info(String msg, Object... params) {
-                actual.info(msg, params);
-            }
-
-            @Override
-            public void warn(String msg, Object... params) {
-                actual.warn(msg, params);
-            }
-
-            @Override
-            public void error(String msg, Object... params) {
-                actual.error(msg, params);
-            }
-
-            @Override
-            public void debug(String msg, Object... params) {
-                actual.debug(msg, params);
-            }
-
-            @Override
-            public void trace(String msg, Object... params) {
-                actual.trace(msg, params);
-            }
-
-            @Override
-            public void log(Level level, String msg, Object... params) {
-                switch (level) {
-                    case INFO:
-                        actual.info(msg, params);
-                        break;
-                    case WARN:
-                        actual.warn(msg, params);
-                        break;
-                    case ERROR:
-                        actual.error(msg, params);
-                        break;
-                    case DEBUG:
-                        actual.debug(msg, params);
-                        break;
-                    case TRACE:
-                        actual.trace(msg, params);
-                        break;
-                }
-            }
-        };
-        // return new KafkaLogger(name);
+        return LoggerFactory.getLogger(name);
     }
 
     public boolean isRunning() {
@@ -668,39 +505,6 @@ final class DbzNode {
     @Override
     public String toString() {
         return id() + " (" + (running ? "running" : "stopped") + ")";
-    }
-
-    protected final class KafkaLogger implements Logger {
-        private final String name;
-
-        protected KafkaLogger(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public void log(Level level, String msg, Object... params) {
-            log(name, level, null, msg, params);
-        }
-
-        private void log(String classname, Logger.Level level, Throwable t, String msg, Object[] params) {
-            Document doc = Document.create();
-            doc.set("name", classname);
-            doc.setNumber("timestamp", System.currentTimeMillis());
-            doc.setString("level", level.toString());
-            doc.setString("msg", msg);
-            if (t != null) {
-                doc.setString("error", t.getMessage());
-                doc.setString("stackTrace", Strings.getStackTrace(t));
-            }
-            if (params != null) {
-                for (int i = 0; i != params.length; ++i) {
-                    Object param = params[i];
-                    String paramName = "$" + i;
-                    doc.set(paramName, param);
-                }
-            }
-            send("log", "", doc);
-        }
     }
 
 }

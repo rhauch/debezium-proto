@@ -16,9 +16,6 @@ import org.debezium.Testing;
 import org.debezium.core.doc.Document;
 import org.debezium.core.util.NamedThreadFactory;
 import org.debezium.core.util.Sequences;
-import org.debezium.driver.DbzConfiguration;
-import org.debezium.driver.DbzNode;
-import org.debezium.driver.Topics;
 import org.fest.assertions.Fail;
 import org.junit.After;
 import org.junit.Before;
@@ -27,19 +24,15 @@ import org.junit.Before;
  * @author Randall Hauch
  *
  */
-public class AbstractDbzNodeTest implements Testing {
+public abstract class AbstractDbzNodeTest implements Testing {
 
     protected DbzNode node;
-    protected ExecutorService executor;
-    protected ScheduledExecutorService scheduledExecutor;
-
+    protected Environment env;
+    
     @Before
     public void beforeEach() {
         node = null;
-        boolean useDaemonThreads = true;
-        ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads,0,this::createdThread);
-        executor = Executors.newCachedThreadPool(threadFactory);
-        scheduledExecutor = Executors.newScheduledThreadPool(1);
+        env = createEnvironment();
     }
     
     @After
@@ -51,29 +44,18 @@ public class AbstractDbzNodeTest implements Testing {
                 Testing.debug("Completed shutdown of node");
             }
         } finally {
-            try {
-                Testing.debug("Beginning shutdown of scheduledExecutor");
-                scheduledExecutor.shutdown();
-                Testing.debug("Completed shutdown of scheduledExecutor");
-            } finally {
-                try {
-                    Testing.debug("Beginning shutdown of executor");
-                    executor.shutdown();
-                    Testing.debug("Completed shutdown of executor");
-                } finally {
-                    try {
-                        Testing.debug("Awaiting termination of executor");
-                        executor.awaitTermination(10, TimeUnit.SECONDS);
-                        Testing.debug("Completed termination of executor");
-                    } catch ( InterruptedException e ) {
-                        // We were interrupted while blocking, so clear the status ...
-                        Thread.interrupted();
-                    }
-                }
-            }
+            env.shutdown(10, TimeUnit.SECONDS);
         }
     }
     
+    protected Environment createEnvironment() {
+        boolean useDaemonThreads = true;
+        ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads,0,this::createdThread);
+        ExecutorService executor = Executors.newCachedThreadPool(threadFactory);
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        return Environment.create(executor, scheduler, new InMemorySyncFoundation());
+    }
+
     protected void createdThread( String threadName ) {
         // Testing.debug(Strings.getStackTrace(new RuntimeException("Created thread '" + threadName + "' (this is a trace and not an error)")));
     }
@@ -83,7 +65,7 @@ public class AbstractDbzNodeTest implements Testing {
             config = Document.create();
             config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
         }
-        node = new DbzNode(config, () -> executor,()->scheduledExecutor);
+        node = new DbzNode(config, env);
         node.start();
     }
     

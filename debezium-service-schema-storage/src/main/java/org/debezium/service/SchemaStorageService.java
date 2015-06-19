@@ -44,32 +44,25 @@ import org.debezium.core.message.Topic;
 @NotThreadSafe
 public class SchemaStorageService implements StreamTask, InitableTask {
 
-    public static final String SEND_RESPONSE_WITH_UDATE = "task.send.response.with.update";
 
     private static final String SYSTEM_NAME = "kafka";
     private static final SystemStream SCHEMA_UPDATES = new SystemStream(SYSTEM_NAME, Topic.SCHEMA_UPDATES);
     private static final SystemStream PARTIAL_RESPONSES = new SystemStream(SYSTEM_NAME, Topic.PARTIAL_RESPONSES);
 
     private KeyValueStore<String, Document> store;
-    private boolean sendResponseUponUpdate = false;
 
     public SchemaStorageService() {
-        System.out.println("Creating SchemaStorageService instance");
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void init(Config config, TaskContext context) {
-        System.out.println("SchemaStorageService.init(...)");
-        this.sendResponseUponUpdate = config.getBoolean(SEND_RESPONSE_WITH_UDATE, sendResponseUponUpdate);
         this.store = (KeyValueStore<String, Document>) context.getStore("schema-store");
-        System.out.println("SchemaStorageService.init(...) completed");
     }
 
     @Override
     public void process(IncomingMessageEnvelope env, MessageCollector collector, TaskCoordinator coordinator) throws Exception {
         try {
-            System.out.println("SchemaStorageService.process(...) begin");
             String dbIdStr = (String) env.getKey();
             DatabaseId dbId = Identifier.parseDatabaseId(dbIdStr);
             Document request = (Document) env.getMessage();
@@ -92,7 +85,6 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                     Message.addFailureReason(response, "Database '" + dbIdStr + "' does not exist.");
                     Message.setEnded(response, System.currentTimeMillis());
                     sendResponse(response, dbIdStr, collector);
-                    System.out.println("SchemaStorageService.process(...) completed with DOES_NOT_EXIST");
                     return;
                 }
                 // Otherwise it was a creation, so create it ...
@@ -103,7 +95,6 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 Message.setAfter(response, schema);
                 Message.setEnded(response, System.currentTimeMillis());
                 sendResponse(response, dbIdStr, collector);
-                System.out.println("SchemaStorageService.process(...) completed read request");
                 return;
             }
 
@@ -118,12 +109,11 @@ public class SchemaStorageService implements StreamTask, InitableTask {
                 collector.send(new OutgoingMessageEnvelope(SCHEMA_UPDATES, dbIdStr, dbIdStr, response));
 
                 // And (depending upon the config) also send the response to the partial responses stream ...
-                if (sendResponseUponUpdate) sendResponse(response, dbIdStr, collector);
+                sendResponse(response, dbIdStr, collector);
             } else {
                 // Otherwise the patch failed, so just output it as unchanged ...
                 sendResponse(response, dbIdStr, collector);
             }
-            System.out.println("SchemaStorageService.process(...) completed");
         } catch (RuntimeException t) {
             t.printStackTrace();
             throw t;

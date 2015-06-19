@@ -9,7 +9,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.doc.Document;
@@ -80,8 +83,32 @@ public interface Debezium {
      * @return the client that is connected to the Debezium cluster; never null
      * @see #configure()
      */
-    static Client start(Configuration config) {
-        return new DbzClient(config).start();
+    public static Client start(Configuration config) {
+        return new DbzClient(config,Environment.create(config)).start();
+    }
+
+    /**
+     * Connect to a Debezium cluster using the supplied configuration.
+     * 
+     * @param config the immutable configuration; may not be null
+     * @param foundationFactory the factory for the foundation; may not be null
+     * @return the client that is connected to the Debezium cluster; never null
+     * @see #configure()
+     */
+    static Client start(Configuration config, Function<Supplier<Executor>,Foundation> foundationFactory ) {
+        return new DbzClient(config,Environment.create(foundationFactory)).start();
+    }
+
+    /**
+     * Connect to a Debezium cluster using the supplied configuration.
+     * 
+     * @param config the immutable configuration; may not be null
+     * @param env the environment to use for the client; may not be null
+     * @return the client that is connected to the Debezium cluster; never null
+     * @see #configure()
+     */
+    static Client start(Configuration config, Environment env ) {
+        return new DbzClient(config,env).start();
     }
 
     /**
@@ -211,7 +238,7 @@ public interface Debezium {
          * Specify whether the producer connections should be initialized lazily. The default is 'false'.
          * 
          * @param lazy {@code true} if the initialization should be lazy, or false if the connections should be established upon
-         *            startupp
+         *            startup
          * @return this instance for chaining together methods; never null
          */
         Configure lazyInitialization(boolean lazy);
@@ -245,6 +272,20 @@ public interface Debezium {
         Database connect(DatabaseId id, String username, String device, String appVersion);
         
         /**
+         * Connect to the specified database using the given username.
+         * 
+         * @param id the database identifier
+         * @param username the username
+         * @param device the device identifier or token
+         * @param appVersion the version of the application
+         * @param timeout the maximum amount of time to wait for responses
+         * @param unit the unit of time for the timeout
+         * @return the database connection
+         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
+         */
+        Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
+        
+        /**
          * Provision a new database with the given name.
          * @param id the database identifier
          * @param username the username
@@ -255,6 +296,20 @@ public interface Debezium {
          * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
          */
         Database provision(DatabaseId id, String username, String device, String appVersion);
+        
+        /**
+         * Provision a new database with the given name.
+         * @param id the database identifier
+         * @param username the username
+         * @param device the device identifier or token
+         * @param appVersion the version of the application
+         * @param timeout the maximum amount of time to wait for responses
+         * @param unit the unit of time for the timeout
+         * @return the database connection
+         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
+         * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
+         */
+        Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
         
         /**
          * Shutdown this client and release all resources.

@@ -79,6 +79,7 @@
         <module>debezium-service-response-accumulator</module>
         <module>debezium-driver</module>
         <!--module>debezium-docker-mini</module-->
+        <module>debezium-integration-tests</module>
         <module>debezium-example-app</module>
         <module>debezium-example-load-app</module>
     </modules>
@@ -322,7 +323,20 @@
                 <scope>test</scope>
                 <type>test-jar</type>
             </dependency>
-
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-driver</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-integration-tests</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
     <dependencies>

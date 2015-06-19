@@ -35,7 +35,7 @@ public interface Database extends Closeable {
      * 
      * @return the database ID; never null
      */
-    DatabaseId databaseId();
+    public DatabaseId databaseId();
 
     /**
      * Non-blocking method that read the database's schema.
@@ -44,7 +44,7 @@ public interface Database extends Closeable {
      * @return a completion object that acts as a future and that the caller can use to block until the handler has completed
      *         processing its result; never null
      */
-    Completion readSchema(OutcomeHandler<Schema> handler);
+    public Completion readSchema(OutcomeHandler<Schema> handler);
 
     /**
      * Non-blocking method that read one or more entities from the database.
@@ -55,7 +55,7 @@ public interface Database extends Closeable {
      * @return a completion object that acts as a future and that the caller can use to block until the handler has completed
      *         processing its result; never null
      */
-    Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler);
+    public Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler);
 
     /**
      * Non-blocking method that reads one entity from the database.
@@ -65,7 +65,7 @@ public interface Database extends Closeable {
      * @return a completion object that acts as a future and that the caller can use to block until the handler has completed
      *         processing its result; never null
      */
-    default Completion readEntity(EntityId entityId, OutcomeHandler<Stream<Entity>> handler) {
+    default public Completion readEntity(EntityId entityId, OutcomeHandler<Stream<Entity>> handler) {
         return readEntities(Collections.singleton(entityId), handler);
     }
 
@@ -84,23 +84,24 @@ public interface Database extends Closeable {
      * @return a completion object that acts as a future and that the caller can use to block until the handler has completed
      *         processing its result; never null
      */
-    Completion changeEntities(Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId, Entity>>> handler);
+    public Completion changeEntities(Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId, Entity>>> handler);
 
     /**
      * Determine if this database is connected to the Debezium backend.
      * 
      * @return true if the database is connected, or false otherwise
      */
-    boolean isConnected();
+    public boolean isConnected();
 
     /**
      * Close the connection to the backend database. This database object cannot be used after it is closed.
      */
     @Override
-    void close();
+    public void close();
 
     /**
-     * The result of an asynchronous method that can be used to {@link #await() wait} while the method completes. This is a simpler
+     * The result of an asynchronous method that can be used to {@link #await() wait} while the method completes. This is a
+     * simpler
      * form of the standard {@link Future}.
      * 
      * @author Randall Hauch
@@ -113,7 +114,7 @@ public interface Database extends Closeable {
          *         can
          *         be called to wait until complete
          */
-        boolean isComplete();
+        public boolean isComplete();
 
         /**
          * Waits if necessary for the operation to complete, and then
@@ -122,7 +123,7 @@ public interface Database extends Closeable {
          * @throws InterruptedException if the current thread was interrupted
          *             while waiting
          */
-        void await() throws InterruptedException;
+        public void await() throws InterruptedException;
 
         /**
          * Waits if necessary for at most the given time for the operation
@@ -134,7 +135,7 @@ public interface Database extends Closeable {
          *             while waiting
          * @throws TimeoutException if the wait timed out
          */
-        void await(long timeout, TimeUnit unit)
+        public void await(long timeout, TimeUnit unit)
                 throws InterruptedException, TimeoutException;
     }
 
@@ -152,7 +153,7 @@ public interface Database extends Closeable {
          * 
          * @param outcome the outcome; never null
          */
-        void handle(Outcome<T> outcome);
+        public void handle(Outcome<T> outcome);
     }
 
     /**
@@ -183,7 +184,7 @@ public interface Database extends Closeable {
          * @return true if the operation failed, or false otherwise
          * @see #succeeded()
          */
-        default boolean failed() {
+        default public boolean failed() {
             return !succeeded();
         }
 
@@ -194,7 +195,7 @@ public interface Database extends Closeable {
          * @return true if the operation succeeded, or false otherwise
          * @see #succeeded()
          */
-        default boolean succeeded() {
+        default public boolean succeeded() {
             return status() == Status.OK;
         }
 
@@ -203,21 +204,21 @@ public interface Database extends Closeable {
          * 
          * @return the outcome status; never null
          */
-        Status status();
+        public Status status();
 
         /**
          * Get the reason why the operation failed, if it was not successful.
          * 
          * @return the failure reason, or null if the operation {@link #succeeded() succeeded}.
          */
-        String failureReason();
+        public String failureReason();
 
         /**
          * Get the result of the successful operation.
          * 
          * @return the operation result, or null if the operation {@link #failed() failed}.
          */
-        T result();
+        public T result();
     }
 
     /**
@@ -251,7 +252,7 @@ public interface Database extends Closeable {
          * 
          * @return the patch; never null
          */
-        Patch<IdType> patch();
+        public Patch<IdType> patch();
 
         /**
          * Get current representation of the target at the time the patch was applied. The target can be used in the case of a
@@ -259,14 +260,14 @@ public interface Database extends Closeable {
          * 
          * @return the target, or null if the target didn't exist when the patch was applied.
          */
-        TargetType target();
+        public TargetType target();
 
         /**
          * Get the identifier of the target.
          * 
          * @return the identifier; never null
          */
-        IdType id();
+        public IdType id();
 
         /**
          * Determine whether the change did not succeed. This is a convenience method that is equivalent to {@code !succeeded()}
@@ -275,7 +276,7 @@ public interface Database extends Closeable {
          * @return true if the operation failed, or false otherwise
          * @see #succeeded()
          */
-        default boolean failed() {
+        default public boolean failed() {
             return !succeeded();
         }
 
@@ -286,7 +287,7 @@ public interface Database extends Closeable {
          * @return true if the operation succeeded, or false otherwise
          * @see #succeeded()
          */
-        default boolean succeeded() {
+        default public boolean succeeded() {
             return status() == ChangeStatus.OK;
         }
 
@@ -295,13 +296,13 @@ public interface Database extends Closeable {
          * 
          * @return the outcome status; never null
          */
-        ChangeStatus status();
+        public ChangeStatus status();
 
         /**
          * Get the reason(s) why the change failed, if it was not successful.
          * 
          * @return the failure reasons, or null if the operation {@link #succeeded() succeeded}.
          */
-        Stream<String> failureReasons();
+        public Stream<String> failureReasons();
     }
 }

@@ -41,9 +41,19 @@ public class MockDatabase implements Database {
         public Database connect(DatabaseId id, String username, String device, String appVersion) {
             return new MockDatabase(id, content.createGenerator() );
         }
+        
+        @Override
+        public Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
+            return new MockDatabase(id, content.createGenerator() );
+        }
 
         @Override
         public Database provision(DatabaseId id, String username, String device, String appVersion) {
+            return new MockDatabase(id, content.createGenerator() );
+        }
+        
+        @Override
+        public Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
             return new MockDatabase(id, content.createGenerator() );
         }
 

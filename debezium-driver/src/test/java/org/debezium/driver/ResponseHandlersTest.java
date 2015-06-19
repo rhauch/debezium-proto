@@ -9,6 +9,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.Testing;
@@ -17,11 +18,7 @@ import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.function.Callable;
 import org.debezium.core.message.Message;
-import org.debezium.driver.DbzConfiguration;
-import org.debezium.driver.DbzNode;
-import org.debezium.driver.ExecutionContext;
-import org.debezium.driver.RequestId;
-import org.debezium.driver.ResponseHandlers;
+import org.debezium.core.util.NamedThreadFactory;
 import org.debezium.driver.Database.Outcome;
 import org.fest.assertions.Fail;
 import org.junit.After;
@@ -42,22 +39,21 @@ public class ResponseHandlersTest implements Testing {
     
     private ResponseHandlers handlers;
     private DbzNode node;
-    private ExecutorService executor;
-    private ScheduledExecutorService scheduledExecutor;
     private ExecutionContext context;
     private DatabaseId dbId;
     private volatile RequestId requestId;
     private volatile Document response;
     private volatile CountDownLatch completed;
     
+    protected Environment env;
+
     @Before
     public void beforeEach() {
         handlers = null;
         node = null;
-        executor = Executors.newCachedThreadPool();
-        scheduledExecutor = Executors.newScheduledThreadPool(1);
+        env = createEnvironment();
         dbId = Identifier.of("my-db");
-        context = new ExecutionContext(dbId, USERNAME, DEVICE, APP_VERSION);
+        context = new ExecutionContext(dbId, USERNAME, DEVICE, APP_VERSION, 5, TimeUnit.SECONDS);
         requestId = null;
         response = null;
         completed = null;
@@ -70,25 +66,28 @@ public class ResponseHandlersTest implements Testing {
                 node.shutdown();
             }
         } finally {
-            try {
-                executor.shutdown();
-            } finally {
-                try {
-                    executor.awaitTermination(10, TimeUnit.SECONDS);
-                } catch ( InterruptedException e ) {
-                    // We were interrupted while blocking, so clear the status ...
-                    Thread.interrupted();
-                }
-            }
+            env.shutdown(10, TimeUnit.SECONDS);
         }
     }
     
+    protected Environment createEnvironment() {
+        boolean useDaemonThreads = true;
+        ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads,0,this::createdThread);
+        ExecutorService executor = Executors.newCachedThreadPool(threadFactory);
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        return Environment.create(executor, scheduler, new InMemorySyncFoundation());
+    }
+
+    protected void createdThread( String threadName ) {
+        // Testing.debug(Strings.getStackTrace(new RuntimeException("Created thread '" + threadName + "' (this is a trace and not an error)")));
+    }
+
     protected void startWith(Document config) {
         if ( config == null ) {
             config = Document.create();
             config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
         }
-        node = new DbzNode(config, () -> executor,()->scheduledExecutor);
+        node = new DbzNode(config, env);
         handlers = new ResponseHandlers();
         node.add(handlers);
         node.start();

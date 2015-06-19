@@ -77,7 +77,7 @@ final class ResponseHandlers extends Service {
          * 
          * @param response the response message; never null
          */
-        void handleResponse(Document response);
+        public void handleResponse(Document response);
         
         /**
          * Handle a failure condition. Once this method is called, the handler will be unregistered.
@@ -85,7 +85,7 @@ final class ResponseHandlers extends Service {
          * @param status the failure status
          * @param failureReason the reasons for the failure
          */
-        void handleError(Outcome.Status status, String failureReason);
+        public void handleError(Outcome.Status status, String failureReason);
     }
     
     private static final class Registration {
@@ -179,6 +179,11 @@ final class ResponseHandlers extends Service {
     
     ResponseHandlers() {
         this.requestIdSupplier = requestIdSupplier;
+    }
+    
+    @Override
+    public String getName() {
+        return "ResponseHandlers";
     }
     
     @Override
@@ -295,6 +300,9 @@ final class ResponseHandlers extends Service {
             failureHandler.accept(Outcome.Status.TIMEOUT, "Interrupted while waiting for results");
         } catch (RuntimeException e ) {
             failureHandler.accept(Outcome.Status.COMMUNICATION_ERROR, e.getMessage());
+        } finally {
+            // No matter what, we need to remove the registration since this request is complete ...
+            registrations.remove(requestId);
         }
         return Optional.empty();
     }
@@ -351,6 +359,9 @@ final class ResponseHandlers extends Service {
                 registration.handle(id, response, () -> registrations.remove(id));
             } catch (Throwable t) {
                 logger().error("Unable to process response using handler {}: {}", registration, response, t);
+            } finally {
+                // The response has completed, so remove the registration ...
+                registrations.remove(id);
             }
         }
     }

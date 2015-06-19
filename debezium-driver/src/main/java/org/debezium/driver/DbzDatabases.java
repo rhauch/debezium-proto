@@ -25,6 +25,8 @@ import org.debezium.core.message.Topic;
 import org.debezium.driver.Database.Outcome;
 import org.debezium.driver.DbzNode.Service;
 import org.debezium.driver.ResponseHandlers.Handlers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Randall Hauch
@@ -33,20 +35,10 @@ import org.debezium.driver.ResponseHandlers.Handlers;
 final class DbzDatabases extends Service {
     
     private static final class ActiveDatabase {
-        private final DatabaseId id;
         private final Document schema;
         
         protected ActiveDatabase(DatabaseId id, Document schema) {
-            this.id = id;
             this.schema = schema;
-        }
-        
-        public boolean isActive() {
-            return true;
-        }
-        
-        public DatabaseId id() {
-            return id;
         }
         
         public Document schema() {
@@ -54,6 +46,7 @@ final class DbzDatabases extends Service {
         }
     }
     
+    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ConcurrentMap<DatabaseId, ActiveDatabase> activeDatabases = new ConcurrentHashMap<>();
     private final ResponseHandlers handlers;
     
@@ -62,7 +55,13 @@ final class DbzDatabases extends Service {
     }
     
     @Override
+    public String getName() {
+        return "DbzDatabases";
+    }
+    
+    @Override
     protected void onStart(DbzNode node) {
+        logger.debug("Starting Databases. Subscribing to '{}'...",Topic.SCHEMA_UPDATES);
         // Add a single-threaded consumer that will read the "schema-updates" topic to get all database schema updates.
         // We use a unique group ID so that we get *all* the messages on this topic.
         int numThreads = 1;
@@ -72,17 +71,24 @@ final class DbzDatabases extends Service {
             Document updatedSchema = Message.getAfter(msg);
             DatabaseId dbId = Identifier.parseDatabaseId(key);
             activeDatabases.put(dbId, new ActiveDatabase(dbId, updatedSchema));
+            logger.debug("Cached active database '{}'...",dbId);
             return true;
         });
     }
     
     @Override
     protected void beginShutdown(DbzNode node) {
+        logger.debug("Beginning shutdown of databases");
     }
     
     @Override
     protected void completeShutdown(DbzNode node) {
         activeDatabases.clear();
+        logger.debug("Completed shutdown of databases");
+    }
+    
+    DbzConnection provision(ExecutionContext context) {
+        return provision(context,context.defaultTimeout(),context.timeoutUnit());
     }
     
     DbzConnection provision(ExecutionContext context, long timeout, TimeUnit unit) {
@@ -90,13 +96,19 @@ final class DbzDatabases extends Service {
             DatabaseId dbId = context.databaseId();
             ActiveDatabase db = activeDatabases.get(dbId);
             if (db != null) {
-                throw new DebeziumProvisioningException("Unable to provision database '" + dbId + "'");
+                throw new DebeziumProvisioningException("Database '" + dbId + "' already exists");
             }
+            logger.debug("Provisioning new database '{}'",dbId);
             db = handlers.requestAndWait(context, timeout, unit, submitCreateSchema(context, dbId, node),
                                          this::updateActiveDatabase, this::provisioningFailed)
                                          .orElseThrow(DebeziumConnectionException::new);
+            logger.debug("Completed provisioning new database '{}'",dbId);
             return new DbzConnection(this, context);
         }).orElseThrow(DebeziumClientException::new);
+    }
+    
+    DbzConnection connect(ExecutionContext context) {
+        return connect(context,context.defaultTimeout(),context.timeoutUnit());
     }
     
     DbzConnection connect(ExecutionContext context, long timeout, TimeUnit unit) {
@@ -110,9 +122,11 @@ final class DbzDatabases extends Service {
         DatabaseId dbId = context.databaseId();
         ActiveDatabase db = activeDatabases.get(dbId);
         if (db == null) {
+            logger.debug("Active database info not found for '{}', so attempting to read schema",dbId);
             db = handlers.requestAndWait(context, timeout, unit, submitReadSchema(context, dbId, node),
                                          this::updateActiveDatabase, notAvailable(dbId))
                                          .orElseThrow(DebeziumConnectionException::new);
+            logger.debug("Found and cached schema for database '{}'",dbId);
         }
         recordConnection(context, dbId, node);
         assert db != null;
@@ -121,6 +135,7 @@ final class DbzDatabases extends Service {
     
     private Consumer<RequestId> submitReadSchema(ExecutionContext context, DatabaseId id, DbzNode node) {
         return requestId -> {
+            logger.trace("Attempting to submit request to read schema for database '{}'",id);
             Document request = Patch.read(id).asDocument();
             Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
             if ( !node.send(Topic.SCHEMA_PATCHES, context.databaseId().asString(), request) ) {
@@ -131,6 +146,7 @@ final class DbzDatabases extends Service {
     
     private Consumer<RequestId> submitCreateSchema(ExecutionContext context, DatabaseId id, DbzNode node) {
         return requestId -> {
+            logger.trace("Attempting to submit request to create schema for database '{}'",id);
             Document request = Patch.create(id).asDocument();
             Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
             if ( !node.send(Topic.SCHEMA_PATCHES, context.databaseId().asString(), request) ) {
@@ -140,6 +156,7 @@ final class DbzDatabases extends Service {
     }
     
     private void recordConnection(ExecutionContext context, DatabaseId id, DbzNode node) {
+        logger.trace("Established new connection to database '{}'",id);
         Document msg = Message.createConnectionMessage(node.id(),id, context.username(),context.device(),context.version());
         node.send(Topic.CONNECTIONS, context.username(), msg);
     }
@@ -150,6 +167,7 @@ final class DbzDatabases extends Service {
             Document schema = Message.getAfter(schemaReadResponse);
             ActiveDatabase db = new ActiveDatabase(dbId, schema);
             activeDatabases.put(dbId, db);
+            logger.debug("Caching updated schema for database '{}'",dbId);
             return db;
         }
         return null;
@@ -166,15 +184,17 @@ final class DbzDatabases extends Service {
     }
     
     boolean disconnect(DbzConnection connection) {
+        logger.trace("Disconnecting connection from database '{}'",connection.databaseId());
         // Clean up any resources held for the given database connection ...
         return true;
     }
     
-    void readSchema(ExecutionContext context, Handlers handlers) {
+    void readSchema(ExecutionContext context, Handlers handlers ) {
         if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to read entities");
         // We should always have one locally since we're connected ...
         whenRunning(node -> {
-            Document schema = activeDatabase(node,context,10,TimeUnit.SECONDS).schema();
+            logger.debug("Reading the schema for database '{}'",context.databaseId());
+            Document schema = activeDatabase(node,context,context.defaultTimeout(),context.timeoutUnit()).schema();
             handlers.successHandler.ifPresent(c->c.accept(schema));
             handlers.completionHandler.ifPresent(Callable::call);
             return true;
@@ -184,6 +204,7 @@ final class DbzDatabases extends Service {
     void readEntities(ExecutionContext context, Iterable<EntityId> entityIds, Handlers handlers) {
         if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to read entities");
         whenRunning(node -> {
+            logger.debug("Reading entities in database '{}'",context.databaseId());
             RequestId requestId = this.handlers.register(context, 1, handlers).orElseThrow(DebeziumClientException::new);
             Batch<EntityId> batch = Batch.<EntityId> create().read(entityIds).build();
             Document request = batch.asDocument();
@@ -197,6 +218,7 @@ final class DbzDatabases extends Service {
     void changeEntities(ExecutionContext context, Batch<EntityId> batch, Handlers handlers) {
         if (handlers == null) throw new IllegalArgumentException("A non-null handler is required to change entities");
         whenRunning(node -> {
+            logger.debug("Submitting batch to change {} entities in database '{}'",batch.patchCount(),context.databaseId());
             RequestId requestId = this.handlers.register(context, batch.patchCount(), handlers).orElseThrow(DebeziumClientException::new);
             Document request = batch.asDocument();
             Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), context.username());
@@ -204,5 +226,4 @@ final class DbzDatabases extends Service {
             return requestId;
         }).orElseThrow(DebeziumClientException::new);
     }
-    
 }

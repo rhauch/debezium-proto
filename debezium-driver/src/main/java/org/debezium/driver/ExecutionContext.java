@@ -5,6 +5,8 @@
  */
 package org.debezium.driver;
 
+import java.util.concurrent.TimeUnit;
+
 import org.debezium.core.component.DatabaseId;
 
 /**
@@ -17,12 +19,16 @@ final class ExecutionContext {
     private final String username;
     private final String device;
     private final String version;
+    private final long defaultTimeout;
+    private final TimeUnit timeoutUnit;
     
-    ExecutionContext( DatabaseId dbId, String username, String device, String version ) {
+    ExecutionContext( DatabaseId dbId, String username, String device, String version, long defaultTimeout, TimeUnit unit ) {
         this.username = username;
         this.dbId = dbId;
         this.device =device;
         this.version = version;
+        this.defaultTimeout = defaultTimeout;
+        this.timeoutUnit=unit;
     }
     
     public DatabaseId databaseId() {
@@ -39,6 +45,14 @@ final class ExecutionContext {
     
     public String version() {
         return version;
+    }
+    
+    public long defaultTimeout() {
+        return defaultTimeout;
+    }
+    
+    public TimeUnit timeoutUnit() {
+        return timeoutUnit;
     }
     
     @Override

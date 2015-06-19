@@ -33,6 +33,10 @@ public abstract class Stopwatch {
         public Duration totalDuration() {
             return duration;
         }
+        @Override
+        protected int count() {
+            return 1;
+        }
     };
 
     protected static class RestartableStopwatch extends SimpleStopwatch {
@@ -50,10 +54,9 @@ public abstract class Stopwatch {
             duration = duration.plus(System.currentTimeMillis() - started,ChronoUnit.MILLIS);
             return this;
         }
-
         @Override
-        public Duration averageDuration(int count) {
-            return super.averageDuration(this.count * count);
+        protected int count() {
+            return count;
         }
     };
 
@@ -81,13 +84,15 @@ public abstract class Stopwatch {
         return duration != null ? duration : Duration.ZERO;
     }
     
-    public Duration averageDuration( int count ) {
-        return count < 1 ? Duration.ofSeconds(0) : duration.dividedBy(count);
+    public Duration averageDuration() {
+        return duration.dividedBy(count());
     }
+    
+    protected abstract int count();
     
     @Override
     public String toString() {
-        return totalDuration().toString();
+        return "Total: " + totalDuration() + "; average: " + averageDuration();
     }
     
 }

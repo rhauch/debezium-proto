@@ -5,16 +5,10 @@
  */
 package org.debezium.driver;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.message.Topic;
-import org.debezium.core.util.NamedThreadFactory;
 
 
 /**
@@ -27,32 +21,19 @@ final class DbzClient implements Debezium.Client {
     private final DbzNode node;
     private final DbzDatabases databases;
     private final ResponseHandlers responseHandlers;
-    private ExecutorService executor;
-    private ScheduledExecutorService scheduledExecutor;
+    private final Environment env;
     
-    public DbzClient( Configuration config ) {
+    public DbzClient( Configuration config, Environment env ) {
         this.config = (DbzConfiguration)config;
-        this.node = new DbzNode(this.config.getDocument(),this::executor,this::scheduledExecutor);
+        this.env = env;
+        this.node = new DbzNode(this.config.getDocument(),env);
         this.responseHandlers = new ResponseHandlers();
         this.databases = new DbzDatabases(this.responseHandlers);
         this.node.add(this.databases);
         this.node.add(this.responseHandlers); // will be shut down after 'databases'
     }
     
-    private Executor executor() {
-        return this.executor;
-    }
-    
-    private ScheduledExecutorService scheduledExecutor() {
-        return this.scheduledExecutor;
-    }
-    
     public DbzClient start() {
-        boolean useDaemonThreads = false;    // they will keep the VM running if not shutdown properly
-        ThreadFactory threadFactory = new NamedThreadFactory("debezium", "consumer",useDaemonThreads);
-        ThreadFactory scheduledThreadFactory = new NamedThreadFactory("debezium", "timer",true);
-        executor = Executors.newCachedThreadPool(threadFactory);
-        scheduledExecutor = Executors.newScheduledThreadPool(0,scheduledThreadFactory);
         node.start();
         // Subscribe to the 'partial-responses' topic and forward to all of the response handlers ...
         node.subscribe(node.id(), Topics.of(Topic.PARTIAL_RESPONSES), 1, (topic,partition,offset,key,msg)->responseHandlers.submit(msg));
@@ -61,35 +42,31 @@ final class DbzClient implements Debezium.Client {
     
     @Override
     public Database connect(DatabaseId id, String username, String device, String appVersion) {
-        return databases.connect(new ExecutionContext(id,username,device,appVersion), 10, TimeUnit.SECONDS);
+        return connect(id,username,device,appVersion, 10, TimeUnit.SECONDS);
+    }
+    
+    @Override
+    public Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
+        return databases.connect(new ExecutionContext(id,username,device,appVersion, timeout, unit));
     }
     
     @Override
     public Database provision(DatabaseId id, String username, String device, String appVersion) {
-        return databases.provision(new ExecutionContext(id,username,device,appVersion), 10, TimeUnit.SECONDS);
+        return provision(id,username,device,appVersion, 10, TimeUnit.SECONDS);
+    }
+    
+    @Override
+    public Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
+        return databases.provision(new ExecutionContext(id,username,device,appVersion, timeout, unit));
     }
     
     @Override
     public void shutdown( long timeout, TimeUnit unit ) {
         // Shutdown the cluster node, which shuts down all services and the service manager ...
-        node.shutdown();
-        if ( scheduledExecutor != null ) {
-            try {
-                scheduledExecutor.shutdown();
-            } finally {
-                scheduledExecutor = null;
-                if ( executor != null ) {
-                    executor.shutdown();
-                    try {
-                        executor.awaitTermination(timeout, unit);
-                    } catch ( InterruptedException e ) {
-                        // We were interrupted while blocking, so clear the status ...
-                        Thread.interrupted();
-                    } finally {
-                        executor = null;
-                    }
-                }
-            }
+        try {
+            node.shutdown();
+        } finally {
+            env.shutdown(timeout,unit);
         }
     }
 }
