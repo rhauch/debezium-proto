@@ -8,8 +8,6 @@ package org.debezium.driver;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.Testing;
-import org.debezium.driver.DbzConfiguration;
-import org.debezium.driver.Debezium;
 import org.debezium.driver.Debezium.Acknowledgement;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -26,14 +24,12 @@ public class DbzNodeExternalKafkaTest extends AbstractDbzNodeTest {
         Testing.Print.enable();
         Testing.Debug.enable();
         
-        DbzConfiguration config = (DbzConfiguration) Debezium.configure()
+        startWith(Debezium.configure()
                 .clientId(DatabaseTest.class.getSimpleName())
                 .withBroker("localhost:9092")
                 .withZookeeper("localhost:2181/")
                 .acknowledgement(Acknowledgement.ALL)
-                .lazyInitialization(true)
-                .build();
-        startWith(config.getDocument());
+                .initializeProducerImmediately(true));
         sendAndReceiveMessages(100, 1, "dbz-node-test", 10, TimeUnit.SECONDS);
     }
 }

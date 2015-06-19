@@ -20,6 +20,7 @@ import org.debezium.core.function.Callable;
 import org.debezium.core.message.Message;
 import org.debezium.core.util.NamedThreadFactory;
 import org.debezium.driver.Database.Outcome;
+import org.debezium.driver.Debezium.Configure;
 import org.fest.assertions.Fail;
 import org.junit.After;
 import org.junit.Before;
@@ -82,12 +83,11 @@ public class ResponseHandlersTest implements Testing {
         // Testing.debug(Strings.getStackTrace(new RuntimeException("Created thread '" + threadName + "' (this is a trace and not an error)")));
     }
 
-    protected void startWith(Document config) {
+    protected void startWith(Configure config) {
         if ( config == null ) {
-            config = Document.create();
-            config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
+            config = Debezium.configure().initializeProducerImmediately(true);
         }
-        node = new DbzNode(config, env);
+        node = new DbzNode(config.build(), env);
         handlers = new ResponseHandlers();
         node.add(handlers);
         node.start();

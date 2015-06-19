@@ -25,7 +25,6 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.DefaultDecoder;
 import kafka.utils.VerifiableProperties;
 
-import org.debezium.core.doc.Document;
 import org.debezium.core.serde.Decoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,10 +66,13 @@ final class KafkaFoundation implements Foundation {
     private volatile boolean running = true;
 
     public KafkaFoundation(Configuration config, Supplier<Executor> executor) {
-        Document configDoc = ((DbzConfiguration)config).getDocument();
-        this.producerConfig = DbzConfiguration.asProperties(configDoc.getDocument(DbzConfiguration.PRODUCER_SECTION));
-        this.consumerConfig = DbzConfiguration.asProperties(configDoc.getDocument(DbzConfiguration.CONSUMER_SECTION));
+        ClientConfiguration clientConfig = ClientConfiguration.adapt(config);
+        this.producerConfig = clientConfig.getProducerConfiguration().asProperties();
+        this.consumerConfig = clientConfig.getConsumerConfiguration().asProperties();
         this.executor = executor;
+        if ( clientConfig.initializeProducersImmediately() ) {
+            producer();
+        }
     }
 
     @Override

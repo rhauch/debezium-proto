@@ -17,16 +17,14 @@ import org.debezium.core.message.Topic;
  */
 final class DbzClient implements Debezium.Client {
 
-    private final DbzConfiguration config;
     private final DbzNode node;
     private final DbzDatabases databases;
     private final ResponseHandlers responseHandlers;
     private final Environment env;
     
     public DbzClient( Configuration config, Environment env ) {
-        this.config = (DbzConfiguration)config;
         this.env = env;
-        this.node = new DbzNode(this.config.getDocument(),env);
+        this.node = new DbzNode(config,env);
         this.responseHandlers = new ResponseHandlers();
         this.databases = new DbzDatabases(this.responseHandlers);
         this.node.add(this.databases);

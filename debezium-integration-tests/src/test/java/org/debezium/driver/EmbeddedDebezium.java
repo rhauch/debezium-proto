@@ -54,8 +54,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * In-memory representations of a Debezium.Client and all services using in-memory streams. This is designed to be used
- * within tests. Each topic only has a single partition.
+ * In-memory representations of a Debezium.Client and all services. Streams are implemented with in-memory queues, and all
+ * stream consumers are run in separate threads. Thus, each service is run in its own thread, and all client behavior matches
+ * that when the client runs against a normal Debezium installation that uses Kafka for streams.
+ * <p>
+ * The purpose of this class is to make it easy to test the behavior and interaction of the client and all services, using a
+ * single lightweight class that tests can instantiate as needed. Since Kafka and Samza are not used, this will not test any
+ * behavior or interaction with Kafka brokers. And, since this system uses a single partition for each stream, it does not
+ * replicate the multi-partition behavior of a normal Debezium installation. All information is kept in memory (including the
+ * key-value stores used in the services), so the information is not durable (making cleanup easy) and is limited to the available
+ * memory.
+ * <p>
+ * Be sure to call {@link #shutdown(long, TimeUnit)} when finished with an {@link InMemorySystem} instance. Doing so will
+ * properly clean up all threads and resources.
  */
 public class InMemorySystem implements Debezium.Client {
 
@@ -99,7 +110,7 @@ public class InMemorySystem implements Debezium.Client {
     public Database connect(DatabaseId id, String username, String device, String appVersion) {
         return client.connect(id, username, device, appVersion);
     }
-    
+
     @Override
     public Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
         return client.connect(id, username, device, appVersion, timeout, unit);
@@ -109,10 +120,10 @@ public class InMemorySystem implements Debezium.Client {
     public Database provision(DatabaseId id, String username, String device, String appVersion) {
         return client.provision(id, username, device, appVersion);
     }
-    
+
     @Override
     public Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
-        return client.provision(id, username, device, appVersion,timeout,unit);
+        return client.provision(id, username, device, appVersion, timeout, unit);
     }
 
     @Override
@@ -133,8 +144,8 @@ public class InMemorySystem implements Debezium.Client {
     }
 
     protected void addService(StreamTask service, Config config, String serviceName, String... inputTopics) {
-        logger.debug("SYSTEM: adding service '{}' to topics {}",serviceName,inputTopics);
-        
+        logger.debug("SYSTEM: adding service '{}' to topics {}", serviceName, inputTopics);
+
         // Create a message queue that accumulates messages ...
         MessageQueue messageQueue = createMessageQueue(serviceName);
 
@@ -149,7 +160,7 @@ public class InMemorySystem implements Debezium.Client {
                 if (messageQueue.isWindowToBeFired()) {
                     // It's time to call the window method on the service ...
                     try {
-                        logger.debug("SERVICE {}: Invoking window()",service.getClass().getSimpleName());
+                        logger.debug("SERVICE {}: Invoking window()", service.getClass().getSimpleName());
                         ((WindowableTask) service).window(messageQueue.collector(), messageQueue.coordinator());
                         messageQueue.sendAll();
                     } catch (Exception e) {
@@ -157,7 +168,7 @@ public class InMemorySystem implements Debezium.Client {
                     }
                 }
                 // Call the service ...
-                logger.debug("SERVICE {}: Processing message: {}",service.getClass().getSimpleName(),message);
+                logger.debug("SERVICE {}: Processing message: {}", service.getClass().getSimpleName(), message);
                 service.process(inputEnvelope, messageQueue.collector(), messageQueue.coordinator());
                 // and send all accumulated messages ...
                 messageQueue.sendAll();
@@ -173,7 +184,7 @@ public class InMemorySystem implements Debezium.Client {
             // Create a task context ...
             InitableTask itask = (InitableTask) service;
             try {
-                logger.debug("SERVICE {}: Initializing",service.getClass().getSimpleName());
+                logger.debug("SERVICE {}: Initializing", service.getClass().getSimpleName());
                 itask.init(config, taskContext(serviceName));
             } catch (Exception e) {
                 Testing.printError(e);
@@ -232,11 +243,11 @@ public class InMemorySystem implements Debezium.Client {
     }
 
     protected MessageQueue createMessageQueue(String name) {
-        return createMessageQueue(name,null, null);
+        return createMessageQueue(name, null, null);
     }
 
     protected MessageQueue createMessageQueue(String name, Consumer<RequestScope> commitFunction) {
-        return createMessageQueue(name,commitFunction, null);
+        return createMessageQueue(name, commitFunction, null);
     }
 
     protected MessageQueue createMessageQueue(String name, Consumer<RequestScope> commitFunction, Consumer<RequestScope> shutdownFunction) {
@@ -251,8 +262,8 @@ public class InMemorySystem implements Debezium.Client {
                 byte[] message = messageEncoder.toBytes((Document) envelope.getMessage());
                 KeyedMessage<byte[], byte[]> rawMessage = new KeyedMessage<>(topic, key, partitionKey, message);
                 messages.add(rawMessage);
-                if ( logger.isTraceEnabled() ) {
-                    logger.trace("TOPIC: add message with key '{}' and value: {}",topic,envelope.getMessage());
+                if (logger.isTraceEnabled()) {
+                    logger.trace("TOPIC: add message with key '{}' and value: {}", topic, envelope.getMessage());
                 }
             }
         };
@@ -270,7 +281,7 @@ public class InMemorySystem implements Debezium.Client {
             }
         };
 
-        return new MessageQueue(name,messages, messageCollector, taskCoordinator, foundation::producer);
+        return new MessageQueue(name, messages, messageCollector, taskCoordinator, foundation::producer);
     }
 
     protected static final class MessageQueue {
@@ -300,13 +311,13 @@ public class InMemorySystem implements Debezium.Client {
         }
 
         public void sendAll() {
-            if ( logger.isDebugEnabled() && messages.isEmpty() ) {
-                logger.debug("QUEUE {}: no messages to send",name);
+            if (logger.isDebugEnabled() && messages.isEmpty()) {
+                logger.debug("QUEUE {}: no messages to send", name);
             }
             while (!messages.isEmpty()) {
                 KeyedMessage<byte[], byte[]> message = messages.remove();
-                if ( logger.isTraceEnabled() ) {
-                    logger.trace("QUEUE {}: send message with key '{}' on topic '{}'",name,new String(message.key()),message.topic());
+                if (logger.isTraceEnabled()) {
+                    logger.trace("QUEUE {}: send message with key '{}' on topic '{}'", name, new String(message.key()), message.topic());
                 }
                 producer.get().send(message);
             }

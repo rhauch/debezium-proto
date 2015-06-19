@@ -58,7 +58,7 @@ public class DatabaseTest {
                                        .withBroker(kafka.getKafkaBrokerString())
                                        .withZookeeper(kafka.getZkConnectString())
                                        .acknowledgement(Acknowledgement.ALL)
-                                       .lazyInitialization(true)
+                                       .initializeProducerImmediately(true)
                                        .build();
         client = Debezium.start(config);
     }

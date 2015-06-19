@@ -9,8 +9,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import org.debezium.KafkaTestCluster;
-import org.debezium.driver.DbzConfiguration;
-import org.debezium.driver.Debezium;
 import org.debezium.driver.Debezium.Acknowledgement;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -41,14 +39,12 @@ public class DbzNodeEmbeddedKafkaTest extends AbstractDbzNodeTest {
         System.out.println("Kafka broker string: " + kafka.getKafkaBrokerString());
         System.out.println("Zookeeper connect string: " + kafka.getZkConnectString());
         
-        DbzConfiguration config = (DbzConfiguration) Debezium.configure()
+        startWith(Debezium.configure()
                 .clientId(DatabaseTest.class.getSimpleName())
                 .withBroker(kafka.getKafkaBrokerString())
                 .withZookeeper(kafka.getZkConnectString())
                 .acknowledgement(Acknowledgement.ALL)
-                .lazyInitialization(true)
-                .build();
-        startWith(config.getDocument());
+                .initializeProducerImmediately(true));
         sendAndReceiveMessages(10, 1, "dbz-embedded-node-test", 10, TimeUnit.SECONDS);
     }
 

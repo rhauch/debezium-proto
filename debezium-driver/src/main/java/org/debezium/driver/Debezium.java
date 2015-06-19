@@ -15,8 +15,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.debezium.core.component.DatabaseId;
-import org.debezium.core.doc.Document;
-import org.debezium.core.doc.DocumentReader;
 
 /**
  * @author Randall Hauch
@@ -36,22 +34,12 @@ public interface Debezium {
     /**
      * Obtain a fluent API to programmatically modify up a configuration based upon the supplied starting point.
      * 
-     * @param document the initial JSON configuration; may not be null
-     * @return the new builder; never null
-     */
-    public static Configure configure(Document document) {
-        return new DbzConfigurator(() -> document);
-    }
-
-    /**
-     * Obtain a fluent API to programmatically modify up a configuration based upon the supplied starting point.
-     * 
      * @param stream the stream containing the initial JSON configuration; may not be null
      * @return the new builder; never null
      * @throws IOException if there is a problem reading the supplied stream
      */
     public static Configure configure(InputStream stream) throws IOException {
-        return new DbzConfigurator(DocumentReader.defaultReader().read(stream));
+        return new DbzConfigurator(Configuration.load(stream));
     }
 
     /**
@@ -62,7 +50,7 @@ public interface Debezium {
      * @throws IOException if there is a problem reading the supplied stream
      */
     public static Configure configure(URL url) throws IOException {
-        return new DbzConfigurator(DocumentReader.defaultReader().read(url));
+        return new DbzConfigurator(Configuration.load(url));
     }
 
     /**
@@ -73,7 +61,7 @@ public interface Debezium {
      * @throws IOException if there is a problem reading the supplied stream
      */
     public static Configure configure(File file) throws IOException {
-        return new DbzConfigurator(DocumentReader.defaultReader().read(file));
+        return new DbzConfigurator(Configuration.load(file));
     }
 
     /**
@@ -84,7 +72,7 @@ public interface Debezium {
      * @see #configure()
      */
     public static Client start(Configuration config) {
-        return new DbzClient(config,Environment.create(config)).start();
+        return new DbzClient(config, Environment.create(config)).start();
     }
 
     /**
@@ -95,8 +83,8 @@ public interface Debezium {
      * @return the client that is connected to the Debezium cluster; never null
      * @see #configure()
      */
-    static Client start(Configuration config, Function<Supplier<Executor>,Foundation> foundationFactory ) {
-        return new DbzClient(config,Environment.create(foundationFactory)).start();
+    static Client start(Configuration config, Function<Supplier<Executor>, Foundation> foundationFactory) {
+        return new DbzClient(config, Environment.create(foundationFactory)).start();
     }
 
     /**
@@ -107,8 +95,8 @@ public interface Debezium {
      * @return the client that is connected to the Debezium cluster; never null
      * @see #configure()
      */
-    static Client start(Configuration config, Environment env ) {
-        return new DbzClient(config,env).start();
+    static Client start(Configuration config, Environment env) {
+        return new DbzClient(config, env).start();
     }
 
     /**
@@ -237,11 +225,45 @@ public interface Debezium {
         /**
          * Specify whether the producer connections should be initialized lazily. The default is 'false'.
          * 
-         * @param lazy {@code true} if the initialization should be lazy, or false if the connections should be established upon
-         *            startup
+         * @param immediately {@code true} if the initialization should be done immediately upon startup, or false if the
+         * connections should be done only when needed
          * @return this instance for chaining together methods; never null
          */
-        Configure lazyInitialization(boolean lazy);
+        Configure initializeProducerImmediately(boolean immediately);
+
+        /**
+         * Specify how frequently (in seconds) the callback cleaner should run.
+         * 
+         * @param period the number of seconds between runs
+         * @return this instance for chaining together methods; never null
+         */
+        Configure cleanerPeriodInSeconds(int period);
+
+        /**
+         * Specify the initial delay (in seconds) for the the callback cleaner.
+         * 
+         * @param delay the number of seconds after startup after which the cleaner should be run the first time
+         * @return this instance for chaining together methods; never null
+         */
+        Configure cleanerDelayInSeconds(int delay);
+
+        /**
+         * Specify the number of response partitions.
+         * 
+         * @param count the number of separate partitions used to track the registered callbacks; must be positive
+         * @return this instance for chaining together methods; never null
+         */
+        Configure responsePartitionCount(int count);
+
+        /**
+         * Specify the maximum backlog per partition for registered callbacks. If the number of incomplete requests
+         * exceeds this number per callback partition, then any new requests will block until existing requests have
+         * been completed.
+         * 
+         * @param count the maximum number of callbacks allowed per partition before new requests are blocked
+         * @return this instance for chaining together methods; never null
+         */
+        Configure responseMaxBacklog(int count);
 
         /**
          * Create a new immutable representation of the current state of this configurator.
@@ -270,7 +292,7 @@ public interface Debezium {
          * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
          */
         Database connect(DatabaseId id, String username, String device, String appVersion);
-        
+
         /**
          * Connect to the specified database using the given username.
          * 
@@ -284,9 +306,10 @@ public interface Debezium {
          * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
          */
         Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
-        
+
         /**
          * Provision a new database with the given name.
+         * 
          * @param id the database identifier
          * @param username the username
          * @param device the device identifier or token
@@ -296,9 +319,10 @@ public interface Debezium {
          * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
          */
         Database provision(DatabaseId id, String username, String device, String appVersion);
-        
+
         /**
          * Provision a new database with the given name.
+         * 
          * @param id the database identifier
          * @param username the username
          * @param device the device identifier or token
@@ -310,9 +334,10 @@ public interface Debezium {
          * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
          */
         Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
-        
+
         /**
          * Shutdown this client and release all resources.
+         * 
          * @param timeout the maximum time that this method should block before returning; must be positive
          * @param unit the time unit for {@code timeout}; may not be null
          */

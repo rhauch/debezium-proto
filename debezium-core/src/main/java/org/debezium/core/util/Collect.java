@@ -32,6 +32,14 @@ public class Collect {
         return Collections.unmodifiableSet(values);
     }
     
+    public static <T> List<T> arrayListOf( T[] values ) {
+        List<T> result = new ArrayList<>();
+        for ( T value : values ) {
+            if ( value != null ) result.add(value);
+        }
+        return result;
+    }
+    
     public static <T> List<T> arrayListOf( T first, @SuppressWarnings("unchecked") T...additional ) {
         List<T> result = new ArrayList<>();
         result.add(first);
@@ -46,6 +54,7 @@ public class Collect {
         values.forEach((value)->result.add(value));
         return result;
     }
+    
     
     public static <K,V> Map<K,V> mapOf( K key, V value ) {
         return Collections.singletonMap(key, value);

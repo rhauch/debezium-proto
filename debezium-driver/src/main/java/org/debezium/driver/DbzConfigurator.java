@@ -6,12 +6,12 @@
 package org.debezium.driver;
 
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.debezium.core.doc.Document;
 import org.debezium.driver.Debezium.Configure;
 
 /**
@@ -19,30 +19,40 @@ import org.debezium.driver.Debezium.Configure;
  *
  */
 final class DbzConfigurator implements Debezium.Configure {
+    
+    private static Properties copy( Properties props ) {
+        Properties copy = new Properties();
+        if ( props != null && !props.isEmpty()) copy.putAll(props);
+        return copy;
+    }
 
-    private final Document config;
+    private final Properties props;
     private final Set<BrokerAddress> kafkaBrokerAddresses = new HashSet<>();
     private final Set<String> compressedTopics = new HashSet<>();
 
     DbzConfigurator() {
-        this(Document::create);
+        this(Properties::new);
     }
 
-    DbzConfigurator( Supplier<Document> config ) {
-        this.config = config.get().clone();
+    DbzConfigurator( Supplier<Properties> config ) {
+        this.props = copy(config.get());
     }
 
-    DbzConfigurator( Document config ) {
-        this.config = config.clone();
+    DbzConfigurator( Properties config ) {
+        this.props = copy(config);
+    }
+
+    DbzConfigurator( Configuration config ) {
+        this.props = config.asProperties();
     }
 
     private DbzConfigurator setConsumerProperty(String name, String value) {
-        config.getOrCreateDocument(DbzConfiguration.CONSUMER_SECTION).setString(name, value);
+        props.setProperty("consumers." + name, value);
         return this;
     }
 
     private DbzConfigurator setProducerProperty(String name, String value) {
-        config.getOrCreateDocument(DbzConfiguration.PRODUCER_SECTION).setString(name, value);
+        props.setProperty("producers." + name, value);
         return this;
     }
 
@@ -116,9 +126,34 @@ final class DbzConfigurator implements Debezium.Configure {
         return setProducerProperty("send.buffer.bytes", Integer.toString(size));
     }
     
+    
     @Override
-    public Configure lazyInitialization(boolean lazy) {
-        config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY, lazy);
+    public Configure cleanerPeriodInSeconds(int period) {
+        props.setProperty("cleaner.period.seconds", Integer.toString(period));
+        return this;
+    }
+    
+    @Override
+    public Configure cleanerDelayInSeconds(int delay) {
+        props.setProperty("cleaner.delay.seconds", Integer.toString(delay));
+        return this;
+    }
+    
+    @Override
+    public Configure responsePartitionCount(int count) {
+        props.setProperty("response.partitions", Integer.toString(count));
+        return this;
+    }
+
+    @Override
+    public Configure responseMaxBacklog(int count) {
+        props.setProperty("response.max.backlog", Integer.toString(count));
+        return this;
+    }
+
+    @Override
+    public Configure initializeProducerImmediately(boolean immediately) {
+        props.setProperty("initialize.producers", Boolean.toString(immediately));
         return this;
     }
 
@@ -132,6 +167,6 @@ final class DbzConfigurator implements Debezium.Configure {
             setProducerProperty("compressed.topics",
                                 compressedTopics.stream().map(Object::toString).collect(Collectors.joining(",")));
         }
-        return new DbzConfiguration(config);
+        return Configuration.from(props);
     }
 }

@@ -26,7 +26,6 @@ import kafka.consumer.TopicFilter;
 import kafka.producer.KeyedMessage;
 
 import org.debezium.core.doc.Document;
-import org.debezium.core.doc.Value;
 import org.debezium.core.function.Callable;
 import org.debezium.core.function.Predicates;
 import org.debezium.core.serde.Decoder;
@@ -133,7 +132,7 @@ final class DbzNode {
     }
 
     private final String nodeId = UUID.randomUUID().toString();
-    private final Document config;
+    private final Configuration config;
     private final Supplier<Foundation> foundation;
     private final Supplier<Executor> executor;
     private final Supplier<ScheduledExecutorService> scheduledExecutor;
@@ -146,7 +145,7 @@ final class DbzNode {
     private final Logger logger = DbzNode.logger(getClass());
     private volatile boolean running = false;
 
-    DbzNode(Document config, Environment env ) {
+    DbzNode(Configuration config, Environment env ) {
         this.config = config;
         this.foundation = env::getFoundation;
         this.executor = env::getExecutor;
@@ -159,15 +158,12 @@ final class DbzNode {
     }
 
     /**
-     * Get the configuration property with the given name.
+     * Get the configuration.
      * 
-     * @param propertyName the name of the configuration property
-     * @param defaultValue the default value for the property; may be null or a {@link Value#nullValue() null value}
-     * @return the configuration's value, or the {@code defaultValue} if the configuration does not contain the configuration
-     *         property
+     * @return the configuration; never null
      */
-    public Value getConfig(String propertyName, Value defaultValue) {
-        return config.get(propertyName, defaultValue);
+    public Configuration getConfiguration() {
+        return config;
     }
 
     /**

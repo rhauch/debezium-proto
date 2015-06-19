@@ -16,6 +16,7 @@ import org.debezium.Testing;
 import org.debezium.core.doc.Document;
 import org.debezium.core.util.NamedThreadFactory;
 import org.debezium.core.util.Sequences;
+import org.debezium.driver.Debezium.Configure;
 import org.fest.assertions.Fail;
 import org.junit.After;
 import org.junit.Before;
@@ -60,12 +61,11 @@ public abstract class AbstractDbzNodeTest implements Testing {
         // Testing.debug(Strings.getStackTrace(new RuntimeException("Created thread '" + threadName + "' (this is a trace and not an error)")));
     }
     
-    protected void startWith( Document config ) {
+    protected void startWith( Configure config ) {
         if ( config == null ) {
-            config = Document.create();
-            config.setBoolean(DbzConfiguration.INIT_PRODUCER_LAZILY,true);
+            config = Debezium.configure().initializeProducerImmediately(true);
         }
-        node = new DbzNode(config, env);
+        node = new DbzNode(config.build(), env);
         node.start();
     }
     

@@ -26,7 +26,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.debezium.core.doc.Document;
-import org.debezium.core.doc.Value;
 import org.debezium.core.function.Callable;
 import org.debezium.core.util.Sequences;
 import org.debezium.driver.Database.Outcome;
@@ -41,8 +40,6 @@ import org.debezium.driver.DbzNode.Service;
  */
 final class ResponseHandlers extends Service {
     
-    public static int DEFAULT_PARTITION_COUNT = 10;
-    public static int DEFAULT_MAX_BACKLOG = 10;
     public static int DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS = 300;
     
     public static Handlers with(Consumer<Document> successHandler, Callable completionHandler,
@@ -175,7 +172,7 @@ final class ResponseHandlers extends Service {
     private volatile CountDownLatch threads;
     private volatile String clientId;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private volatile long maxRegistrationAgeInSeconds;
+    private volatile long maxRegistrationAgeInMillis;
     
     ResponseHandlers() {
         this.requestIdSupplier = requestIdSupplier;
@@ -191,10 +188,10 @@ final class ResponseHandlers extends Service {
         this.clientId = node.id();
         this.requestIdSupplier = () -> RequestId.create(clientId);
         // Create the partitions ...
-        int numPartitions = node.getConfig("response.partitions", Value.create(DEFAULT_PARTITION_COUNT)).convert().asInteger();
-        int maxBacklog = node.getConfig("response.max.backlog", Value.create(DEFAULT_MAX_BACKLOG)).convert().asInteger();
-        maxRegistrationAgeInSeconds = node.getConfig("response.max.registration.age.seconds",
-                                                     Value.create(DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS)).convert().asLong();
+        ClientConfiguration config = ClientConfiguration.adapt(node.getConfiguration());
+        int numPartitions = config.getResponsePartitionCount();
+        int maxBacklog = config.getMaxResponseBacklog();
+        maxRegistrationAgeInMillis = config.getMaxResponseRegistrationAge(TimeUnit.MILLISECONDS);
         threads = new CountDownLatch(numPartitions);
         Sequences.times(numPartitions)
                  .mapToObj(i->new Partition(maxBacklog, this::processResponse, this::partitionStarted, this::partitionStopped))
@@ -204,7 +201,9 @@ final class ResponseHandlers extends Service {
         this.numPartitions = partitions.size();
         
         // Start the cleaner thread ..
-        node.execute(60,60, TimeUnit.SECONDS, this::cleanRegistrations);
+        long delay = config.getCleanerDelay(TimeUnit.SECONDS);
+        long period = config.getCleanerPeriod(TimeUnit.SECONDS);
+        node.execute(delay,period, TimeUnit.SECONDS, this::cleanRegistrations);
     }
     
     @Override
@@ -369,23 +368,22 @@ final class ResponseHandlers extends Service {
     protected void cleanRegistrations() {
         try {
             long now = System.currentTimeMillis();
-            long maxRegistrationAge = TimeUnit.MILLISECONDS.convert(maxRegistrationAgeInSeconds, TimeUnit.SECONDS);
             registrations.entrySet()
                          .stream()
-                         .filter(entry -> entry.getValue().age(now) > maxRegistrationAge)
+                         .filter(entry -> entry.getValue().age(now) > maxRegistrationAgeInMillis)
                          .map(entry -> entry.getKey())
                          .collect(Collectors.toSet())
-                         .forEach(this::failRegistration);
+                         .forEach(this::expireRegistration);
         } catch (RuntimeException t) {
             logger().error("Error while cleaning expired response registrations",t);
         }
     }
     
-    private void failRegistration(RequestId requestId) {
+    private void expireRegistration(RequestId requestId) {
         Registration registration = registrations.remove(requestId);
         if (registration != null) {
             try {
-                registration.fail(Outcome.Status.CLIENT_STOPPED, "Client stopped");
+                registration.fail(Outcome.Status.TIMEOUT, "Registered callback expired and has been removed");
             } catch (RuntimeException e) {
                 logger().error("Unable to process response using handler {}: {}", registration, e.getMessage(), e);
             }
@@ -397,7 +395,13 @@ final class ResponseHandlers extends Service {
             // Lock to prevent new registrations ...
             lock.writeLock().lock();
             try {
-                registrations.keySet().forEach(this::failRegistration);
+                registrations.values().forEach(registration->{
+                    try {
+                        registration.fail(Outcome.Status.CLIENT_STOPPED, "Client stopped");
+                    } catch (RuntimeException e) {
+                        logger().error("Unable to process response using handler {}: {}", registration, e.getMessage(), e);
+                    }
+                });
             } finally {
                 registrations.clear();
             }
@@ -407,6 +411,6 @@ final class ResponseHandlers extends Service {
     }
     
     protected boolean isEmpty() {
-        return threads.getCount() == 0;
+        return threads == null || threads.getCount() == 0;
     }
 }

@@ -104,7 +104,7 @@ public class RandomContentTest implements Testing {
         Stopwatch sw = Stopwatch.simple();
         generateBatches(sw, 1000);
         Testing.Print.enable();
-        Testing.print("1000 batches in " + asString(sw.totalDuration()) + " (" + asString(sw.averageDuration(1000)) + " per batch)");
+        Testing.print("1000 batches in " + asString(sw.totalDuration()) + " (" + asString(sw.averageDuration()) + " per batch)");
     }
 
     @Test
@@ -155,8 +155,8 @@ public class RandomContentTest implements Testing {
         return asString(sw.totalDuration());
     }
     
-    protected String average( Stopwatch sw, int count) {
-        return asString(sw.averageDuration(count));
+    protected String average( Stopwatch sw) {
+        return asString(sw.averageDuration());
     }
     
     protected String batchesPerSecondString( Stopwatch sw, int totalCount ) {
