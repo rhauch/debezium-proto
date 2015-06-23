@@ -20,7 +20,8 @@ import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
 import org.debezium.driver.Database;
 import org.debezium.driver.Debezium;
-import org.debezium.example.RandomContent.ContentGenerator;
+import org.debezium.driver.RandomContent;
+import org.debezium.driver.RandomContent.ContentGenerator;
 
 /**
  * @author Randall Hauch

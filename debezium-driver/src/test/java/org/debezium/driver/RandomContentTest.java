@@ -3,7 +3,7 @@
  * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.example;
+package org.debezium.driver;
 
 import java.text.DecimalFormat;
 import java.time.Duration;
@@ -19,8 +19,10 @@ import org.debezium.core.component.Identifier;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
 import org.debezium.core.util.Stopwatch;
-import org.debezium.example.RandomContent.ContentGenerator;
-import org.debezium.example.RandomContent.IdGenerator;
+import org.debezium.core.util.Stopwatch.Statistics;
+import org.debezium.driver.RandomContent;
+import org.debezium.driver.RandomContent.ContentGenerator;
+import org.debezium.driver.RandomContent.IdGenerator;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -104,7 +106,8 @@ public class RandomContentTest implements Testing {
         Stopwatch sw = Stopwatch.reusable();
         generateBatches(sw, 1000);
         Testing.Print.enable();
-        Testing.print("1000 batches in " + asString(sw.durations().total()) + " (" + asString(sw.durations().average()) + " per batch)");
+        Statistics stats = sw.durations().statistics();
+        Testing.print("1000 batches in " + stats.getTotalAsString() + " (" + stats.getAverageAsString() + " per batch)");
     }
 
     @Test
@@ -125,7 +128,7 @@ public class RandomContentTest implements Testing {
                     Testing.print("Waiting to start " + threadName);
                     starter.await();
                     generateBatches(sw, numBatchesPerThread);
-                    Testing.print(threadName + " generated " + numBatchesPerThread + " batches in " + total(sw) + " ("
+                    Testing.print(threadName + " generated " + numBatchesPerThread + " batches in " + sw.durations().statistics().getTotalAsString() + " ("
                             + batchesPerSecondString(sw,numBatchesPerThread) + " batches/sec)");
                     totalBatchesPerSecond.accumulate(batchesPerSecond(sw,numBatchesPerThread));
                 } catch (InterruptedException e) {
@@ -151,26 +154,12 @@ public class RandomContentTest implements Testing {
         return left + right;
     }
     
-    protected String total( Stopwatch sw ) {
-        return asString(sw.durations().total());
-    }
-    
-    protected String average( Stopwatch sw) {
-        return asString(sw.durations().average());
-    }
-    
     protected String batchesPerSecondString( Stopwatch sw, int totalCount ) {
         return new DecimalFormat("0.0##").format(batchesPerSecond(sw,totalCount));
     }
     
     protected double batchesPerSecond( Stopwatch sw, int totalCount ) {
-        Duration duration = sw.durations().total();
-        double seconds = duration.getSeconds() + (duration.getNano() / 1e9);
-        return totalCount / seconds;
-    }
-    
-    protected String asString( Duration duration ) {
-        return duration.toString().substring(2);
+        return totalCount / sw.durations().statistics().getTotal().getSeconds();
     }
     
     protected double invert( Duration duration ) {

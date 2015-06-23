@@ -22,6 +22,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongToIntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,8 @@ import org.debezium.core.function.Callable;
 import org.debezium.core.util.Sequences;
 import org.debezium.driver.Database.Outcome;
 import org.debezium.driver.DbzNode.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A service that manages a set of handlers for response messages. The service partitions the handlers and response messages
@@ -39,30 +42,31 @@ import org.debezium.driver.DbzNode.Service;
  * @author Randall Hauch
  */
 final class ResponseHandlers extends Service {
-    
+
     public static int DEFAULT_MAX_REGISTRATION_AGE_IN_SECONDS = 300;
-    
+
     public static Handlers with(Consumer<Document> successHandler, Callable completionHandler,
                                 BiConsumer<Outcome.Status, String> failureHandler) {
         return new Handlers(successHandler, completionHandler, failureHandler);
     }
-    
+
     public static final class Handlers {
         public final Optional<Consumer<Document>> successHandler;
         public final Optional<Callable> completionHandler;
         public final Optional<BiConsumer<Outcome.Status, String>> failureHandler;
-        
+
         protected Handlers(Consumer<Document> successHandler, Callable completionHandler, BiConsumer<Outcome.Status, String> failureHandler) {
             this.successHandler = Optional.ofNullable(successHandler);
             this.completionHandler = Optional.ofNullable(completionHandler);
             this.failureHandler = Optional.ofNullable(failureHandler);
         }
+
         @Override
         public String toString() {
             return successHandler + " & " + completionHandler + " & " + failureHandler;
         }
     }
-    
+
     /**
      * A handler of response message(s) for a given request.
      */
@@ -75,7 +79,7 @@ final class ResponseHandlers extends Service {
          * @param response the response message; never null
          */
         public void handleResponse(Document response);
-        
+
         /**
          * Handle a failure condition. Once this method is called, the handler will be unregistered.
          * 
@@ -84,20 +88,20 @@ final class ResponseHandlers extends Service {
          */
         public void handleError(Outcome.Status status, String failureReason);
     }
-    
+
     private static final class Registration {
         protected final ExecutionContext context;
         protected final Handlers handlers;
         private final AtomicInteger partsRemaining;
         private final long registeredAt;
-        
+
         protected Registration(ExecutionContext context, int parts, Handlers handlers) {
             this.context = context;
             this.handlers = handlers;
             this.partsRemaining = new AtomicInteger(parts);
             this.registeredAt = System.currentTimeMillis();
         }
-        
+
         /**
          * Call the handler for the given response, and
          * 
@@ -112,26 +116,31 @@ final class ResponseHandlers extends Service {
                 onCompletion.call();
             }
         }
-        
+
         protected void fail(Outcome.Status status, String failureMessage) {
             handlers.failureHandler.ifPresent(f -> f.accept(status, failureMessage));
         }
-        
+
         public long age(long now) {
             return now - this.registeredAt;
         }
-        
+
         @Override
         public String toString() {
             return context + " (" + handlers + ")";
         }
     }
-    
+
+    /**
+     * The queue of response messages for a subset of requests.
+     * @author Randall Hauch
+     */
     private static final class Partition {
+        private final Logger logger = LoggerFactory.getLogger(getClass());
         private final BlockingQueue<Document> queue;
         private final Runnable runnable;
         private final AtomicBoolean run = new AtomicBoolean(true);
-        
+
         protected Partition(int maxBacklog, Consumer<Document> consumer, Consumer<Partition> onStartup, Consumer<Partition> onCompletion) {
             this.queue = new LinkedBlockingDeque<Document>(maxBacklog);
             this.runnable = new Runnable() {
@@ -141,7 +150,9 @@ final class ResponseHandlers extends Service {
                     while (run.get()) {
                         try {
                             Document doc = queue.poll(500, TimeUnit.MILLISECONDS);
-                            if (doc != null) consumer.accept(doc);
+                            if (doc != null) {
+                                consumer.accept(doc);
+                            }
                         } catch (InterruptedException e) {
                             Thread.interrupted(); // clear the flag for this thread ...
                             break;
@@ -151,38 +162,42 @@ final class ResponseHandlers extends Service {
                 }
             };
         }
-        
+
         public boolean submit(Document response) {
+            logger.trace("Submitting response message to the partition queue");
             return queue.offer(response);
         }
-        
+
         public boolean submit(Document response, long timeout, TimeUnit unit) throws InterruptedException {
+            logger.trace("Submitting response message to the partition queue with max timeout of {} {}",timeout,unit);
             return queue.offer(response, timeout, unit);
         }
-        
+
         public void stop() {
+            logger.debug("Stopping partition");
             this.run.set(false);
         }
     }
-    
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final List<Partition> partitions = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<RequestId, Registration> registrations = new ConcurrentHashMap<>();
-    private volatile long numPartitions;
+    private volatile LongToIntFunction partitionFunction;
     private volatile Supplier<RequestId> requestIdSupplier;
     private volatile CountDownLatch threads;
     private volatile String clientId;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private volatile long maxRegistrationAgeInMillis;
-    
+
     ResponseHandlers() {
         this.requestIdSupplier = requestIdSupplier;
     }
-    
+
     @Override
     public String getName() {
         return "ResponseHandlers";
     }
-    
+
     @Override
     protected void onStart(DbzNode node) {
         this.clientId = node.id();
@@ -194,23 +209,26 @@ final class ResponseHandlers extends Service {
         maxRegistrationAgeInMillis = config.getMaxResponseRegistrationAge(TimeUnit.MILLISECONDS);
         threads = new CountDownLatch(numPartitions);
         Sequences.times(numPartitions)
-                 .mapToObj(i->new Partition(maxBacklog, this::processResponse, this::partitionStarted, this::partitionStopped))
+                 .mapToObj(i -> new Partition(maxBacklog, this::processResponse, this::partitionStarted, this::partitionStopped))
                  .forEach(partitions::add);
         // Run each of the partitions ...
         partitions.forEach(partition -> node.execute(partition.runnable));
-        this.numPartitions = partitions.size();
-        
+        long slots = partitions.size() - 1;
+        partitionFunction = input -> {
+            return (int) (slots % input);
+        };
+
         // Start the cleaner thread ..
         long delay = config.getCleanerDelay(TimeUnit.SECONDS);
         long period = config.getCleanerPeriod(TimeUnit.SECONDS);
-        node.execute(delay,period, TimeUnit.SECONDS, this::cleanRegistrations);
+        node.execute(delay, period, TimeUnit.SECONDS, this::cleanRegistrations);
     }
-    
+
     @Override
     protected void beginShutdown(DbzNode node) {
         partitions.forEach(Partition::stop);
     }
-    
+
     @Override
     protected void completeShutdown(DbzNode node) {
         if (threads != null) {
@@ -222,14 +240,14 @@ final class ResponseHandlers extends Service {
             }
         }
     }
-    
+
     protected void partitionStarted(Partition partition) {
     }
-    
+
     protected void partitionStopped(Partition partition) {
         if (threads != null) threads.countDown();
     }
-    
+
     /**
      * Register a new response handler.
      * 
@@ -252,7 +270,7 @@ final class ResponseHandlers extends Service {
             }
         });
     }
-    
+
     /**
      * Register a new response handler.
      * 
@@ -267,7 +285,7 @@ final class ResponseHandlers extends Service {
                                         BiConsumer<Outcome.Status, String> failureHandler) {
         return register(context, parts, with(successHandler, completionHandler, failureHandler));
     }
-    
+
     /**
      * Submit a request and wait for the response.
      * 
@@ -297,17 +315,18 @@ final class ResponseHandlers extends Service {
         } catch (InterruptedException e) {
             Thread.interrupted();
             failureHandler.accept(Outcome.Status.TIMEOUT, "Interrupted while waiting for results");
-        } catch (RuntimeException e ) {
+        } catch (RuntimeException e) {
             failureHandler.accept(Outcome.Status.COMMUNICATION_ERROR, e.getMessage());
         } finally {
-            // No matter what, we need to remove the registration since this request is complete ...
+            // No matter what, we need to remove the registration since we waited for this request to complete ...
             registrations.remove(requestId);
         }
         return Optional.empty();
     }
-    
+
     /**
-     * Submit a response.
+     * Submit a response message. This is typically called by the message consumer in the client that processes partial response
+     * messages.
      * 
      * @param response the response; may not be null
      * @return {@code true} if successful, or {@code false} if the response could not be submitted because the service is
@@ -316,7 +335,7 @@ final class ResponseHandlers extends Service {
     public boolean submit(Document response) {
         return submit(response, partition -> partition.submit(response));
     }
-    
+
     /**
      * Submit a response and wait a duration of time if needed.
      * 
@@ -335,36 +354,52 @@ final class ResponseHandlers extends Service {
             }
         });
     }
-    
+
+    /**
+     * Determine and find the {@link Partition} to which the request applies, and then call the supplied function with this
+     * Partition.
+     * @param response the partial response message from which the request ID is found; never null
+     * @param submitFunction the function that should be called with the designated partition
+     * @return the result of the {@code submitFunction}
+     */
     private boolean submit(Document response, Function<Partition, Boolean> submitFunction) {
         assert response != null;
         return ifRunning(node -> {
             RequestId id = RequestId.from(response);
             if (!clientId.equals(id.getClientId())) return false;
             // Partition on the request number ...
-            int index = (int) (numPartitions % id.getRequestNumber());
+            int index = partitionFunction.applyAsInt(id.getRequestNumber());
             Partition partition = partitions.get(index);
             return submitFunction.apply(partition);
         });
     }
-    
+
+    /**
+     * Method to accept a new message from the 'partial-responses' topic, and to forward this to the handler registered
+     * with the same request ID. Note that each request might produce multiple partial responses, so the registered handler is
+     * removed only if this response message is the last partial response received for the request.
+     * 
+     * @param response the partial response document; never null
+     */
     protected void processResponse(Document response) {
+        logger.trace("Client is processing partial response message: \n{}", response);
         RequestId id = RequestId.from(response);
         // We don't need to lock for removal ...
         Registration registration = registrations.get(id);
         if (registration != null) {
             // Invoke the registered handler ...
             try {
+                logger.trace("Calling registered handler for partial response with ID '{}' and message: \n{}", id, response);
                 registration.handle(id, response, () -> registrations.remove(id));
             } catch (Throwable t) {
                 logger().error("Unable to process response using handler {}: {}", registration, response, t);
-            } finally {
-                // The response has completed, so remove the registration ...
-                registrations.remove(id);
             }
         }
     }
-    
+
+    /**
+     * Looks at all registrations to see if they are expired. This method is called periodically from the cleaning thread.
+     */
     protected void cleanRegistrations() {
         try {
             long now = System.currentTimeMillis();
@@ -375,10 +410,10 @@ final class ResponseHandlers extends Service {
                          .collect(Collectors.toSet())
                          .forEach(this::expireRegistration);
         } catch (RuntimeException t) {
-            logger().error("Error while cleaning expired response registrations",t);
+            logger().error("Error while cleaning expired response registrations", t);
         }
     }
-    
+
     private void expireRegistration(RequestId requestId) {
         Registration registration = registrations.remove(requestId);
         if (registration != null) {
@@ -389,13 +424,13 @@ final class ResponseHandlers extends Service {
             }
         }
     }
-    
+
     protected void drainRegistrations() {
         try {
             // Lock to prevent new registrations ...
             lock.writeLock().lock();
             try {
-                registrations.values().forEach(registration->{
+                registrations.values().forEach(registration -> {
                     try {
                         registration.fail(Outcome.Status.CLIENT_STOPPED, "Client stopped");
                     } catch (RuntimeException e) {
@@ -409,7 +444,7 @@ final class ResponseHandlers extends Service {
             lock.writeLock().unlock();
         }
     }
-    
+
     protected boolean isEmpty() {
         return threads == null || threads.getCount() == 0;
     }

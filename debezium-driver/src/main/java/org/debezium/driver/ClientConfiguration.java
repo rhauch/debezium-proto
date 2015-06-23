@@ -113,7 +113,7 @@ public interface ClientConfiguration extends Configuration {
     }
     
     default public int getResponsePartitionCount(){
-        return getInteger("response.partitions",10);
+        return getInteger("response.partition.count",10);
     }
     
     default public int getMaxResponseBacklog(){

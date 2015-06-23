@@ -141,10 +141,10 @@ final class DbzConfigurator implements Debezium.Configure {
     
     @Override
     public Configure responsePartitionCount(int count) {
-        props.setProperty("response.partitions", Integer.toString(count));
+        props.setProperty("response.partition.count", Integer.toString(count));
         return this;
     }
-
+    
     @Override
     public Configure responseMaxBacklog(int count) {
         props.setProperty("response.max.backlog", Integer.toString(count));

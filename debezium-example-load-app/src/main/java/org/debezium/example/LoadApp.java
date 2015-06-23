@@ -33,6 +33,7 @@ import org.debezium.driver.Configuration;
 import org.debezium.driver.Database;
 import org.debezium.driver.Debezium;
 import org.debezium.driver.DebeziumConnectionException;
+import org.debezium.driver.RandomContent;
 
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
@@ -137,7 +138,7 @@ public class LoadApp {
             print(results);
         } finally {
             sw.stop();
-            print("Completed with the following request rates over " + numThreads + " thread(s) in " + sw.durations().totalAsString());
+            print("Completed with the following request rates over " + numThreads + " thread(s) in " + sw.durations().statistics().getTotalAsString());
             print("  Mean rate:   " + new DecimalFormat("#,###,##0.0").format(batchMeter.getMeanRate()) + " batch/sec");
             print("  1 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getOneMinuteRate()) + " batch/sec");
             print("  5 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getFiveMinuteRate()) + " batch/sec");

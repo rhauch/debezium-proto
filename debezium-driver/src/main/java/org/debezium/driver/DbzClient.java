@@ -27,8 +27,7 @@ final class DbzClient implements Debezium.Client {
         this.node = new DbzNode(config,env);
         this.responseHandlers = new ResponseHandlers();
         this.databases = new DbzDatabases(this.responseHandlers);
-        this.node.add(this.databases);
-        this.node.add(this.responseHandlers); // will be shut down after 'databases'
+        this.node.add(this.databases,this.responseHandlers); // will be shut down after 'databases'
     }
     
     public DbzClient start() {

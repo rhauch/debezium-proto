@@ -25,6 +25,7 @@ import org.debezium.core.doc.Document;
 import org.debezium.core.function.Callable;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Message;
+import org.debezium.core.message.Message.Status;
 import org.debezium.core.message.Patch;
 
 /**
@@ -83,11 +84,14 @@ final class DbzConnection implements Database {
     @Override
     public Completion readEntities(Iterable<EntityId> entityIds, OutcomeHandler<Stream<Entity>> handler) {
         ensureOpen();
+        if (!entityIds.iterator().hasNext()) throw new DebeziumInvalidRequestException("The batch is empty");
         RequestCompletion latch = new RequestCompletion();
         dbs.readEntities(context, entityIds, handleStream(handler, latch, response -> {
             EntityId id = Message.getEntityId(response);
             Document representation = Message.getAfter(response);
-            return Entity.with(id, representation);
+            if (representation != null) return Entity.with(id, representation);
+            changeStatus(Status.DOES_NOT_EXIST);
+            return null;
         }));
         return latch;
     }
@@ -95,6 +99,7 @@ final class DbzConnection implements Database {
     @Override
     public Completion changeEntities(Batch<EntityId> batch, OutcomeHandler<Stream<Change<EntityId, Entity>>> handler) {
         ensureOpen();
+        if (batch.isEmpty()) throw new DebeziumInvalidRequestException("The batch is empty");
         RequestCompletion latch = new RequestCompletion();
         dbs.changeEntities(context, batch, handleStream(handler, latch, response -> {
             EntityId id = Message.getEntityId(response);
@@ -138,7 +143,7 @@ final class DbzConnection implements Database {
         public boolean isComplete() {
             return latch.getCount() == 0;
         }
-        
+
         @Override
         public void await() throws InterruptedException {
             latch.await();
@@ -149,8 +154,9 @@ final class DbzConnection implements Database {
             latch.await(timeout, unit);
         }
 
-        protected void complete() {
+        protected RequestCompletion complete() {
             latch.countDown();
+            return this;
         }
     }
 
@@ -168,7 +174,9 @@ final class DbzConnection implements Database {
 
         public void accumulate(Document response) {
             T result = responseAdapter.apply(response);
-            if (result != null) results.add(result);
+            if (result != null) {
+                results.add(result);
+            }
         }
 
         public void success() {
@@ -192,7 +200,9 @@ final class DbzConnection implements Database {
                     });
                 }
             } finally {
-                if (completion != null) completion.call();
+                if (completion != null) {
+                    completion.call();
+                }
             }
         }
 

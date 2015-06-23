@@ -19,6 +19,23 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 public class VariableLatch {
 
     /**
+     * Create a new variable latch.
+     * @return the variable latch; never null
+     */
+    public static VariableLatch create() {
+        return create(0);
+    }
+
+    /**
+     * Create a new variable latch.
+     * @param initialValue the initial number of latches
+     * @return the variable latch; never null
+     */
+    public static VariableLatch create( int initialValue ) {
+        return new VariableLatch(0);
+    }
+
+    /**
      * Synchronization control For CountDownLatch.
      * Uses AQS state to represent count.
      */
@@ -43,7 +60,7 @@ public class VariableLatch {
             // Increment or decrement count; signal when transition to zero
             for (;;) {
                 int c = getState();
-                if (c == 0) return false;
+                if (c == 0 && releases >= 0) return false;
                 int nextc = c-releases;
                 if ( nextc < 0 ) nextc = 0;
                 if (compareAndSetState(c, nextc))
@@ -169,6 +186,21 @@ public class VariableLatch {
      */
     public void countUp() {
         sync.releaseShared(-1);
+    }
+
+    /**
+     * Increments the count of the latch, releasing all waiting threads if
+     * the count reaches zero.
+     *
+     * <p>If the current count is greater than zero then it is decremented.
+     * If the new count is zero then all waiting threads are re-enabled for
+     * thread scheduling purposes.
+     *
+     * <p>If the current count equals zero then nothing happens.
+     * @param count the number of counts to increase
+     */
+    public void countUp( int count) {
+        sync.releaseShared(-1 * (Math.abs(count)));
     }
 
     /**

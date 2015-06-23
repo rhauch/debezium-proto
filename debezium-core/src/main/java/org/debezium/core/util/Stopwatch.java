@@ -5,10 +5,15 @@
  */
 package org.debezium.core.util;
 
+import java.text.DecimalFormat;
 import java.time.Duration;
+import java.util.LongSummaryStatistics;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.debezium.core.annotation.ThreadSafe;
 
@@ -49,43 +54,123 @@ public abstract class Stopwatch {
      */
     @ThreadSafe
     public static interface Durations {
-        /**
-         * Get the total duration that the stopwatch or stopwatches have run.
-         * 
-         * @return the total duration; never null
-         */
-        public Duration total();
 
         /**
-         * Get the average duration that the stopwatch or stopwatches have run.
+         * Get the statistics for the durations in nanoseconds.
          * 
-         * @return the average duration; never null
+         * @return the statistics; never null
          */
-        public Duration average();
+        Statistics statistics();
+    }
+
+    public static interface Statistics {
+        /**
+         * Returns the count of durations recorded.
+         *
+         * @return the count of durations
+         */
+        public long getCount();
 
         /**
-         * Get the total duration that the stopwatch or stopwatches have run, as a formatted string.
-         * 
-         * @return the string representation of the total duration; never null
+         * Returns the total of all recorded durations.
+         *
+         * @return The total duration; never null but possibly {@link Duration#ZERO}.
          */
-        default public String totalAsString() {
-            return asString(total());
+        public Duration getTotal();
+
+        /**
+         * Returns the minimum of all recorded durations.
+         *
+         * @return The minimum duration; never null but possibly {@link Duration#ZERO}.
+         */
+        public Duration getMinimum();
+
+        /**
+         * Returns the maximum of all recorded durations.
+         *
+         * @return The maximum duration; never null but possibly {@link Duration#ZERO}.
+         */
+        public Duration getMaximum();
+
+        /**
+         * Returns the arithmetic mean of all recorded durations.
+         *
+         * @return The average duration; never null but possibly {@link Duration#ZERO}.
+         */
+        public Duration getAverage();
+
+        default public String getTotalAsString() {
+            return asString(getTotal());
         }
 
-        /**
-         * Get the average duration that the stopwatch or stopwatches have run, as a formatted string.
-         * 
-         * @return the string representation of the average duration; never null
-         */
-        default public String averageAsString() {
-            return asString(average());
+        default public String getMinimumAsString() {
+            return asString(getMinimum());
         }
-        
-        /**
-         * Atomically obtain a snapshot of the durations that will not be mutable.
-         * @return the immutable snapshot of this object; never null
-         */
-        public Durations snapshot();
+
+        default public String getMaximumAsString() {
+            return asString(getMaximum());
+        }
+
+        default public String getAverageAsString() {
+            return asString(getAverage());
+        }
+    }
+
+    private static Statistics createStatistics(LongSummaryStatistics stats) {
+        boolean some = stats.getCount() > 0L;
+        return new Statistics() {
+            @Override
+            public long getCount() {
+                return stats.getCount();
+            }
+
+            @Override
+            public Duration getMaximum() {
+                return some ? Duration.ofNanos(stats.getMax()) : Duration.ZERO;
+            }
+
+            @Override
+            public Duration getMinimum() {
+                return some ? Duration.ofNanos(stats.getMin()) : Duration.ZERO;
+            }
+
+            @Override
+            public Duration getTotal() {
+                return some ? Duration.ofNanos(stats.getSum()) : Duration.ZERO;
+            }
+
+            @Override
+            public Duration getAverage() {
+                return some ? Duration.ofNanos((long) stats.getAverage()) : Duration.ZERO;
+            }
+            
+            private String fixedLengthSeconds( Duration duration ) {
+                double seconds = duration.toNanos() * 1e-9;
+                String result = new DecimalFormat("##0.00000").format(seconds) + "s";
+                if ( result.length() == 8 ) return "  " + result;
+                if ( result.length() == 9 ) return " " + result;
+                return result;
+            }
+
+            private String fixedLength( long count ) {
+                String result = new DecimalFormat("###0").format(count);
+                if ( result.length() == 1 ) return "   " + result;
+                if ( result.length() == 2 ) return "  " + result;
+                if ( result.length() == 3 ) return " " + result;
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                StringBuilder sb = new StringBuilder();
+                sb.append(fixedLengthSeconds(getTotal()) + " total;");
+                sb.append(fixedLength(getCount()) + " samples;");
+                sb.append(fixedLengthSeconds(getAverage()) + " avg;");
+                sb.append(fixedLengthSeconds(getMinimum()) + " min;");
+                sb.append(fixedLengthSeconds(getMaximum()) + " max");
+                return sb.toString();
+            }
+        };
     }
 
     /**
@@ -157,10 +242,60 @@ public abstract class Stopwatch {
         Stopwatch create();
 
         /**
+         * Time the given function.
+         * 
+         * @param runnable the function to call
+         */
+        default public void time(Runnable runnable) {
+            time(1, runnable);
+        }
+
+        /**
+         * Time the given function multiple times.
+         * 
+         * @param repeat the number of times to repeat the function call; must be positive
+         * @param runnable the function to call; may not be null
+         */
+        default public void time(int repeat, Runnable runnable) {
+            for (int i = 0; i != repeat; ++i) {
+                Stopwatch sw = create().start();
+                try {
+                    runnable.run();
+                } finally {
+                    sw.stop();
+                }
+            }
+        }
+
+        /**
+         * Time the given function multiple times.
+         * 
+         * @param repeat the number of times to repeat the function call; must be positive
+         * @param runnable the function that is to be executed a number of times; may not be null
+         * @param cleanup the function that is to be called after each time call to the runnable function, and not included
+         *            in the time measurements; may be null
+         * @throws Exception the exception thrown by the runnable function
+         */
+        default public <T> void time(int repeat, Callable<T> runnable, Consumer<T> cleanup) throws Exception {
+            for (int i = 0; i != repeat; ++i) {
+                T result = null;
+                Stopwatch sw = create().start();
+                try {
+                    result = runnable.call();
+                } finally {
+                    sw.stop();
+                    if (cleanup != null) {
+                        cleanup.accept(result);
+                    }
+                }
+            }
+        }
+
+        /**
          * Block until all running stopwatches have been {@link Stopwatch#stop() stopped}. This means that if a stopwatch
          * is {@link #create() created} but never started, this method will not wait for it. Likewise, if a stopwatch
-         * is {@link #create() created} and started, then this method will block until the stopwatch is
-         * {@link Stopwatch#stop() stopped} (even if the same stopwatch is started multiple times).
+         * is {@link #create() created} and started, then this method will block until the stopwatch is {@link Stopwatch#stop()
+         * stopped} (even if the same stopwatch is started multiple times).
          * are stopped.
          * 
          * @throws InterruptedException if the thread is interrupted before unblocking
@@ -179,32 +314,23 @@ public abstract class Stopwatch {
     }
 
     /**
-     * Create a new set of stopwatches. The resulting object is threadsafe.
+     * Create a new set of stopwatches. The resulting object is threadsafe, and each {@link Stopwatch} created by
+     * {@link StopwatchSet#create()} is also threadsafe.
      * 
-     * @return the stopwatches object; never null
+     * @return the stopwatches set; never null
      */
     public static StopwatchSet multiple() {
         MultipleDurations durations = new MultipleDurations();
         VariableLatch latch = new VariableLatch(0);
         return new StopwatchSet() {
             @Override
+            public Statistics statistics() {
+                return durations.statistics();
+            }
+
+            @Override
             public Stopwatch create() {
                 return createWith(durations, latch::countUp, latch::countDown);
-            }
-
-            @Override
-            public Duration average() {
-                return durations.average();
-            }
-
-            @Override
-            public Duration total() {
-                return durations.total();
-            }
-            
-            @Override
-            public Durations snapshot() {
-                return durations.snapshot();
             }
 
             @Override
@@ -216,17 +342,12 @@ public abstract class Stopwatch {
             public void await(long timeout, TimeUnit unit) throws InterruptedException {
                 latch.await(timeout, unit);
             }
-        };
-    }
 
-    /**
-     * Compute the readable string representation of the supplied duration.
-     * 
-     * @param duration the duration; may not be null
-     * @return the string representation; never null
-     */
-    protected static String asString(Duration duration) {
-        return duration.toString().substring(2);
+            @Override
+            public String toString() {
+                return statistics().toString();
+            }
+        };
     }
 
     /**
@@ -278,7 +399,22 @@ public abstract class Stopwatch {
             public Durations durations() {
                 return duration;
             }
+            
+            @Override
+            public String toString() {
+                return durations().toString();
+            }
         };
+    }
+
+    /**
+     * Compute the readable string representation of the supplied duration.
+     * 
+     * @param duration the duration; may not be null
+     * @return the string representation; never null
+     */
+    protected static String asString(Duration duration) {
+        return duration.toString().substring(2);
     }
 
     /**
@@ -292,7 +428,7 @@ public abstract class Stopwatch {
 
         @Override
         public String toString() {
-            return "Total: " + totalAsString() + "; average: " + averageAsString();
+            return statistics().toString();
         }
     }
 
@@ -303,28 +439,18 @@ public abstract class Stopwatch {
      */
     @ThreadSafe
     private static final class SingleDuration extends BaseDurations {
-        private final AtomicLong total = new AtomicLong();
+        private final AtomicReference<Statistics> stats = new AtomicReference<>();
 
         @Override
-        public Duration total() {
-            return Duration.ofNanos(total.get());
-        }
-
-        @Override
-        public Duration average() {
-            return total();
+        public Statistics statistics() {
+            return stats.get();
         }
 
         @Override
         public void add(Duration duration) {
-            total.set(duration.toNanos());
-        }
-        
-        @Override
-        public Durations snapshot() {
-            SingleDuration result = new SingleDuration();
-            result.add(total());
-            return result;
+            LongSummaryStatistics stats = new LongSummaryStatistics();
+            if (duration != null) stats.accept(duration.toNanos());
+            this.stats.set(createStatistics(stats));
         }
     }
 
@@ -338,44 +464,13 @@ public abstract class Stopwatch {
         private final ConcurrentLinkedQueue<Duration> durations = new ConcurrentLinkedQueue<>();
 
         @Override
-        public Duration total() {
-            AtomicLong totalDuration = new AtomicLong();
-            durations.forEach(duration -> totalDuration.addAndGet(duration.toNanos()));
-            return Duration.ofNanos(totalDuration.get());
-        }
-
-        @Override
-        public Duration average() {
-            return computeAverage(new AtomicLong());
-        }
-
-        public Duration computeAverage(AtomicLong count) {
-            count.set(0);
-            AtomicLong totalDuration = new AtomicLong();
-            durations.forEach(duration -> {
-                totalDuration.addAndGet(duration.toNanos());
-                count.incrementAndGet();
-            });
-            return count.get() == 0 ? Duration.ZERO : Duration.ofNanos(totalDuration.get() / count.get());
+        public Statistics statistics() {
+            return createStatistics(durations.stream().mapToLong(Duration::toNanos).summaryStatistics());
         }
 
         @Override
         public void add(Duration duration) {
             durations.add(duration);
-        }
-        
-        @Override
-        public Durations snapshot() {
-            MultipleDurations result = new MultipleDurations();
-            durations.forEach(result::add);
-            return result;
-        }
-        
-        @Override
-        public String toString() {
-            AtomicLong count = new AtomicLong();
-            Duration avg = computeAverage(count);
-            return "Total: " + totalAsString() + "; average: " + asString(avg) + "; count=" + count.get();
         }
     }
 }

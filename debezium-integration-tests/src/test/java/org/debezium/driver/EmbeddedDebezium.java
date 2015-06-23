@@ -94,7 +94,7 @@ public class EmbeddedDebezium implements Debezium.Client {
         addService(new SchemaStorageService(), serviceConfig, "response-accumulator-service", Topic.SCHEMA_PATCHES);
 
         // Create the client ...
-        Configuration config = Debezium.configure().build();
+        Configuration config = Debezium.configure().responseMaxBacklog(2000).build();
         client = Debezium.start(config, env);
     }
 
@@ -168,7 +168,7 @@ public class EmbeddedDebezium implements Debezium.Client {
                     }
                 }
                 // Call the service ...
-                logger.debug("SERVICE {}: Processing message: {}", service.getClass().getSimpleName(), message);
+                logger.debug("SERVICE {}: Processing message with key '{}', partition {}, and offset {}: {}", service.getClass().getSimpleName(), key, partition, offset, message);
                 service.process(inputEnvelope, messageQueue.collector(), messageQueue.coordinator());
                 // and send all accumulated messages ...
                 messageQueue.sendAll();
@@ -263,7 +263,7 @@ public class EmbeddedDebezium implements Debezium.Client {
                 KeyedMessage<byte[], byte[]> rawMessage = new KeyedMessage<>(topic, key, partitionKey, message);
                 messages.add(rawMessage);
                 if (logger.isTraceEnabled()) {
-                    logger.trace("TOPIC: add message with key '{}' and value: {}", topic, envelope.getMessage());
+                    logger.trace("TOPIC: add message to topic '{}' with key '{}' and value: {}", topic, envelope.getKey(), envelope.getMessage());
                 }
             }
         };

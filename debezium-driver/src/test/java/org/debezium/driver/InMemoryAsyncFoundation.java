@@ -109,7 +109,7 @@ public class InMemoryAsyncFoundation implements Foundation {
                             try {
                                 consumer.consume(topic, 1, offset.get(), key, m);
                             } catch (Throwable t) {
-                                logger.error("Error consuming message on topic {} with offset {} and key {}", t, topic, offset.get(), key);
+                                logger.error("Error consuming message on topic '{}' with offset {} and key {}", topic, offset.get(), key, t);
                             }
                         }
                     }
@@ -170,7 +170,7 @@ public class InMemoryAsyncFoundation implements Foundation {
         @Override
         public boolean send(KeyedMessage<byte[], byte[]> message) {
             if ( logger.isTraceEnabled() ) {
-            logger.trace("FOUNDATION: sending message '{}' on topic '{}' to consumer groups",new String(message.key()),message.topic());
+                logger.trace("FOUNDATION: sending message '{}' on topic '{}' to consumer groups: {}",new String(message.key()),message.topic(),consumersByGroupId.keySet());
             }
             // Write out to each of the consumer groups (if there are any) ...
             consumersByGroupId.forEach((groupId, group) -> group.accept(message));

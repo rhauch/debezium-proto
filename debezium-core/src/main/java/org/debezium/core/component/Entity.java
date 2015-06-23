@@ -49,5 +49,10 @@ public final class Entity implements Identified<EntityId> {
     public Document document() {
         return doc;
     }
+    
+    @Override
+    public String toString() {
+        return id.toString() + "-" + doc;
+    }
 
 }

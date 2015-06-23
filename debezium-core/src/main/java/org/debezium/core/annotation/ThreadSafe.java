@@ -21,7 +21,7 @@ import java.lang.annotation.Target;
  * @see NotThreadSafe
  */
 @Documented
-@Target( ElementType.TYPE )
+@Target( {ElementType.TYPE, ElementType.FIELD} )
 @Retention( RetentionPolicy.RUNTIME )
 public @interface ThreadSafe {
 }

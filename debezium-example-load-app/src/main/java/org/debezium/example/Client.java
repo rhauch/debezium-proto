@@ -19,7 +19,8 @@ import org.debezium.driver.Database;
 import org.debezium.driver.Database.Change;
 import org.debezium.driver.Database.Completion;
 import org.debezium.driver.Database.Outcome;
-import org.debezium.example.RandomContent.ContentGenerator;
+import org.debezium.driver.RandomContent;
+import org.debezium.driver.RandomContent.ContentGenerator;
 
 import com.codahale.metrics.Meter;
 

@@ -3,7 +3,7 @@
  * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.example;
+package org.debezium.driver;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,7 +33,7 @@ import org.debezium.core.message.Patch.Editor;
  */
 public final class RandomContent {
     
-    public interface IdGenerator {
+    public static interface IdGenerator {
         EntityId[] generateEditableIds();
         EntityId[] generateRemovableIds();
     }

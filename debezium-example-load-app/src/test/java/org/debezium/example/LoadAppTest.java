@@ -7,6 +7,7 @@ package org.debezium.example;
 
 import org.debezium.driver.Configuration;
 import org.debezium.driver.Debezium;
+import org.debezium.driver.RandomContent;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;

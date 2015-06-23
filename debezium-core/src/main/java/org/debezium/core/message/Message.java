@@ -122,6 +122,7 @@ public final class Message {
     private static final Set<String> HEADER_FIELD_NAMES = Collect.unmodifiableSet(Field.CLIENT_ID,
                                                                                   Field.REQUEST,
                                                                                   Field.USER,
+                                                                                  Field.PART,
                                                                                   Field.PARTS,
                                                                                   Field.DATABASE_ID,
                                                                                   Field.COLLECTION,
@@ -166,7 +167,7 @@ public final class Message {
         Array responses = complete.setArray(Field.RESPONSES, Array.createWithNulls(parts));
         Value part = partialResponse.get(Field.PART);
         assert part != null;
-        assert part.isInteger();
+        assert part.isNumber();
         int index = part.asInteger().intValue() - 1;
         responses.setDocument(index, partialResponse);
         return complete;
