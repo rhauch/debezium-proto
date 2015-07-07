@@ -72,6 +72,70 @@ public final class Strings {
         pw.close();
         return bas.toString();
     }
+    
+    /**
+     * Parse the supplied string as a integer value.
+     * @param value the string representation of a integer value
+     * @param defaultValue the value to return if the string value is null or cannot be parsed as an int
+     * @return the int value
+     */
+    public static int asInt( String value, int defaultValue ) {
+        if ( value != null ) {
+            try {
+                return Integer.parseInt(value);
+            } catch ( NumberFormatException e ) {
+            }
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * Parse the supplied string as a long value.
+     * @param value the string representation of a long value
+     * @param defaultValue the value to return if the string value is null or cannot be parsed as a long
+     * @return the long value
+     */
+    public static long asLong( String value, long defaultValue ) {
+        if ( value != null ) {
+            try {
+                return Long.parseLong(value);
+            } catch ( NumberFormatException e ) {
+            }
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * Parse the supplied string as a double value.
+     * @param value the string representation of a double value
+     * @param defaultValue the value to return if the string value is null or cannot be parsed as a double
+     * @return the double value
+     */
+    public static double asDouble( String value, double defaultValue ) {
+        if ( value != null ) {
+            try {
+                return Double.parseDouble(value);
+            } catch ( NumberFormatException e ) {
+            }
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * Parse the supplied string as a boolean value.
+     * @param value the string representation of a boolean value
+     * @param defaultValue the value to return if the string value is null or cannot be parsed as a boolean
+     * @return the boolean value
+     */
+    public static boolean asBoolean( String value, boolean defaultValue ) {
+        if ( value != null ) {
+            try {
+                return Boolean.parseBoolean(value);
+            } catch ( NumberFormatException e ) {
+            }
+        }
+        return defaultValue;
+    }
 
     private Strings() {
     }

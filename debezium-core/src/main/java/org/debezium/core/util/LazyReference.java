@@ -5,10 +5,7 @@
  */
 package org.debezium.core.util;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -25,9 +22,7 @@ public final class LazyReference<T> {
     }
 
     private final AtomicReference<T> ref = new AtomicReference<>();
-    private final AtomicBoolean created = new AtomicBoolean(false);
     private final Supplier<T> supplier;
-    private final Lock creationLock = new ReentrantLock();
 
     private LazyReference(Supplier<T> supplier) {
         this.supplier = supplier;
@@ -39,7 +34,7 @@ public final class LazyReference<T> {
      * @return {@code true} if the object has been created, or false otherwise
      */
     public boolean isInitialized() {
-        return created.get();
+        return ref.get() != null;
     }
 
     /**
@@ -58,18 +53,10 @@ public final class LazyReference<T> {
      *            object is released; may be null
      */
     public void release(Consumer<T> finalizer) {
-        if (created.get()) {
-            try {
-                creationLock.lock();
-                if (created.get()) {
-                    T val = ref.getAndSet(null);
-                    if (val != null && finalizer != null) finalizer.accept(val);
-                    created.set(false);
-                }
-            } finally {
-                creationLock.unlock();
-            }
-        }
+        ref.updateAndGet(existing->{
+            if ( existing != null && finalizer != null ) finalizer.accept(existing);
+            return null;
+        });
     }
 
     /**
@@ -86,16 +73,6 @@ public final class LazyReference<T> {
     }
 
     public T get() {
-        if (!created.get()) {
-            try {
-                creationLock.lock();
-                if (!created.get()) {
-                    ref.set(supplier.get());
-                }
-            } finally {
-                creationLock.unlock();
-            }
-        }
-        return ref.get();
+        return ref.updateAndGet(existing->existing != null ? existing : supplier.get());
     }
 }

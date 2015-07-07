@@ -7,6 +7,7 @@ activemq-data/
 .recommenders/
 .classpath
 .project
+.cache
 .settings/
 .gradle/
 build/
@@ -19,3 +20,5 @@ log
 npm-debug.log
 .DS_Store
 phantomjsdriver.log
+
+/state/

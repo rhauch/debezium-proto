@@ -122,6 +122,7 @@ public final class Message {
     private static final Set<String> HEADER_FIELD_NAMES = Collect.unmodifiableSet(Field.CLIENT_ID,
                                                                                   Field.REQUEST,
                                                                                   Field.USER,
+                                                                                  Field.PART,
                                                                                   Field.PARTS,
                                                                                   Field.DATABASE_ID,
                                                                                   Field.COLLECTION,
@@ -166,7 +167,7 @@ public final class Message {
         Array responses = complete.setArray(Field.RESPONSES, Array.createWithNulls(parts));
         Value part = partialResponse.get(Field.PART);
         assert part != null;
-        assert part.isInteger();
+        assert part.isNumber();
         int index = part.asInteger().intValue() - 1;
         responses.setDocument(index, partialResponse);
         return complete;
@@ -513,13 +514,29 @@ public final class Message {
     public static boolean includeBefore(Document message) {
         return message.getBoolean(Field.INCLUDE_BEFORE, false);
     }
+    
+    public static long getDurationInMillis( Document message ) {
+        long begun = message.getLong(Field.BEGUN,-1);
+        long ended = message.getLong(Field.ENDED, -1);
+        if ( begun <= 0L || ended <= 0L ) return -1;
+        assert ended >= begun;
+        return ended - begun;
+    }
 
     public static int getParts(Document message) {
         return message.getInteger(Field.PARTS, 1);
     }
 
+    public static int getParts(Document message, int defaultParts ) {
+        return message.getInteger(Field.PARTS, defaultParts);
+    }
+
     public static int getPart(Document message) {
         return message.getInteger(Field.PART, 1);
+    }
+
+    public static int getPart(Document message, int defaultPart) {
+        return message.getInteger(Field.PART, defaultPart);
     }
 
     public static void setParts(Document message, int part, int parts) {
@@ -529,11 +546,21 @@ public final class Message {
         message.setNumber(Field.PART, part);
         message.setNumber(Field.PARTS, parts);
     }
+    
+    public static boolean hasOps( Document message ) {
+        Array array = message.getArray(Field.OPS);
+        return array != null && !array.isEmpty();
+    }
+    
+    public static boolean isReadOnly( Document message ) {
+        Array array = message.getArray(Field.OPS);
+        return array == null || array.isEmpty();
+    }
 
     public static Action determineAction(Document message) {
-        boolean includesBefore = getAfter(message) != null;
+        boolean includesBefore = getBefore(message) != null;
         if (includesBefore) {
-            boolean includesAfter = getBefore(message) != null;
+            boolean includesAfter = getAfter(message) != null;
             return includesAfter ? Action.UPDATED : Action.DELETED;
         }
         return Action.CREATED;

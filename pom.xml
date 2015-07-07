@@ -25,44 +25,63 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Major dependencies -->
-        <samza.version>0.7.0</samza.version>
-        <kafka.version>0.8.1.1</kafka.version>
+        <samza.version>0.9.0</samza.version>
+        <kafka.version>0.8.2.1</kafka.version>
         <scala.version>2.10.4</scala.version>
         <scala.label.version>2.10</scala.label.version>
         <curator.version>2.4.0</curator.version>
         <zookeeper.version>3.4.6</zookeeper.version>
-        <avro.version>1.7.7</avro.version>
         <junit.version>4.11</junit.version>
         <fest.version>1.4</fest.version>
         <jackson.version>2.4.0</jackson.version>
+        <!-- Kafka uses Metrics 2.2.0, but Metrics 3.x uses a different package
+             structure so it can be used alongside 2.x within the same classloader -->
+        <metrics.version>3.1.0</metrics.version>
 
         <!-- Logging stuff -->
-        <jboss.logging.version>3.1.4.GA</jboss.logging.version>
-        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version>
+        <!--jboss.logging.version>3.1.4.GA</jboss.logging.version>
+        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version-->
         <log4j.version>1.2.16</log4j.version>
         <org.slf4j.version>1.7.2</org.slf4j.version>
         <slf4j.log4j.version>1.7.2</slf4j.log4j.version>
         <jboss.slf4j.logmanager.version>1.0.3.GA</jboss.slf4j.logmanager.version>
 
         <!-- Maven Plugins -->
+        <version.resources.plugin>2.4.2</version.resources.plugin>
         <version.assembly.plugin>2.4</version.assembly.plugin>
-        <version.resourceStates.plugin>2.4.2</version.resourceStates.plugin>
-        <version.vertx.plugin>2.0.1-final</version.vertx.plugin>
         <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
         <version.google.formatter.plugin>0.3.1</version.google.formatter.plugin>
+        <version.spotify.docker.plugin>0.1.2</version.spotify.docker.plugin>
+        <version.scala.plugin>2.15.2</version.scala.plugin>
 
         <maven.compiler.argument.source>1.8</maven.compiler.argument.source>
         <maven.compiler.argument.target>1.8</maven.compiler.argument.target>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
+        <docker.maintainer>Debezium community</docker.maintainer>
+
     </properties>
     <modules>
         <module>debezium-core</module>
-        <module>debezium-services</module>
-        <module>debezium-services-job-package</module>
-        <module>debezium-client</module>
+        <module>debezium-docker-jre8</module>
+        <module>debezium-docker-zookeeper</module>
+        <module>debezium-docker-kafka</module>
+        <module>debezium-samza</module>
+        <module>debezium-assembly-descriptors</module>
+        <module>debezium-service</module>
+        <module>debezium-service-entity-batch</module>
+        <module>debezium-service-entity-storage</module>
+        <module>debezium-service-schema-storage</module>
+        <!--module>debezium-service-schema-learning-partitioner</module>
+        <module>debezium-service-schema-learning</module>
+        <module>debezium-service-metrics</module-->
+        <module>debezium-service-response-accumulator</module>
+        <module>debezium-driver</module>
+        <!--module>debezium-docker-mini</module-->
+        <module>debezium-integration-tests</module>
         <module>debezium-example-app</module>
+        <module>debezium-example-load-app</module>
     </modules>
     <developers>
         <developer>
@@ -116,6 +135,21 @@
                 <version>${samza.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kv-rocksdb_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kv-inmemory_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-kafka_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+            </dependency>
+            <dependency>
               <groupId>com.fasterxml.jackson.core</groupId>
               <artifactId>jackson-core</artifactId>
               <version>${jackson.version}</version>
@@ -125,11 +159,6 @@
             <dependency>
                 <groupId>org.apache.samza</groupId>
                 <artifactId>samza-core_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-serializers_${scala.label.version}</artifactId>
                 <version>${samza.version}</version>
             </dependency>
             <dependency>
@@ -145,14 +174,18 @@
                 <version>${samza.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kafka_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
+                <groupId>io.dropwizard.metrics</groupId>
+                <artifactId>metrics-core</artifactId>
+                <version>${metrics.version}</version>
             </dependency>
-
 
             <!-- Logging dependencies -->
             <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${org.slf4j.version}</version>
+            </dependency>
+            <!--dependency>
                 <groupId>org.jboss.msc</groupId>
                 <artifactId>jboss-msc</artifactId>
                 <version>${jboss.msc.version}</version>
@@ -168,15 +201,10 @@
                 <version>${jboss.logmanager.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${org.slf4j.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.jboss.slf4j</groupId>
                 <artifactId>slf4j-jboss-logmanager</artifactId>
                 <version>${jboss.slf4j.logmanager.version}</version>
-            </dependency>
+            </dependency-->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-log4j12</artifactId>
@@ -221,6 +249,14 @@
                 <version>${curator.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.apache.samza</groupId>
+                <artifactId>samza-core_${scala.label.version}</artifactId>
+                <version>${samza.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+
             <!-- Debezium artifacts -->
             <dependency>
                 <groupId>org.debezium</groupId>
@@ -229,17 +265,47 @@
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
-                <artifactId>debezium-client</artifactId>
+                <artifactId>debezium-driver</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
-                <artifactId>debezium-services</artifactId>
+                <artifactId>debezium-samza</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
-                <artifactId>debezium-services-job-package</artifactId>
+                <artifactId>debezium-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-entity-batch-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-entity-storage-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-storage-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-learning-partitioner-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-schema-learning-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-response-accumulator-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- Debezium test artifacts -->
@@ -250,7 +316,27 @@
                 <type>test-jar</type>
                 <scope>test</scope>
             </dependency>
-
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-service</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-driver</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-integration-tests</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
     <dependencies>
@@ -321,11 +407,6 @@
                     <version>${version.failsafe.plugin}</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-resourceStates-plugin</artifactId>
-                    <version>${version.resourceStates.plugin}</version>
-                </plugin>
-                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
                     <version>${version.codehaus.helper.plugin}</version>
@@ -336,14 +417,14 @@
                     <version>${version.google.formatter.plugin}</version>
                 </plugin>
                 <plugin>
-                    <groupId>io.vertx</groupId>
-                    <artifactId>vertx-maven-plugin</artifactId>
-                    <version>${version.vertx.plugin}</version>
+                    <groupId>com.spotify</groupId>
+                    <artifactId>docker-maven-plugin</artifactId>
+                    <version>${version.spotify.docker.plugin}</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.apache.avro</groupId>
-                    <artifactId>avro-maven-plugin</artifactId>
-                    <version>${avro.version}</version>
+                    <groupId>org.scala-tools</groupId>
+                    <artifactId>maven-scala-plugin</artifactId>
+                    <version>${version.scala.plugin}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -357,6 +438,12 @@
                         <phase>verify</phase>
                         <goals>
                             <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>attach-test-sources</id>
+                        <goals>
+                            <goal>test-jar-no-fork</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -379,7 +466,7 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resourceStates-plugin</artifactId>
+                <artifactId>maven-resources-plugin</artifactId>
                 <configuration>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
@@ -427,6 +514,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Generate the Docker images; by default, skip -->
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <configuration>
+                    <skipDockerBuild>true</skipDockerBuild>
+                </configuration>
             </plugin>
         </plugins>
     </build>

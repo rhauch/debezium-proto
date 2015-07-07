@@ -20,13 +20,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import org.debezium.client.Configuration;
-import org.debezium.client.Database;
-import org.debezium.client.Database.Change;
-import org.debezium.client.Database.Completion;
-import org.debezium.client.Database.Outcome;
-import org.debezium.client.Debezium;
-import org.debezium.client.DebeziumConnectionException;
 import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
@@ -36,6 +29,13 @@ import org.debezium.core.component.Schema;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Batch;
+import org.debezium.driver.Configuration;
+import org.debezium.driver.Database;
+import org.debezium.driver.Debezium;
+import org.debezium.driver.DebeziumConnectionException;
+import org.debezium.driver.Database.Change;
+import org.debezium.driver.Database.Completion;
+import org.debezium.driver.Database.Outcome;
 
 /**
  * @author Randall Hauch

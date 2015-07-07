@@ -1,0 +1,97 @@
+zookeeper:
+  image: debezium-zookeeper
+  ports:
+    - "2181:2181"
+    - "2888:2888"
+    - "3888:3888"
+  environment:
+    SERVER_ID: 1
+    SERVER_COUNT: 1
+    LOG_LEVEL: WARN
+  volumes:
+    - ./state/zk-data:/zookeeper/data
+    - ./state/zk-txns:/zookeeper/txns
+kafka:
+  image: debezium-kafka
+  ports:
+    - "9092:9092"
+  links:
+    - zookeeper
+  environment:
+    BROKER_ID: 1
+    ZOOKEEPER_CONNECT: zookeeper:2181
+    CREATE_TOPICS: >
+        entity-batches:1:1,
+        entity-patches:1:1,
+        entity-updates:1:1,
+        partial-responses:1:1,
+        complete-responses:1:1,
+        schema-patches:1:1,
+        schema-updates:1:1,
+        connections:1:1
+    HEAP_OPTS: -Xmx500M
+    KAFKA_ADVERTISED_PORT: 9092
+    # Be sure to give the host computer's IP address, or if on OS X use address of boot2docker (via `boot2docker ip`)
+    KAFKA_ADVERTISED_HOST_NAME: 192.168.59.103
+    LOG_LEVEL: WARN
+# Problem with Kafka when using data volumes on OS X
+# See https://issues.apache.org/jira/browse/KAFKA-1966
+#  volumes:
+#    - ./state/kafka/data:/kafka/data
+#    - ./state/kafka/logs:/kafka/logs
+entitybatch:
+  image: debezium-entity-batch-service
+  links:
+    - kafka
+    - zookeeper
+  environment:
+    LOG_LEVEL: WARN
+entitystorage:
+  image: debezium-entity-storage-service
+  links:
+    - zookeeper
+    - kafka
+  environment:
+    LOG_LEVEL: WARN
+schemastorage:
+  image: debezium-schema-storage-service
+  links:
+    - kafka
+    - zookeeper
+  environment:
+    LOG_LEVEL: WARN
+responseaccumulator:
+  image: debezium-response-accumulator-service
+  links:
+    - kafka
+    - zookeeper
+  environment:
+    LOG_LEVEL: WARN
+#
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/
+# metrics:
+#   image: debezium-metrics-service
+#   links:
+#     - zookeeper:zookeeper
+#     - kafka:kafka
+#   environment:
+#     KAFKA: kafka:9092
+#     ZOOKEEPER: zookeeper:2181/
+# # schemalearningpartitioner:
+# #   image: debezium-schema-learning-partitioner-service
+# #   links:
+# #     - zookeeper:zookeeper
+# #     - kafka:kafka
+# #   environment:
+# #     KAFKA: kafka:9092
+# #     ZOOKEEPER: zookeeper:2181/
+# # schemalearning:
+# #   image: debezium-schema-learning-service
+# #   links:
+# #     - zookeeper:zookeeper
+# #     - kafka:kafka
+# #   environment:
+# #     KAFKA: kafka:9092
+# #     ZOOKEEPER: zookeeper:2181/
