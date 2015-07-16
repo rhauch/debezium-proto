@@ -12,7 +12,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -39,12 +40,17 @@ import org.apache.samza.task.TaskCoordinator;
 import org.apache.samza.task.TaskCoordinator.RequestScope;
 import org.apache.samza.task.WindowableTask;
 import org.debezium.Testing;
-import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.EntityType;
 import org.debezium.core.doc.Document;
+import org.debezium.core.message.Patch;
+import org.debezium.core.message.Patch.Editor;
 import org.debezium.core.message.Topic;
 import org.debezium.core.serde.Decoder;
 import org.debezium.core.serde.Encoder;
 import org.debezium.core.serde.Serdes;
+import org.debezium.core.util.Stopwatch;
+import org.debezium.core.util.Stopwatch.StopwatchSet;
 import org.debezium.samza.MemoryKeyValueStore;
 import org.debezium.service.EntityBatchService;
 import org.debezium.service.EntityStorageService;
@@ -68,7 +74,9 @@ import org.slf4j.LoggerFactory;
  * Be sure to call {@link #shutdown(long, TimeUnit)} when finished with an {@link EmbeddedDebezium} instance. Doing so will
  * properly clean up all threads and resources.
  */
-public class EmbeddedDebezium implements Debezium.Client {
+public class EmbeddedDebezium implements Debezium {
+
+    protected static final RandomContent RANDOM_CONTENT = RandomContent.load();
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String systemName = "kafka";
@@ -77,15 +85,26 @@ public class EmbeddedDebezium implements Debezium.Client {
     private final Serde<String> keyEncoder = Serdes.string();
     private final Encoder<Document> messageEncoder = Serdes.documentEncoder();
 
-    private final Debezium.Client client;
-    private final InMemoryAsyncFoundation foundation = new InMemoryAsyncFoundation("kafka", null, this::getExecutor);
-    private final Environment env = Environment.create(exec -> foundation);
+    private final Debezium client;
+    private final InMemoryAsyncMessageBus bus;
     private final List<StreamTask> services = new ArrayList<>();
     private final List<Runnable> windowables = new ArrayList<>();
     private final MetricsRegistry metricsRegistry = null;
     private final ConcurrentMap<String, KeyValueStore<String, Document>> storesByName = new ConcurrentHashMap<>();
+    
+    private final StopwatchSet connectTimer = Stopwatch.multiple();
+    private final StopwatchSet provisionTimer = Stopwatch.multiple();
+    private final StopwatchSet readSchemaTimer = Stopwatch.multiple();
+    private final StopwatchSet readEntityTimer = Stopwatch.multiple();
+    private final StopwatchSet changeEntityTimer = Stopwatch.multiple();
+    private final StopwatchSet removeEntityTimer = Stopwatch.multiple();
+    private final StopwatchSet batchTimer = Stopwatch.multiple();
+    private final StopwatchSet shutdownTimer = Stopwatch.multiple();
 
     public EmbeddedDebezium() {
+        ExecutorService executor = Executors.newCachedThreadPool();
+        bus = new InMemoryAsyncMessageBus("kafka", () -> executor);
+
         // Wire up the services to the foundation, which uses a separate thread for each service ...
         Config serviceConfig = new MapConfig();
         addService(new EntityBatchService(), serviceConfig, "entity-batch-service", Topic.ENTITY_BATCHES);
@@ -94,8 +113,13 @@ public class EmbeddedDebezium implements Debezium.Client {
         addService(new SchemaStorageService(), serviceConfig, "response-accumulator-service", Topic.SCHEMA_PATCHES);
 
         // Create the client ...
-        Configuration config = Debezium.configure().responseMaxBacklog(2000).build();
-        client = Debezium.start(config, env);
+        client = Debezium.driver()
+                         .clientId("client")
+                         .initializeProducerImmediately(true)
+                         .usingExecutor(() -> executor)
+                         .usingBus(execSupplier -> bus )
+                         .usingSecurity(PassthroughSecurityProvider::new)
+                         .start();
     }
 
     /**
@@ -107,38 +131,89 @@ public class EmbeddedDebezium implements Debezium.Client {
     }
 
     @Override
-    public Database connect(DatabaseId id, String username, String device, String appVersion) {
-        return client.connect(id, username, device, appVersion);
+    public BatchBuilder batch() {
+        BatchBuilder delegate = client.batch();
+        return new BatchBuilder() {
+            @Override
+            public BatchBuilder readEntity(EntityId entityId) {
+                return delegate.readEntity(entityId);
+            }
+            @Override
+            public BatchBuilder changeEntity(Patch<EntityId> patch) {
+                return delegate.changeEntity(patch);
+            }
+            @Override
+            public Editor<BatchBuilder> changeEntity(EntityId entityId) {
+                return delegate.changeEntity(entityId);
+            }
+            @Override
+            public Editor<BatchBuilder> createEntity(EntityType entityType) {
+                return delegate.createEntity(entityType);
+            }
+            @Override
+            public BatchBuilder destroyEntity(EntityId entityId) {
+                return delegate.destroyEntity(entityId);
+            }
+            @Override
+            public BatchResult submit(SessionToken token, long timeout, TimeUnit unit) {
+                return batchTimer.time(()->delegate.submit(token, timeout, unit));
+            }
+        };
     }
 
     @Override
-    public Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
-        return client.connect(id, username, device, appVersion, timeout, unit);
+    public SessionToken connect(String username, String device, String appVersion, String... databaseIds) {
+        return connectTimer.time(()-> client.connect(username, device, appVersion, databaseIds));
     }
 
     @Override
-    public Database provision(DatabaseId id, String username, String device, String appVersion) {
-        return client.provision(id, username, device, appVersion);
+    public void provision(SessionToken adminToken, String databaseId, long timeout, TimeUnit unit) {
+        provisionTimer.time(()-> client.provision(adminToken, databaseId, timeout, unit));
     }
 
     @Override
-    public Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit) {
-        return client.provision(id, username, device, appVersion, timeout, unit);
+    public Schema readSchema(SessionToken token, String databaseId, long timeout, TimeUnit unit) {
+        return readSchemaTimer.time(()->client.readSchema(token, databaseId, timeout, unit));
     }
 
+    @Override
+    public Entity readEntity(SessionToken token, EntityId entityId, long timeout, TimeUnit unit) {
+        return readEntityTimer.time(()->client.readEntity(token, entityId, timeout, unit));
+    }
+
+    @Override
+    public EntityChange changeEntity(SessionToken token, Patch<EntityId> patch, long timeout, TimeUnit unit) {
+        return changeEntityTimer.time(()->client.changeEntity(token, patch, timeout, unit));
+    }
+
+    @Override
+    public boolean destroyEntity(SessionToken token, EntityId entityId, long timeout, TimeUnit unit) {
+        return removeEntityTimer.time(()->client.destroyEntity(token, entityId, timeout, unit));
+    }
+    
     @Override
     public void shutdown(long timeout, TimeUnit unit) {
-        try {
-            client.shutdown(timeout, unit);
-        } finally {
-            foundation.shutdown();
+        shutdownTimer.time(()->client.shutdown(timeout, unit));
+    }
+
+    public void printStatistics(String desc) {
+        if (Testing.Print.isEnabled()) {
+            Testing.print("Times to " + desc);
+            Testing.print("  - read schemas        " + readSchemaTimer.statistics());
+            Testing.print("  - read entities       " + readEntityTimer.statistics());
+            Testing.print("  - change entities     " + changeEntityTimer.statistics());
+            Testing.print("  - remove entities     " + removeEntityTimer.statistics());
+            Testing.print("  - provision databases " + provisionTimer.statistics());
+            Testing.print("  - connect sessions    " + connectTimer.statistics());
+            Testing.print("  - batch requests      " + batchTimer.statistics());
+            Testing.print("  - shutdown            " + shutdownTimer.statistics());
         }
     }
-
-    private Executor getExecutor() {
-        return env.getExecutor();
+    
+    public BatchBuilder createEntities( BatchBuilder batch, int numEdits, int numRemoves, EntityType type ) {
+        return RANDOM_CONTENT.createGenerator().addToBatch(batch, numEdits, numRemoves, type);
     }
-
+    
     protected void addService(StreamTask service, String serviceName, String... inputTopics) {
         addService(service, null, serviceName, inputTopics);
     }
@@ -168,7 +243,9 @@ public class EmbeddedDebezium implements Debezium.Client {
                     }
                 }
                 // Call the service ...
-                logger.debug("SERVICE {}: Processing message with key '{}', partition {}, and offset {}: {}", service.getClass().getSimpleName(), key, partition, offset, message);
+                logger.debug("SERVICE {}: Processing message with key '{}', partition {}, and offset {}: {}", service.getClass()
+                                                                                                                     .getSimpleName(), key,
+                             partition, offset, message);
                 service.process(inputEnvelope, messageQueue.collector(), messageQueue.coordinator());
                 // and send all accumulated messages ...
                 messageQueue.sendAll();
@@ -196,11 +273,11 @@ public class EmbeddedDebezium implements Debezium.Client {
         }
 
         // Ensure that the topics exist ...
-        foundation.createStreams(inputTopics);
+        bus.createStreams(inputTopics);
 
         // Add the service as a consumer for each of the topics ...
         TopicFilter topicFilter = Topics.anyOf(inputTopics);
-        foundation.subscribe(serviceName, topicFilter, 1, keyDecoder, messageDecoder, consumer); // will start running immediately
+        bus.subscribe(serviceName, topicFilter, 1, keyDecoder, messageDecoder, consumer); // will start running immediately
 
         // Record and initialize the service ...
         services.add(service);
@@ -223,7 +300,7 @@ public class EmbeddedDebezium implements Debezium.Client {
 
             @Override
             public Set<SystemStreamPartition> getSystemStreamPartitions() {
-                return foundation.getSystemStreamPartitions();
+                return bus.getSystemStreamPartitions();
             }
 
             @Override
@@ -263,7 +340,8 @@ public class EmbeddedDebezium implements Debezium.Client {
                 KeyedMessage<byte[], byte[]> rawMessage = new KeyedMessage<>(topic, key, partitionKey, message);
                 messages.add(rawMessage);
                 if (logger.isTraceEnabled()) {
-                    logger.trace("TOPIC: add message to topic '{}' with key '{}' and value: {}", topic, envelope.getKey(), envelope.getMessage());
+                    logger.trace("TOPIC: add message to topic '{}' with key '{}' and value: {}", topic, envelope.getKey(),
+                                 envelope.getMessage());
                 }
             }
         };
@@ -281,7 +359,7 @@ public class EmbeddedDebezium implements Debezium.Client {
             }
         };
 
-        return new MessageQueue(name, messages, messageCollector, taskCoordinator, foundation::producer);
+        return new MessageQueue(name, messages, messageCollector, taskCoordinator, bus::producer);
     }
 
     protected static final class MessageQueue {

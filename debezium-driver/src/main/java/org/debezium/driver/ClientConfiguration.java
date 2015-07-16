@@ -6,17 +6,19 @@
 package org.debezium.driver;
 
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
+import org.debezium.core.annotation.Immutable;
+
 /**
- * A specialized configuration for the Debezium.Client.
+ * A specialized configuration for the Debezium driver.
  * @author Randall Hauch
  */
-public interface ClientConfiguration extends Configuration {
+@Immutable
+interface ClientConfiguration extends Configuration {
 
     /**
      * Obtain a {@link ClientConfiguration} adapter for the given {@link Configuration}.
@@ -100,28 +102,12 @@ public interface ClientConfiguration extends Configuration {
         };
     }
 
-    default public long getCleanerPeriod( TimeUnit unit ) {
-        return (int)unit.convert(getLong("cleaner.period.seconds",60), TimeUnit.SECONDS);
-    }
-
-    default public long getCleanerDelay( TimeUnit unit ) {
-        return (int)unit.convert(getLong("cleaner.delay.seconds",60), TimeUnit.SECONDS);
-    }
-    
     default public boolean initializeProducersImmediately() {
         return getBoolean("initialize.producers",true);
     }
     
-    default public int getResponsePartitionCount(){
-        return getInteger("response.partition.count",10);
-    }
-    
-    default public int getMaxResponseBacklog(){
-        return getInteger("response.max.backlog",10);
-    }
-    
-    default public long getMaxResponseRegistrationAge( TimeUnit unit ) {
-        return unit.convert(getLong("response.max.registration.age.seconds",300), TimeUnit.SECONDS);
+    default public int getResponseReaderThreadCount(){
+        return getInteger("response.reader.thread.count",10);
     }
     
     default public Configuration getProducerConfiguration() {

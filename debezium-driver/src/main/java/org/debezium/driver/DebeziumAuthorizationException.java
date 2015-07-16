@@ -5,32 +5,33 @@
  */
 package org.debezium.driver;
 
+
 /**
- * An exception that denotes a failure to connect to Debezium.
+ * An exception that denotes a failure to authorize.
  * 
  * @author Randall Hauch
  */
-public class DebeziumConnectionException extends DebeziumException {
-    
+public class DebeziumAuthorizationException extends DebeziumException {
+
     private static final long serialVersionUID = 1L;
-    
+
     /**
      * Constructs a new runtime exception with {@code null} as its detail message. The cause is not initialized, and may
      * subsequently be initialized by a call to {@link #initCause}.
      */
-    public DebeziumConnectionException() {
+    public DebeziumAuthorizationException() {
     }
-    
+
     /**
      * Constructs a new runtime exception with the specified detail message. The cause is not initialized, and may subsequently be
      * initialized by a call to {@link #initCause}.
      * 
      * @param message the message
      */
-    public DebeziumConnectionException(String message) {
+    public DebeziumAuthorizationException(String message) {
         super(message);
     }
-    
+
     /**
      * Constructs a new runtime exception with the specified cause and a detail message of
      * <tt>(cause==null ? null : cause.toString())</tt> (which typically contains the class and detail message of <tt>cause</tt>).
@@ -39,10 +40,10 @@ public class DebeziumConnectionException extends DebeziumException {
      * @param cause the cause. (A {@code null} value is permitted,
      *            and indicates that the cause is nonexistent or unknown.)
      */
-    public DebeziumConnectionException(Throwable cause) {
+    public DebeziumAuthorizationException(Throwable cause) {
         super(cause);
     }
-    
+
     /**
      * Constructs a new runtime exception with the specified detail message and cause.
      * <p>
@@ -53,10 +54,10 @@ public class DebeziumConnectionException extends DebeziumException {
      * @param cause the cause. (A {@code null} value is permitted,
      *            and indicates that the cause is nonexistent or unknown.)
      */
-    public DebeziumConnectionException(String message, Throwable cause) {
+    public DebeziumAuthorizationException(String message, Throwable cause) {
         super(message, cause);
     }
-    
+
     /**
      * Constructs a new runtime exception with the specified detail message, cause, suppression enabled or disabled, and writable
      * stack trace enabled or disabled.
@@ -69,8 +70,8 @@ public class DebeziumConnectionException extends DebeziumException {
      * @param writableStackTrace whether or not the stack trace should
      *            be writable
      */
-    public DebeziumConnectionException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    public DebeziumAuthorizationException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
         super(message, cause, enableSuppression, writableStackTrace);
     }
-    
+
 }

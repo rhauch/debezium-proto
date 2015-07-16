@@ -81,6 +81,12 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
          */
         Patch.Editor<Builder<IdType>> edit( IdType id );
         /**
+         * Add the supplied patch to the batch.
+         * @param patch the patch for the target object; may not be null
+         * @return this batch builder instance to easily chain together multiple method invocations on the builder; never null
+         */
+        Builder<IdType> patch( Patch<IdType> patch );
+        /**
          * Record the removal of the target object with the given identifier. This method immediately adds the patch to the
          * batch.
          * @param id the identifier of the target object; may not be null
@@ -123,6 +129,12 @@ public final class Batch<IdType extends Identifier> implements Iterable<Patch<Id
         public Builder<T> remove(T target) {
             if ( patches == null ) patches = new LinkedList<>();
             return editor.remove(target);
+        }
+        @Override
+        public Builder<T> patch(Patch<T> patch) {
+            if ( patches == null ) patches = new LinkedList<>();
+            patches.add(patch);
+            return this;
         }
         @Override
         public Batch<T> build() {

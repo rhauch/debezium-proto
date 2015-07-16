@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -57,6 +58,8 @@ public final class Message {
         public static final String AFTER = "after";
         public static final String RESPONSES = "responses";
         public static final String ACTION = "action";
+        public static final String ENTITY_TYPE = "$type";
+        public static final String ENTITY_TAGS = "$tags";
     }
 
     public static enum Action {
@@ -295,9 +298,14 @@ public final class Message {
         return Identifier.of(databaseId, entityType, id, zoneId);
     }
 
+    /**
+     * Get the database identifier from the supplied document.
+     * @param doc the document; may not be null
+     * @return the database ID, or null if the identifier could not be found
+     */
     public static DatabaseId getDatabaseId(Document doc) {
         String databaseId = doc.getString(Field.DATABASE_ID);
-        return Identifier.of(databaseId);
+        return databaseId != null ? Identifier.of(databaseId) : null;
     }
 
     public static ZoneId getZoneId(Document doc, DatabaseId dbId ) {
@@ -448,6 +456,25 @@ public final class Message {
             return Collections.singleton(value.toString());
         }
         return Collections.emptyList();
+    }
+
+    public static Optional<String> getFirstFailureReason(Document message) {
+        Value value = message.get(Field.ERROR);
+        if (Value.notNull(value)) {
+            if (value.isArray()) {
+                return value.asArray().streamValues().filter(Value::notNull)
+                            .map(Value::toString)
+                            .findFirst();
+            }
+            if (value.isDocument()) {
+                return value.asDocument().stream().filter(Document.Field::isNotNull)
+                            .map(Document.Field::getValue)
+                            .map(Value::toString)
+                            .findFirst();
+            }
+            return Optional.of(value.toString());
+        }
+        return Optional.empty();
     }
 
     public static void setOperations(Document response, Document originalRequest) {

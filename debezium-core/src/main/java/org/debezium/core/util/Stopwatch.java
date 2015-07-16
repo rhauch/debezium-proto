@@ -251,6 +251,25 @@ public abstract class Stopwatch {
         }
 
         /**
+         * Time the given function.
+         * 
+         * @param runnable the function that is to be executed; may not be null
+         * @return the result of the operation
+         */
+        default public <T> T time(Callable<T> runnable) {
+            Stopwatch sw = create().start();
+            try {
+                return runnable.call();
+            } catch ( RuntimeException e ) {
+                throw e;
+            } catch ( Exception e ) {
+                throw new RuntimeException(e);
+            } finally {
+                sw.stop();
+            }
+        }
+
+        /**
          * Time the given function multiple times.
          * 
          * @param repeat the number of times to repeat the function call; must be positive

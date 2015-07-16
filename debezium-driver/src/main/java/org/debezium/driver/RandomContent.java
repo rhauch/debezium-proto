@@ -14,16 +14,20 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
+import org.debezium.core.component.EntityType;
+import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
 import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Action;
 import org.debezium.core.message.Patch.Editor;
+import org.debezium.driver.Debezium.BatchBuilder;
 
 /**
  * Logic for generating large numbers of {@link Batch batches} that create, modified, and delete entities based upon
@@ -32,9 +36,12 @@ import org.debezium.core.message.Patch.Editor;
  * @author Randall Hauch
  */
 public final class RandomContent {
-    
+
+    private static final AtomicLong GENERATED_ID = new AtomicLong(0);
+
     public static interface IdGenerator {
         EntityId[] generateEditableIds();
+
         EntityId[] generateRemovableIds();
     }
 
@@ -50,7 +57,7 @@ public final class RandomContent {
          * @return the batch; never null
          */
         public Batch<EntityId> generateBatch(EntityId[] editedIds, EntityId[] removedIds);
-        
+
         /**
          * Generate a batch that edits and removes a random number of entities.
          * 
@@ -58,22 +65,62 @@ public final class RandomContent {
          * @return the batch; never null
          */
         default public Batch<EntityId> generateBatch(IdGenerator idGenerator) {
-            if ( idGenerator == null ) return generateBatch(null,null);
-            return generateBatch(idGenerator.generateEditableIds(),idGenerator.generateRemovableIds());
+            if (idGenerator == null) return generateBatch(null, null);
+            return generateBatch(idGenerator.generateEditableIds(), idGenerator.generateRemovableIds());
         }
-        
+
         /**
          * Generate an entity representation.
+         * 
          * @param id the identifier of the entity; may not be null
          * @return the entity representation; never null
          */
-        default public Entity generateEntity( EntityId id ) {
-            Batch<EntityId> batch = generateBatch(new EntityId[]{id},null);
+        default public Entity generateEntity(EntityId id) {
+            Batch<EntityId> batch = generateBatch(new EntityId[] { id }, null);
             Patch<EntityId> patch = batch.patch(0);
             Document doc = Document.create();
-            patch.apply(doc,(op)->{});
+            patch.apply(doc, (op) -> {
+            });
             return Entity.with(id, doc);
         }
+
+        /**
+         * Add the specified number of edits and specified number of removes to the given {@link BatchBuilder}.
+         * 
+         * @param builder the batch builder; never null
+         * @param numEdits the number of edits (including creates); must be greater than or equal to 0
+         * @param numRemoves the number of removes; must be greater than or equal to 0
+         * @param type the type of entity to create; may not be null
+         * @return the supplied batch builder; never null
+         */
+        default public BatchBuilder addToBatch(BatchBuilder builder, int numEdits, int numRemoves, EntityType type) {
+            IdGenerator generator = generateIds(numEdits,numRemoves,type);
+            generateBatch(generator).forEach(builder::changeEntity);
+            return builder;
+        }
+    }
+    
+    private static IdGenerator generateIds(int editCount, int removeCount, EntityType type) {
+        return new IdGenerator() {
+            @Override
+            public EntityId[] generateEditableIds() {
+                return generateIds(editCount, type);
+            }
+
+            @Override
+            public EntityId[] generateRemovableIds() {
+                return generateIds(removeCount, type);
+            }
+
+            private EntityId[] generateIds(int count, EntityType type) {
+                if (count <= 0) return null;
+                EntityId[] ids = new EntityId[count];
+                for (int i = 0; i != count; ++i) {
+                    ids[i] = Identifier.of(type, Long.toString(GENERATED_ID.incrementAndGet()));
+                }
+                return ids;
+            }
+        };
     }
 
     /**
@@ -166,10 +213,10 @@ public final class RandomContent {
             Action.ADD, Action.ADD, Action.ADD, Action.ADD, Action.ADD,
             Action.ADD, Action.ADD, Action.ADD, Action.ADD, Action.ADD,
             Action.REMOVE, Action.REMOVE,
-            //Action.COPY,
-            //Action.MOVE,
-            //Action.REPLACE
-            };
+            // Action.COPY,
+            // Action.MOVE,
+            // Action.REPLACE
+    };
     private final int numValues;
     private final int numActions = actions.length;
 

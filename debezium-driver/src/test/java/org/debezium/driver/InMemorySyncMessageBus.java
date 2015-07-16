@@ -17,9 +17,9 @@ import kafka.producer.KeyedMessage;
 import org.debezium.core.serde.Decoder;
 
 /**
- * An implementation of {@link Foundation} that will forward published messages directly (in the same thread) to the subscribers.
+ * An implementation of {@link MessageBus} that will forward published messages directly (in the same thread) to the subscribers.
  */
-public class InMemorySyncFoundation implements Foundation {
+public class InMemorySyncMessageBus implements MessageBus {
 
     @FunctionalInterface
     private static interface CurrentOffset {
@@ -56,10 +56,17 @@ public class InMemorySyncFoundation implements Foundation {
         }
     }
 
+    private final String name;
     private final List<Subscriber<?, ?>> subscribers = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<String, AtomicLong> offsetsByTopicName = new ConcurrentHashMap<>();
 
-    public InMemorySyncFoundation() {
+    public InMemorySyncMessageBus( String name ) {
+        this.name = name;
+    }
+    
+    @Override
+    public String getName() {
+        return name;
     }
 
     @Override
@@ -89,7 +96,7 @@ public class InMemorySyncFoundation implements Foundation {
 
     private long nextOffsetForTopic(String topic) {
         return offsetsByTopicName.compute(topic, (t, offset) -> {
-            if (offset == null) new AtomicLong(0);
+            if (offset == null) offset = new AtomicLong(0);
             offset.incrementAndGet();
             return offset;
         }).get();

@@ -19,6 +19,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -133,7 +134,7 @@ final class DbzNode {
 
     private final String nodeId = UUID.randomUUID().toString();
     private final Configuration config;
-    private final Supplier<Foundation> foundation;
+    private final Supplier<MessageBus> messageBus;
     private final Supplier<Executor> executor;
     private final Supplier<ScheduledExecutorService> scheduledExecutor;
     private final List<ScheduledFuture<?>> scheduledTasks = new CopyOnWriteArrayList<>();
@@ -147,7 +148,7 @@ final class DbzNode {
 
     DbzNode(Configuration config, Environment env ) {
         this.config = config;
-        this.foundation = env::getFoundation;
+        this.messageBus = env::getMessageBus;
         this.executor = env::getExecutor;
         this.scheduledExecutor = env::getScheduledExecutor;
         // On node startup, start all registered services ...
@@ -183,7 +184,7 @@ final class DbzNode {
      */
     public void registerStart(Callable notified) {
         if (notified != null && this.startListeners.addIfAbsent(notified)) {
-            logger.debug("Registering start listener: {}", notified);
+            logger.trace("Registering start listener: {}", notified);
         }
     }
 
@@ -195,7 +196,7 @@ final class DbzNode {
      */
     public void registerPreShutdown(Callable notified) {
         if (notified != null && this.preShutdownListeners.addIfAbsent(notified)) {
-            logger.debug("Registering pre-shutdown listener: {}", notified);
+            logger.trace("Registering pre-shutdown listener: {}", notified);
         }
     }
 
@@ -207,7 +208,7 @@ final class DbzNode {
      */
     public void registerPostShutdown(Callable notified) {
         if (notified != null && this.postShutdownListeners.addIfAbsent(notified)) {
-            logger.debug("Registering post-shutdown listener: {}", notified);
+            logger.trace("Registering post-shutdown listener: {}", notified);
         }
     }
 
@@ -272,6 +273,42 @@ final class DbzNode {
     }
 
     /**
+     * Call the supplied function that returns a value if and only if this node is running.
+     * 
+     * @param function the function; may not be null
+     * @return an optional with the result of the function, or empty if the node was not running
+     */
+    public <R> Optional<R> whenRunning(Supplier<R> function) {
+        try {
+            runningLock.lock();
+            if (running) {
+                return Optional.ofNullable(function.get());
+            }
+            return Optional.empty();
+        } finally {
+            runningLock.unlock();
+        }
+    }
+
+    /**
+     * Call the supplied function that returns a value if and only if this node is running.
+     * 
+     * @param function the function; may not be null
+     * @return {@code false} if the node was not running, or the result of the function if running
+     */
+    protected boolean ifRunning(BooleanSupplier function) {
+        try {
+            runningLock.lock();
+            if (running) {
+                return function.getAsBoolean();
+            }
+            return false;
+        } finally {
+            runningLock.unlock();
+        }
+    }
+
+    /**
      * Call the supplied function if and only if this node is not running.
      * 
      * @param function the function; may not be null
@@ -314,7 +351,7 @@ final class DbzNode {
                     scheduledTasks.clear();
                     try {
                         // Shutdown the producer if it was accessed ...
-                        foundation.get().shutdown();
+                        messageBus.get().shutdown();
                     } finally {
                         postShutdownListeners.forEach(Callable::call);
                     }
@@ -335,7 +372,7 @@ final class DbzNode {
      * @return {@code true} if message was sent, or {@code false} otherwise
      */
     public boolean send(String topic, Object partitionKey, byte[] key, byte[] msg) {
-        return foundation.get().producer().send(new KeyedMessage<>(topic, key, partitionKey, msg));
+        return messageBus.get().producer().send(new KeyedMessage<>(topic, key, partitionKey, msg));
     }
 
     /**
@@ -446,7 +483,7 @@ final class DbzNode {
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
         logger.debug("NODE: subscribing {} in group '{}' to topics {}",consumer,groupId,topicFilter);
-        foundation.get().subscribe(groupId, topicFilter, numThreads, keyDecoder, messageDecoder, consumer);
+        messageBus.get().subscribe(groupId, topicFilter, numThreads, keyDecoder, messageDecoder, consumer);
     }
     
     /**

@@ -7,6 +7,8 @@ package org.debezium.driver;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.debezium.core.annotation.Immutable;
+import org.debezium.core.annotation.ThreadSafe;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Message;
 
@@ -14,14 +16,26 @@ import org.debezium.core.message.Message;
  * @author Randall Hauch
  *
  */
+@Immutable
+@ThreadSafe
 final class RequestId implements Comparable<RequestId> {
     
     private static final AtomicLong COUNTER = new AtomicLong();
     
+    /**
+     * Create a new request ID.
+     * @param clientId the Id of the client; may not be null
+     * @return the new request ID; never null
+     */
     public static RequestId create(String clientId) {
         return new RequestId(clientId, COUNTER.incrementAndGet());
     }
     
+    /**
+     * Read the {@link RequestId} from the supplied document.
+     * @param message the message that contains the request ID fields; may not be null
+     * @return the request ID from the message; never null
+     */
     public static RequestId from(Document message ) {
         return new RequestId(Message.getClient(message), Message.getRequest(message));
     }

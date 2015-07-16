@@ -12,7 +12,14 @@ import org.debezium.core.serde.Decoder;
 /**
  * An abstraction for the messaging foundation.
  */
-public interface Foundation {
+public interface MessageBus {
+    
+    /**
+     * Get the name of this message bus, for logging and reporting purposes.
+     * @return the name; may not be null
+     */
+    public String getName();
+    
 
     /**
      * Get the producer.
@@ -36,5 +43,8 @@ public interface Foundation {
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer);
 
+    /**
+     * Release all resources used by this message bus.
+     */
     public void shutdown();
 }

@@ -16,58 +16,53 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Supplier;
-import java.util.stream.Stream;
 
-import org.debezium.core.component.DatabaseId;
-import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
-import org.debezium.core.component.Schema;
 import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Value;
-import org.debezium.core.message.Batch;
-import org.debezium.driver.Configuration;
-import org.debezium.driver.Database;
+import org.debezium.driver.BatchResult;
 import org.debezium.driver.Debezium;
-import org.debezium.driver.DebeziumConnectionException;
-import org.debezium.driver.Database.Change;
-import org.debezium.driver.Database.Completion;
-import org.debezium.driver.Database.Outcome;
+import org.debezium.driver.DebeziumAuthorizationException;
+import org.debezium.driver.Entity;
+import org.debezium.driver.Schema;
+import org.debezium.driver.SessionToken;
 
 /**
  * @author Randall Hauch
  *
  */
 public class SampleApp {
-    
-    protected static Configuration readConfiguration( String path ) {
+
+    protected static InputStream findConfiguration(String path ) {
         try {
+            System.out.println("Looking for configuration on classpath at '" + path + "'");
             InputStream stream = SampleApp.class.getClassLoader().getResourceAsStream(path);
-            if ( stream == null ) {
+            if (stream == null) {
                 // Try path as-is ...
-                File f = FileSystems.getDefault().getPath(path).toAbsolutePath().toFile();
-                if ( f== null || !f.exists() || f.isDirectory() ) {
+                Path filePath = FileSystems.getDefault().getPath(path).toAbsolutePath();
+                System.out.println("Looking for configuration at '" + filePath + "'");
+                File f = filePath.toFile();
+                if (f == null || !f.exists() || f.isDirectory()) {
                     // Try relative to current working directory ...
                     Path current = FileSystems.getDefault().getPath(".").toAbsolutePath();
                     Path absolute = current.resolve(Paths.get(path)).toAbsolutePath();
+                    System.out.println("Looking for configuration relative to '" + current + "' at '" + absolute + "'");
                     f = absolute.toFile();
                 }
-                if ( f != null ) {
+                if (f != null) {
+                    path = f.getAbsolutePath();
                     stream = new FileInputStream(f);
                 }
             }
-            if ( stream != null ) {
-                return Debezium.configure(stream).build();
-            }
-        } catch ( IOException e ) {
+            return stream;
+        } catch (IOException e) {
             System.out.println("Unable to read Debezium client configuration file at '" + path + "': " + e.getMessage());
-            System.exit(1);
+            System.exit(2);
         }
         System.out.println("Unable to read Debezium client configuration file at '" + path + "': file not found");
-        System.exit(1);
+        System.exit(3);
         return null;
     }
 
@@ -78,156 +73,126 @@ public class SampleApp {
         String device = UUID.randomUUID().toString();
         String appVersion = "1.0";
 
-        Configuration config = readConfiguration(pathToConfigFile);
-        Debezium.Client client = Debezium.start(config);
-
-        DatabaseId dbId = Identifier.of(dbName);
-        Database db = null;
+        Debezium driver = null;
         try {
-            db = client.connect(dbId, username,device,appVersion);
-        } catch ( DebeziumConnectionException e ) {
+            InputStream stream = findConfiguration(pathToConfigFile);
+            driver = Debezium.driver()
+                             .load(stream)
+                             .start();
+        } catch (IOException e) {
+            System.out.println("Unable to read Debezium client configuration file at '" + pathToConfigFile + "': " + e.getMessage());
+            System.exit(1);
+        }
+
+        SampleApp app = new SampleApp(driver);
+        app.connect(username, device, appVersion, dbName);
+
+        // Do stuff ...
+        try {
+            app.readAndDisplaySchema(dbName);
+            app.loadNewContacts(dbName);
+            app.readAndDisplaySchema(dbName);
+        } finally {
+            try {
+                app.shutdown(10, TimeUnit.SECONDS);
+                System.exit(0);
+            } catch (Throwable e) {
+                System.out.println("Error shutting down Debezium driver '" + dbName + "': " + e.getMessage());
+                System.exit(3);
+            }
+        }
+    }
+
+    private final ConcurrentMap<EntityId, Document> localStore = new ConcurrentHashMap<>();
+    private final Debezium driver;
+    private SessionToken session;
+
+    public SampleApp(Debezium driver) {
+        this.driver = driver;
+    }
+
+    public void connect(String username, String device, String appVersion, String dbName) {
+        try {
+            session = driver.connect(username, device, appVersion, dbName);
+        } catch (DebeziumAuthorizationException e) {
             // Connecting failed, so try to provision ...
             try {
-                db = client.provision(dbId,username,device,appVersion);
+                driver.provision(session, dbName, 10, TimeUnit.SECONDS);
             } catch (Throwable e2) {
                 System.out.println("Error connecting to or provisioning Debezium database '" + dbName + "': " + e.getMessage());
                 System.exit(2);
             }
         }
-
-        // Do stuff ...
-        SampleApp app = new SampleApp(db);
-        try {
-            attempt(app::readAndDisplaySchema);
-            attempt(app::loadNewContacts);
-            attempt(app::readAndDisplaySchema);
-        } finally {
-            try {
-                app.shutdown();
-                System.exit(0);
-            } catch (Throwable e) {
-                System.out.println("Error shutting down Debezium database '" + dbName + "': " + e.getMessage());
-                System.exit(3);
-            } finally {
-                try {
-                    client.shutdown(10, TimeUnit.SECONDS);
-                } catch (Throwable e) {
-                    System.out.println("Error shutting down Debezium client: " + e.getMessage());
-                    System.exit(4);
-                }
-            }
-        }
-    }
-    
-    private static void attempt( Supplier<Completion> runnable ) {
-        try {
-            Completion result = runnable.get();
-            if ( result != null && !result.isComplete() ) {
-                System.out.println("Waiting for results...");
-                result.await(10, TimeUnit.SECONDS);
-                if ( !result.isComplete() ) System.out.println("Timed out");
-            } else {
-                System.out.println("No need to wait");
-            }
-        } catch ( TimeoutException e ) {
-            System.out.println("Timeout waiting for response for " + runnable + ": " + e.getMessage());
-        } catch ( InterruptedException e ) {
-            Thread.interrupted();
-            System.out.println("Interrupted while waiting for response for " + runnable + ": " + e.getMessage());
-        }
     }
 
-    private final ConcurrentMap<EntityId, Document> localStore = new ConcurrentHashMap<>();
-    private Database db;
-
-    public SampleApp(Database db) {
-        this.db = db;
+    public void shutdown(long timeout, TimeUnit unit) {
+        System.out.println("Shutting down Debezium driver...");
+        driver.shutdown(timeout, unit);
+        System.out.println("Completed shutting down Debezium driver");
     }
 
-    public void shutdown() {
-        System.out.println("Shutting down Debezium client...");
-        db.close();
-        System.out.println("Shutdown complete.");
-    }
-    
-    protected void print( Object msg ) {
+    protected void print(Object msg) {
         System.out.println(msg);
     }
 
-    public Completion readAndDisplaySchema() {
-        System.out.println("Reading schema from '" + db.databaseId() + "'...");
-        return db.readSchema(outcome -> {
-            if (outcome.succeeded()) {
-                Schema schema = outcome.result();
-                print("Schema: " + schema.document());
+    public void readAndDisplaySchema(String dbName) {
+        System.out.println("Reading schema from '" + dbName + "'...");
+        Schema schema = driver.readSchema(session, dbName, 10, TimeUnit.SECONDS);
+        if (schema.asDocument() != null) {
+            print("Schema: " + schema.asDocument());
+        } else {
+            print("Unable to read the schema for '" + dbName + "'");
+        }
+    }
+
+    public void loadNewContacts(String dbName) {
+        System.out.println("Creating 2 new contacts in '" + dbName + "'...");
+        // Create 2 contacts ...
+        EntityType type = Identifier.of(dbName, "Contacts");
+        BatchResult result = driver.batch()
+                                   .createEntity(type)
+                                   .add("firstName", Value.create("Sally"))
+                                   .add("lastName", Value.create("Anderson"))
+                                   .add("homePhone", Value.create("1-222-555-1234"))
+                                   .end()
+                                   .createEntity(type)
+                                   .add("firstName", Value.create("William"))
+                                   .add("lastName", Value.create("Johnson"))
+                                   .add("mobilePhone", Value.create("1-222-555-9876"))
+                                   .end().submit(session, 10, TimeUnit.SECONDS);
+        result.changeStream().forEach(change -> {
+            if (change.succeeded()) {
+                // We successfully changed this entity by applying our patch ...
+                contactUpdated(change.entity());
             } else {
-                // Unable to read the schema, so handle the error
-                String reason = outcome.failureReason();
-                print("Unable to read the schema: " + reason);
+                // Our patch for this entity could not be applied ...
+                System.out.println("Failed to submit batch with changes to contacts: " + change.failureReasons());
+                switch (change.status()) {
+                    case OK:
+                        break;
+                    case DOES_NOT_EXIST:
+                        // The entity was removed by someone else, so we'll delete it locally ...
+                        contactRemoved(change.id());
+                        break;
+                    case PATCH_FAILED:
+                        // We put preconditions into our patch that were not satisfied, so perhaps we
+                        // should rebuild a new patch with the latest representation of the target.
+                        // For now, we'll just update the contact ...
+                        // Patch<EntityId> failedPatch = change.patch();
+                        contactUpdated(change.entity());
+                        break;
+                }
             }
         });
     }
 
-    public Completion loadNewContacts() {
-        System.out.println("Creating 2 new contacts in '" + db.databaseId() + "'...");
-        // Create 2 contacts ...
-        EntityType type = Identifier.of(db.databaseId(),"Contacts");
-        Batch<EntityId> batch = Batch.entities()
-                                     .create(Identifier.newEntity(type))
-                                     .add("firstName", Value.create("Sally"))
-                                     .add("lastName", Value.create("Anderson"))
-                                     .add("homePhone", Value.create("1-222-555-1234"))
-                                     .end()
-                                     .create(Identifier.newEntity(type))
-                                     .add("firstName", Value.create("William"))
-                                     .add("lastName", Value.create("Johnson"))
-                                     .add("mobilePhone", Value.create("1-222-555-9876"))
-                                     .end()
-                                     .build();
-        return db.changeEntities(batch,this::handleUpdate);
+    protected void contactUpdated(Entity entity) {
+        localStore.put(entity.id(), entity.asDocument());
+        System.out.println("Updated contact: \n" + entity.asDocument());
     }
-    
-    protected void handleUpdate( Outcome<Stream<Change<EntityId,Entity>>> outcome ) {
-        if ( outcome.succeeded() ) {
-            outcome.result().forEach(change -> {
-                if (change.succeeded()) {
-                    // We successfully changed this entity by applying our patch ...
-                    contactUpdated(change.target());
-                } else {
-                    // Our patch for this entity could not be applied ...
-                    switch (change.status()) {
-                        case OK:
-                            break;
-                        case DOES_NOT_EXIST:
-                            // The entity was removed by someone else, so we'll delete it locally ...
-                            contactRemoved(change.id());
-                            break;
-                        case PATCH_FAILED:
-                            // We put preconditions into our patch that were not satisfied, so perhaps we
-                            // should rebuild a new patch with the latest representation of the target.
-                            // For now, we'll just update the contact ...
-                            // Patch<EntityId> failedPatch = change.patch();
-                            contactUpdated(change.target());
-                            break;
-                    }
-                }
-            });
-        } else {
-            // Unable to even submit the batch, so handle the error. Perhaps the system is not available, or
-            // our request was poorly formed (e.g., was empty). The best way to handle this is to do different
-            // things based upon the exception type ...
-            String reason = outcome.failureReason();
-            System.out.println("Failed to submit batch with changes to contacts: " + reason );
-        }
-    }
-    
-    protected void contactUpdated( Entity entity ) {
-        localStore.put(entity.id(),entity.document());
-        System.out.println("Updated contact: \n" + entity.document());
-    }
-    
-    protected void contactRemoved( EntityId entityId ) {
-        localStore.remove(entityId);
+
+    protected void contactRemoved(String entityId) {
+        localStore.remove(Identifier.parse(entityId));
         System.out.println("Removed contact: " + entityId);
     }
 

@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A foundation that uses Kafka producers and consumers.
  */
-final class KafkaFoundation implements Foundation {
+final class KafkaMessageBus implements MessageBus {
     
     private static final class KafkaProducer implements MessageProducer, Closeable {
 
@@ -65,7 +65,7 @@ final class KafkaFoundation implements Foundation {
     private final Map<Properties, ConsumerConnector> connectors = new ConcurrentHashMap<>();
     private volatile boolean running = true;
 
-    public KafkaFoundation(Configuration config, Supplier<Executor> executor) {
+    public KafkaMessageBus(Configuration config, Supplier<Executor> executor) {
         ClientConfiguration clientConfig = ClientConfiguration.adapt(config);
         this.producerConfig = clientConfig.getProducerConfiguration().asProperties();
         this.consumerConfig = clientConfig.getConsumerConfiguration().asProperties();
@@ -73,6 +73,13 @@ final class KafkaFoundation implements Foundation {
         if ( clientConfig.initializeProducersImmediately() ) {
             producer();
         }
+    }
+    
+    @Override
+    public String getName() {
+        ProducerConfig pconf = new ProducerConfig(producerConfig);
+        ConsumerConfig cconf = new ConsumerConfig(consumerConfig);
+        return "Kafka(" + pconf.brokerList() + "; zk=" + cconf.zkConnect() + ")";
     }
 
     @Override

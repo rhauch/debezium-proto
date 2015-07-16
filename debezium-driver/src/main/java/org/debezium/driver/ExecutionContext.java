@@ -7,28 +7,28 @@ package org.debezium.driver;
 
 import java.util.concurrent.TimeUnit;
 
+import org.debezium.core.annotation.Immutable;
 import org.debezium.core.component.DatabaseId;
 
 /**
  * @author Randall Hauch
  *
  */
+@Immutable
 final class ExecutionContext {
 
     private final DatabaseId dbId;
     private final String username;
     private final String device;
     private final String version;
-    private final long defaultTimeout;
-    private final TimeUnit timeoutUnit;
+    private final long defaultTimeoutInSeconds;
     
     ExecutionContext( DatabaseId dbId, String username, String device, String version, long defaultTimeout, TimeUnit unit ) {
         this.username = username;
         this.dbId = dbId;
         this.device =device;
         this.version = version;
-        this.defaultTimeout = defaultTimeout;
-        this.timeoutUnit=unit;
+        this.defaultTimeoutInSeconds = unit.toSeconds(defaultTimeout);
     }
     
     public DatabaseId databaseId() {
@@ -47,12 +47,8 @@ final class ExecutionContext {
         return version;
     }
     
-    public long defaultTimeout() {
-        return defaultTimeout;
-    }
-    
-    public TimeUnit timeoutUnit() {
-        return timeoutUnit;
+    public long defaultTimeoutInSeconds() {
+        return defaultTimeoutInSeconds;
     }
     
     @Override

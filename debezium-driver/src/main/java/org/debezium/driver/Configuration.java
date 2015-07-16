@@ -23,14 +23,16 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import org.debezium.core.annotation.Immutable;
 import org.debezium.core.util.Collect;
 
 /**
- * An immutable representation of a single Debezium client configuration.
+ * An immutable representation of a Debezium configuration.
  * 
  * @author Randall Hauch
  */
-public interface Configuration {
+@Immutable
+interface Configuration {
 
     /**
      * Obtain an empty configuration.

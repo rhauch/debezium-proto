@@ -74,6 +74,14 @@ final class ComparableValue implements Value {
         if (obj == this) return true;
         if (obj instanceof Value) {
             Value that = (Value) obj;
+            if ( this.isNumber() && that.isNumber() ) {
+                if ( this.isLong() ) return this.asLong().equals(that.asLong());
+                if ( this.isDouble() ) return this.asDouble().equals(that.asDouble());
+                if ( this.isInteger() ) return this.asInteger().equals(that.asInteger());
+                if ( this.isFloat() ) return this.asFloat().equals(that.asFloat());
+                if ( this.isBigDecimal() ) return this.asBigDecimal().equals(that.asBigDecimal());
+                if ( this.isBigInteger() ) return this.asBigInteger().equals(that.asBigInteger());
+            }
             return this.value.equals(that.asObject());
         }
         // Compare the value straight away ...

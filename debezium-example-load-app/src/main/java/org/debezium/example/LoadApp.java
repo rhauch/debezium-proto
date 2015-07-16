@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.debezium.core.component.DatabaseId;
@@ -29,11 +28,10 @@ import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.util.CommandLineOptions;
 import org.debezium.core.util.Stopwatch;
-import org.debezium.driver.Configuration;
-import org.debezium.driver.Database;
 import org.debezium.driver.Debezium;
-import org.debezium.driver.DebeziumConnectionException;
+import org.debezium.driver.DebeziumAuthorizationException;
 import org.debezium.driver.RandomContent;
+import org.debezium.driver.SessionToken;
 
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
@@ -77,37 +75,44 @@ public class LoadApp {
         final int numThreads = options.getOption("-t", "--threads", 1);
         final int numRequestsPerThread = options.getOption("-r", "--requests-per-thread", 10000);
         verbose = options.getOption("-v", "--verbose", false);
-        System.out.println("**** verbose = " + verbose );
+        System.out.println("**** verbose = " + verbose);
         if (options.hasUnknowns()) {
             print("Unknown option: " + options.getFirstUnknownOptionName());
             printUsage();
             exit(ReturnCode.INCORRECT_USAGE);
         }
 
-        // Read the configuration, start the client, and prepare the random content ...
-        final Configuration config = readConfiguration(pathToConfigFile);
-        printVerbose("Starting Debezium client with configuration: \n" + config);
-        final Debezium.Client client = clientFactory.apply(config);
-        printVerbose("Started Debezium client");
+        // Start the Debezium driver using the specified configuration file ...
+        Debezium driver = null;
+        try {
+            InputStream configStream = findConfiguration(pathToConfigFile);
+            driver = Debezium.driver()
+                             .load(configStream)
+                             .start();
+            printVerbose("Started Debezium client");
+        } catch (IOException e) {
+            System.out.println("Unable to read Debezium client configuration file at '" + pathToConfigFile + "': " + e.getMessage());
+            System.exit(1);
+        }
         final RandomContent randomContent = RandomContent.load();
 
         // Connect to the database ...
         final DatabaseId dbId = Identifier.of(dbName);
         final EntityType entityType = Identifier.of(dbId, entityTypeName);
-        Database db = null;
+        SessionToken session = null;
         try {
             printVerbose("Connecting to Debezium database '" + dbId + "' as user '" + username + "' and device '" + device + "'...");
-            db = client.connect(dbId, username, device, VERSION);
-        } catch (DebeziumConnectionException e) {
+            session = driver.connect(username, device, VERSION, dbName);
+        } catch (DebeziumAuthorizationException e) {
             // Connecting failed, so try to provision ...
             try {
                 printVerbose("Database '" + dbId + "' was not found; attempting to provision it ...");
-                db = client.provision(dbId, username, device, VERSION);
+                driver.provision(session, dbName, 10, TimeUnit.SECONDS);
             } catch (Throwable e2) {
                 error("Error connecting to or provisioning Debezium database '" + dbName + "': " + e.getMessage());
                 try {
                     print("Shutting down client ...");
-                    client.shutdown(10, TimeUnit.SECONDS);
+                    driver.shutdown(10, TimeUnit.SECONDS);
                     exit(ReturnCode.CONNECT_FAILURE);
                 } catch (Throwable e3) {
                     error("Error shutting down Debezium client: " + e.getMessage());
@@ -126,8 +131,9 @@ public class LoadApp {
             List<Future<Results>> futures = new ArrayList<>();
             for (int i = 0; i != numThreads; ++i) {
                 printVerbose("Starting thread " + (i + 1) + " to generate " + numRequestsPerThread + " requests");
-                futures.add(executors.submit(new Client("" + i, db, randomContent.createGenerator(), numRequestsPerThread, entityType,
-                        batchMeter)));
+                Client client = new Client("" + i, driver, session, randomContent.createGenerator(),
+                        numRequestsPerThread, entityType, batchMeter);
+                futures.add(executors.submit(client));
             }
             // Accumulate the results ...
             Results results = futures.stream()
@@ -138,7 +144,8 @@ public class LoadApp {
             print(results);
         } finally {
             sw.stop();
-            print("Completed with the following request rates over " + numThreads + " thread(s) in " + sw.durations().statistics().getTotalAsString());
+            print("Completed with the following request rates over " + numThreads + " thread(s) in "
+                    + sw.durations().statistics().getTotalAsString());
             print("  Mean rate:   " + new DecimalFormat("#,###,##0.0").format(batchMeter.getMeanRate()) + " batch/sec");
             print("  1 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getOneMinuteRate()) + " batch/sec");
             print("  5 min rate:  " + new DecimalFormat("#,###,##0.0").format(batchMeter.getFiveMinuteRate()) + " batch/sec");
@@ -150,18 +157,10 @@ public class LoadApp {
                 exit(ReturnCode.EXECUTORS_SHUTDOWN_ERROR);
             } finally {
                 try {
-                    db.close();
-                    //exit(ReturnCode.SUCCESS);
+                    driver.shutdown(10, TimeUnit.SECONDS);
                 } catch (Throwable e) {
-                    error("Error shutting down Debezium database '" + dbName + "': " + e.getMessage());
-                    exit(ReturnCode.DATABASE_SHUTDOWN_ERROR);
-                } finally {
-                    try {
-                        client.shutdown(10, TimeUnit.SECONDS);
-                    } catch (Throwable e) {
-                        error("Error shutting down Debezium client: " + e.getMessage());
-                        exit(ReturnCode.CLIENT_SHUTDOWN_FAILURE);
-                    }
+                    error("Error shutting down Debezium driver: " + e.getMessage());
+                    exit(ReturnCode.CLIENT_SHUTDOWN_FAILURE);
                 }
             }
         }
@@ -182,10 +181,10 @@ public class LoadApp {
         return null;
     }
 
-    protected static Configuration readConfiguration(String path) {
+    protected static InputStream findConfiguration(String path) {
         try {
             printVerbose("Looking for configuration on classpath at '" + path + "'");
-            InputStream stream = Client.class.getClassLoader().getResourceAsStream(path);
+            InputStream stream = LoadApp.class.getClassLoader().getResourceAsStream(path);
             if (stream == null) {
                 // Try path as-is ...
                 Path filePath = FileSystems.getDefault().getPath(path).toAbsolutePath();
@@ -203,10 +202,7 @@ public class LoadApp {
                     stream = new FileInputStream(f);
                 }
             }
-            if (stream != null) {
-                printVerbose("Parsing configuration file at '" + path + "'");
-                return Debezium.configure(stream).build();
-            }
+            return stream;
         } catch (IOException e) {
             print("Unable to read Debezium client configuration file at '" + path + "': " + e.getMessage());
             exit(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
@@ -235,12 +231,4 @@ public class LoadApp {
         print("          [-r|--requests-per-thread <num-requests-per-thread>] [-v|--verbose]");
         print("");
     }
-
-    protected static Function<Configuration, Debezium.Client> clientFactory = new Function<Configuration, Debezium.Client>() {
-        @Override
-        public org.debezium.driver.Debezium.Client apply(Configuration config) {
-            return Debezium.start(config);
-        }
-    };
-
 }

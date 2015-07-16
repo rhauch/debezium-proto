@@ -6,15 +6,24 @@
 package org.debezium.driver;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.net.URL;
+import java.nio.file.Path;
+import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.debezium.core.component.DatabaseId;
+import org.debezium.core.component.EntityId;
+import org.debezium.core.component.EntityType;
+import org.debezium.core.message.Patch;
+import org.debezium.core.message.Patch.Editor;
 
 /**
  * @author Randall Hauch
@@ -23,88 +32,105 @@ import org.debezium.core.component.DatabaseId;
 public interface Debezium {
 
     /**
-     * Obtain a fluent API to programmatically build up a configuration.
+     * Obtain a fluent API to programmatically build up the configuration for a driver.
      * 
      * @return the new builder; never null
      */
-    public static Configure configure() {
-        return new DbzConfigurator();
-    }
-
-    /**
-     * Obtain a fluent API to programmatically modify up a configuration based upon the supplied starting point.
-     * 
-     * @param stream the stream containing the initial JSON configuration; may not be null
-     * @return the new builder; never null
-     * @throws IOException if there is a problem reading the supplied stream
-     */
-    public static Configure configure(InputStream stream) throws IOException {
-        return new DbzConfigurator(Configuration.load(stream));
-    }
-
-    /**
-     * Obtain a fluent API to programmatically modify up a configuration based upon the supplied starting point.
-     * 
-     * @param url the URL to the initial JSON configuration; may not be null
-     * @return the new builder; never null
-     * @throws IOException if there is a problem reading the supplied stream
-     */
-    public static Configure configure(URL url) throws IOException {
-        return new DbzConfigurator(Configuration.load(url));
-    }
-
-    /**
-     * Obtain a fluent API to programmatically modify up a configuration based upon the supplied starting point.
-     * 
-     * @param file the file to the initial JSON configuration; may not be null
-     * @return the new builder; never null
-     * @throws IOException if there is a problem reading the supplied stream
-     */
-    public static Configure configure(File file) throws IOException {
-        return new DbzConfigurator(Configuration.load(file));
-    }
-
-    /**
-     * Connect to a Debezium cluster using the supplied configuration.
-     * 
-     * @param config the immutable configuration; may not be null
-     * @return the client that is connected to the Debezium cluster; never null
-     * @see #configure()
-     */
-    public static Client start(Configuration config) {
-        return new DbzClient(config, Environment.create(config)).start();
-    }
-
-    /**
-     * Connect to a Debezium cluster using the supplied configuration.
-     * 
-     * @param config the immutable configuration; may not be null
-     * @param foundationFactory the factory for the foundation; may not be null
-     * @return the client that is connected to the Debezium cluster; never null
-     * @see #configure()
-     */
-    static Client start(Configuration config, Function<Supplier<Executor>, Foundation> foundationFactory) {
-        return new DbzClient(config, Environment.create(foundationFactory)).start();
-    }
-
-    /**
-     * Connect to a Debezium cluster using the supplied configuration.
-     * 
-     * @param config the immutable configuration; may not be null
-     * @param env the environment to use for the client; may not be null
-     * @return the client that is connected to the Debezium cluster; never null
-     * @see #configure()
-     */
-    static Client start(Configuration config, Environment env) {
-        return new DbzClient(config, env).start();
+    public static Builder driver() {
+        return new DbzDriverBuilder();
     }
 
     /**
      * A fluent API for building up a Debezium configuration.
      * 
-     * @see Debezium#configure()
+     * @author Randall Hauch
      */
-    static interface Configure {
+    public static interface Builder {
+
+        /**
+         * Load the configuration properties in the file at the supplied URL, overwriting any similarly-named properties
+         * already in this configuration.
+         * 
+         * @param url the URL at which the configuration file can be found; may not be null
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(URL url) throws IOException {
+            try (InputStream stream = url.openStream()) {
+                return load(stream);
+            }
+        }
+
+        /**
+         * Load the configuration properties in the file given by the supplied path, overwriting any similarly-named properties
+         * already in this configuration.
+         * 
+         * @param path the {@link Path} at which the configuration file can be found; may not be null
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(Path path) throws IOException {
+            return load(path.toFile());
+        }
+
+        /**
+         * Load the configuration properties in the given file, overwriting any similarly-named properties already in this
+         * configuration.
+         * 
+         * @param file the configuration file to be read; may not be null
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(File file) throws IOException {
+            try (InputStream stream = new FileInputStream(file)) {
+                return load(stream);
+            }
+        }
+
+        /**
+         * Load the configuration properties using the given reader, overwriting any similarly-named properties already in this
+         * configuration.
+         * 
+         * @param reader the configuration properties reader; may not be null
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(Reader reader) throws IOException {
+            try {
+                Properties properties = new Properties();
+                properties.load(reader);
+                return load(properties);
+            } finally {
+                reader.close();
+            }
+        }
+
+        /**
+         * Load the configuration properties from the given stream, overwriting any similarly-named properties already in this
+         * configuration.
+         * 
+         * @param stream the stream containing the configuration properties; may not be null
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(InputStream stream) throws IOException {
+            try {
+                Properties properties = new Properties();
+                properties.load(stream);
+                return load(properties);
+            } finally {
+                stream.close();
+            }
+        }
+
+        /**
+         * Load the configuration properties, overwriting any similarly-named properties already in this
+         * configuration.
+         * 
+         * @param properties the configuration properties; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        public Builder load(Properties properties);
 
         /**
          * Set the Zookeeper connection string.
@@ -113,7 +139,7 @@ public interface Debezium {
          *            optionally followed by a chroot path
          * @return this builder instance for chaining together methods; never null
          */
-        Configure withZookeeper(String zookeeperConnectString);
+        Builder withZookeeper(String zookeeperConnectString);
 
         /**
          * Add a broker with the given name, machine address, and port.
@@ -123,15 +149,29 @@ public interface Debezium {
          * @param port the port used by the broker; must be positive
          * @return this builder instance for chaining together methods; never null
          */
-        Configure withBroker(String brokerName, String machine, int port);
+        Builder withBroker(String brokerName, String machine, int port);
 
         /**
          * Add a broker with the given broker string in the form "{@code brokerName:machine:port}".
          * 
          * @param brokerString the broker string; may not be null
          * @return this builder instance for chaining together methods; never null
+         * @throws IllegalArgumentException if the string is not in the proper form
          */
-        Configure withBroker(String brokerString);
+        default Builder withBroker(String brokerString) {
+            String[] parts = brokerString.split(":");
+            if (parts.length == 3) {
+                try {
+                    return withBroker(parts[0], parts[1], Integer.parseInt(parts[2]));
+                } catch (NumberFormatException e) {
+                    String msg = "The port number field '" + parts[2] + "' in the broker string '" + brokerString + "' is not an integer";
+                    throw new IllegalArgumentException(msg);
+                }
+            }
+            String msg = "The broker string '" + brokerString
+                    + "' must be of the form 'brokerName:machine:port', where 'port' is an integer";
+            throw new IllegalArgumentException(msg);
+        }
 
         /**
          * Add a broker with the given name and port for the current machine.
@@ -140,25 +180,29 @@ public interface Debezium {
          * @param port the port used by the broker; must be positive
          * @return this builder instance for chaining together methods; never null
          */
-        Configure withBroker(String brokerName, int port);
+        default Builder withBroker(String brokerName, int port) {
+            return withBroker(brokerName, null, port);
+        }
 
         /**
          * Specify the kind of acknowledgement that's required for submitting requests within a Debezium cluster.
+         * <p>
+         * The default is {@link Acknowledgement#ALL}.
          * 
-         * @param acknowledgement the desired acknowledgement level; may be null if the default acknowledgement is to be used
+         * @param acknowledgement the desired acknowledgement level; may not be null
          * @return this builder instance for chaining together methods; never null
          */
-        Configure acknowledgement(Acknowledgement acknowledgement);
+        Builder acknowledgement(Acknowledgement acknowledgement);
 
         /**
-         * Specify the amount of time that Debezium will wait for {@link #acknowledgement(Acknowledgement) acknowledgement} of
-         * requests before reporting an error.
+         * Specify the amount of time that Debezium will wait for {@link #acknowledgement(Acknowledgement) acknowledgement} that
+         * requests were submitted before reporting an error.
          * 
          * @param time the amount of time; must be positive
          * @param unit the time unit; must not be null
          * @return this builder instance for chaining together methods; never null
          */
-        Configure requestTimeout(long time, TimeUnit unit);
+        Builder requestTimeout(long time, TimeUnit unit);
 
         /**
          * Specify the maximum number of times that Debezium should retry a failed request.
@@ -166,9 +210,9 @@ public interface Debezium {
          * sent but the acknowledgement to be lost. Generally this Debezium is tolerant of at-least-once behaviors.
          * 
          * @param maximum the maximum number of times to retry a failed request; must be positive
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure retryFailedRequests(int maximum);
+        Builder retryFailedRequests(int maximum);
 
         /**
          * Specify the amount of time to pause before retrying a request. The Debezium cluster will detect failures and
@@ -177,9 +221,9 @@ public interface Debezium {
          * 
          * @param time the amount of time; must be positive
          * @param unit the time unit; must not be null
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure pauseBeforeRetries(long time, TimeUnit unit);
+        Builder pauseBeforeRetries(long time, TimeUnit unit);
 
         /**
          * Specify the amount of time in between metadata refreshes. Metadata is automatically refreshed when a failure
@@ -191,26 +235,28 @@ public interface Debezium {
          *            will be refreshed after every request (not recommended); if positive, the metadata will be refreshed
          *            periodically
          * @param unit the time unit; must not be null
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure refreshMetadataInterval(long time, TimeUnit unit);
+        Builder refreshMetadataInterval(long time, TimeUnit unit);
 
         /**
          * Specify the compression that should be used to persist information in the transaction logs.
+         * <p>
+         * The default is {@link Compression#NONE}.
          * 
-         * @param compression the compression codec; may be null if {@link Compression#NONE no compression} is to be used
+         * @param compression the compression codec; may not be null
          * @return this builder instance for chaining together methods; never null
          */
-        Configure compression(Compression compression);
+        Builder compression(Compression compression);
 
         /**
          * Specify a client identifier that is sent with all messages to help trace requests through the system.
-         * This should logically represent the application.
+         * This should logically represent the application. If not specified, a random identifier will be generated.
          * 
          * @param id the client identifier; may not be null
          * @return this builder instance for chaining together methods; never null
          */
-        Configure clientId(String id);
+        Builder clientId(String id);
 
         /**
          * Specify the size of the buffer used to write to a socket.
@@ -218,42 +264,26 @@ public interface Debezium {
          * The default is 100kb.
          * 
          * @param size the number of bytes; must be positive
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure socketBufferSize(int size);
+        Builder socketBufferSize(int size);
 
         /**
          * Specify whether the producer connections should be initialized lazily. The default is 'false'.
          * 
          * @param immediately {@code true} if the initialization should be done immediately upon startup, or false if the
          *            connections should be done only when needed (which may make debugging connectivity problems more difficult)
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure initializeProducerImmediately(boolean immediately);
-
-        /**
-         * Specify how frequently (in seconds) the callback cleaner should run.
-         * 
-         * @param period the number of seconds between runs
-         * @return this instance for chaining together methods; never null
-         */
-        Configure cleanerPeriodInSeconds(int period);
-
-        /**
-         * Specify the initial delay (in seconds) for the the callback cleaner.
-         * 
-         * @param delay the number of seconds after startup after which the cleaner should be run the first time
-         * @return this instance for chaining together methods; never null
-         */
-        Configure cleanerDelayInSeconds(int delay);
+        Builder initializeProducerImmediately(boolean immediately);
 
         /**
          * Specify the number of response partitions.
          * 
          * @param count the number of separate partitions used to track the registered callbacks; must be positive
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure responsePartitionCount(int count);
+        Builder responsePartitionCount(int count);
 
         /**
          * Specify the maximum backlog per partition for registered callbacks. If the number of incomplete requests
@@ -261,87 +291,48 @@ public interface Debezium {
          * been completed.
          * 
          * @param count the maximum number of callbacks allowed per partition before new requests are blocked
-         * @return this instance for chaining together methods; never null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configure responseMaxBacklog(int count);
+        Builder responseMaxBacklog(int count);
 
         /**
-         * Create a new immutable representation of the current state of this configurator.
-         * The resulting Configuration can be passed to the {@link Debezium#start(Configuration)} method to create a
-         * {@link Debezium.Client Debezium Client}.
+         * Specify the {@link SecurityProvider} implementation that should be used.
          * 
-         * @return the immutable configuration.
+         * @param security the function that supplies a security provider implementation; may not be null
+         * @return this builder instance for chaining together methods; never null
          */
-        Configuration build();
-    }
-
-    /**
-     * A client connected to a Debezium cluster. Applications and services can use a client to interact with
-     * Debezium.
-     */
-    static interface Client {
+        Builder usingSecurity(Supplier<SecurityProvider> security);
 
         /**
-         * Connect to the specified database using the given username.
+         * Specify the {@link MessageBus} implementation that should be used.
          * 
-         * @param id the database identifier
-         * @param username the username
-         * @param device the device identifier or token
-         * @param appVersion the version of the application
-         * @return the database connection
-         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
+         * @param messageBus the function that supplies the message bus implementation; may not be null
+         * @return this builder instance for chaining together methods; never null
          */
-        Database connect(DatabaseId id, String username, String device, String appVersion);
+        Builder usingBus(Function<Supplier<Executor>, MessageBus> messageBus);
 
         /**
-         * Connect to the specified database using the given username.
+         * Specify the {@link ExecutorService} implementation that should be used.
          * 
-         * @param id the database identifier
-         * @param username the username
-         * @param device the device identifier or token
-         * @param appVersion the version of the application
-         * @param timeout the maximum amount of time to wait for responses
-         * @param unit the unit of time for the timeout
-         * @return the database connection
-         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
+         * @param executor the function that supplies the executor service implementation; may not be null
+         * @return this builder instance for chaining together methods; never null
          */
-        Database connect(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
+        Builder usingExecutor(Supplier<ExecutorService> executor);
 
         /**
-         * Provision a new database with the given name.
+         * Specify the {@link ScheduledExecutorService} implementation that should be used.
          * 
-         * @param id the database identifier
-         * @param username the username
-         * @param device the device identifier or token
-         * @param appVersion the version of the application
-         * @return the database connection
-         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
-         * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
+         * @param executor the function that supplies the scheduled executor service implementation; may not be null
+         * @return this builder instance for chaining together methods; never null
          */
-        Database provision(DatabaseId id, String username, String device, String appVersion);
+        Builder usingScheduledExecutor(Supplier<ScheduledExecutorService> executor);
 
         /**
-         * Provision a new database with the given name.
+         * Start the driver.
          * 
-         * @param id the database identifier
-         * @param username the username
-         * @param device the device identifier or token
-         * @param appVersion the version of the application
-         * @param timeout the maximum amount of time to wait for responses
-         * @param unit the unit of time for the timeout
-         * @return the database connection
-         * @throws DebeziumConnectionException if there was an error connecting to the given database with the given username
-         * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username
+         * @return the driver; never null
          */
-        Database provision(DatabaseId id, String username, String device, String appVersion, long timeout, TimeUnit unit);
-
-        /**
-         * Shutdown this client and release all resources.
-         * 
-         * @param timeout the maximum time that this method should block before returning; must be positive
-         * @param unit the time unit for {@code timeout}; may not be null
-         */
-        void shutdown(long timeout, TimeUnit unit);
+        Debezium start();
     }
 
     /**
@@ -366,13 +357,14 @@ public interface Debezium {
          * when a server fails).
          */
         NONE("0");
+
         private final String literal;
 
         private Acknowledgement(String literal) {
             this.literal = literal;
         }
 
-        public String literal() {
+        String literal() {
             return literal;
         }
 
@@ -398,13 +390,14 @@ public interface Debezium {
          * Use no compression.
          */
         NONE("none");
+
         private final String literal;
 
         private Compression(String literal) {
             this.literal = literal;
         }
 
-        public String literal() {
+        String literal() {
             return literal;
         }
 
@@ -412,6 +405,166 @@ public interface Debezium {
         public String toString() {
             return literal();
         }
+    }
+
+    /**
+     * Authenticate the named user for the given database.
+     * 
+     * @param username the username
+     * @param device the device identifier or token
+     * @param appVersion the version of the application
+     * @param databaseIds the identifier of the database(s) for which the user is to be authenticated
+     * @return the session token for the user; never null
+     * @throws DebeziumAuthorizationException if the user could not be authenticated or authorized for the database(s)
+     */
+    public SessionToken connect(String username, String device, String appVersion, String... databaseIds);
+
+    /**
+     * Provision a new database with the given name, blocking at most the default timeout.
+     * 
+     * @param adminToken a valid session token for an administrative user; may not be null
+     * @param databaseId the identifier for the new database; may not be null
+     * @param timeout the maximum amount of time to wait for responses
+     * @param unit the unit of time for the timeout
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     * @throws DebeziumProvisioningException if there was an error provisioning a database with the given username, for
+     *             example if the database already exists
+     */
+    public void provision(SessionToken adminToken, String databaseId, long timeout, TimeUnit unit);
+
+    /**
+     * Read the current schema for the specified database.
+     * 
+     * @param token a valid session token for the user; may not be null
+     * @param databaseId the name of the database; may not be null
+     * @param timeout the maximum amount of time to wait for responses
+     * @param unit the unit of time for the timeout
+     * @return the schema; never null
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public Schema readSchema(SessionToken token, String databaseId, long timeout, TimeUnit unit);
+
+    /**
+     * Read one entity from the database and return its representation, including whether or not the entity
+     * {@link Entity#exists() exists}.
+     * 
+     * @param token a valid session token for the user; may not be null
+     * @param entityId the entity's unique identifier; may not be null
+     * @param timeout the amount of time to wait for the response
+     * @param unit the unit of time for the timeout
+     * @return a representation of the entity; never null
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public Entity readEntity(SessionToken token, EntityId entityId, long timeout, TimeUnit unit);
+
+    /**
+     * Request to apply the given patch to an entity.
+     * 
+     * @param token a valid session token for the user; may not be null
+     * @param patch the patch; may not be null
+     * @param timeout the amount of time to wait for the response
+     * @param unit the unit of time for the timeout
+     * @return the result of the change request; never null
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public EntityChange changeEntity(SessionToken token, Patch<EntityId> patch, long timeout, TimeUnit unit);
+
+    /**
+     * Destroy one entity from the database.
+     * 
+     * @param token a valid session token for the user; may not be null
+     * @param entityId the entity's unique identifier within this database; may not be null
+     * @param timeout the amount of time to wait for the response
+     * @param unit the unit of time for the timeout
+     * @return {@code true} if the entity existed and was destroyed, or {@code false} if it did not exist
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public boolean destroyEntity(SessionToken token, EntityId entityId, long timeout, TimeUnit unit);
+
+    /**
+     * Begin a batch operation. Use the resulting {@link BatchBuilder} object to assemble the requests, and then
+     * {@link BatchBuilder#submit(SessionToken, long, TimeUnit)} the batch.
+     * 
+     * @return the builder of the batch request; never null
+     */
+    public BatchBuilder batch();
+
+    /**
+     * Shutdown this client and release all resources.
+     * 
+     * @param timeout the maximum time that this method should block before returning; must be positive
+     * @param unit the time unit for {@code timeout}; may not be null
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public void shutdown(long timeout, TimeUnit unit);
+
+    /**
+     * A builder of a batch request, used to record the operations for a single database that are to be
+     * {@link #submit(SessionToken, long, TimeUnit) submitted} to the server using a single network request.
+     * 
+     * @author Randall Hauch
+     */
+    public static interface BatchBuilder {
+        /**
+         * Add a request to this batch to read one entity from the database and return its representation, including whether or
+         * not the entity {@link Entity#exists() exists}.
+         * 
+         * @param entityId the entity's unique identifier within this database; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        public BatchBuilder readEntity(EntityId entityId);
+
+        /**
+         * Add a request to this batch to apply the given patch to an entity.
+         * 
+         * @param patch the patch; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        public BatchBuilder changeEntity(Patch<EntityId> patch);
+
+        /**
+         * Add a request to this batch to destroy one entity from the database.
+         * 
+         * @param entityId the entity's unique identifier within this database; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        public BatchBuilder destroyEntity(EntityId entityId);
+
+        /**
+         * Add a request that changes the entity with the given ID, returning a {@link Editor patch editor} that can be used
+         * to record the operations. Call {@link Editor#end()} on the patch editor to obtain this batch builder.
+         * 
+         * @param entityId the entity's unique identifier within this database; may not be null
+         * @return the patch editor, which when {@link Editor#end()} is called returns this builder
+         */
+        public Patch.Editor<BatchBuilder> changeEntity(EntityId entityId);
+
+        /**
+         * Add a request that creates a new entity of the given type and with a generated ID, returning a {@link Editor patch
+         * editor} that can be used to record the operations. Call {@link Editor#end()} on the patch editor to obtain this
+         * batch builder.
+         * 
+         * @param entityType the type of entity to be created; may not be null
+         * @return the patch editor, which when {@link Editor#end()} is called returns this builder
+         */
+        public Patch.Editor<BatchBuilder> createEntity(EntityType entityType);
+
+        /**
+         * Submit the recorded operations to the server as a single batched request, wait for the response, and return the
+         * results.
+         * 
+         * @param token a valid session token for the user; may not be null
+         * @param timeout the amount of time to wait for the response
+         * @param unit the unit of time for the timeout
+         * @return the results of the batched operations; never null
+         * @throws DebeziumTimeoutException if the operation timed out
+         */
+        public BatchResult submit(SessionToken token, long timeout, TimeUnit unit);
     }
 
 }

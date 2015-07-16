@@ -26,6 +26,7 @@ import org.debezium.core.doc.Document;
 import org.debezium.core.doc.Path;
 import org.debezium.core.doc.Value;
 import org.debezium.core.function.Predicates;
+import org.debezium.core.message.Message.Field;
 import org.debezium.core.util.Iterators;
 import org.debezium.core.util.MathOps;
 
@@ -843,6 +844,8 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
     private final List<Operation> ops;
 
     protected Patch(IdType id, List<Operation> ops) {
+        assert id != null;
+        assert ops != null;
         this.id = id;
         this.ops = ops;
     }
@@ -862,6 +865,16 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
 
     public int operationCount() {
         return ops.size();
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if ( obj == this ) return true;
+        if ( obj instanceof Patch ) {
+            Patch<?> that = (Patch<?>)obj;
+            return this.target().equals(that.target()) && this.ops.equals(that.ops);
+        }
+        return false;
     }
 
     @Override
@@ -921,18 +934,35 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return from(doc);
     }
 
+    /**
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * @param doc the document; may not be null
+     * @return the patch, or null if the document did not contain a patch
+     */
     public static Patch<EntityId> forEntity(Document doc) {
-        return from(doc);
+        return from(doc,null);
     }
 
+    /**
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * @param doc the document; may not be null
+     * @return the patch, or null if the document did not contain a patch
+     */
     public static <IdType extends Identifier> Patch<IdType> from(Document doc) {
         return from(doc,null);
     }
+    /**
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * @param doc the document; may not be null
+     * @param databaseId the database identifier; may be null if the document contains the {@link Field#DATABASE_ID "databaseId"} field
+     * @return the patch, or null if the document did not contain a patch
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public static <IdType extends Identifier> Patch<IdType> from(Document doc, DatabaseId databaseId ) {
         Identifier id = Message.getId(doc,databaseId);
         if (id == null) return null;
-        Array ops = doc.getArray("ops");
+        Array ops = doc.getArray(Field.OPS);
+        if ( ops == null ) return null;
         List<Operation> operations = ops.streamValues().filter(Value::isDocument)
                                         .map(Patch::toOperation)
                                         .filter(Predicates.notNull())

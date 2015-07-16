@@ -5,12 +5,13 @@
  */
 package org.debezium.driver;
 
+
 /**
- * An exception that denotes an invalid request.
+ * An exception that denotes an operation timed out.
  * 
  * @author Randall Hauch
  */
-public class DebeziumInvalidRequestException extends DebeziumException {
+public class DebeziumTimeoutException extends DebeziumException {
     
     private static final long serialVersionUID = 1L;
     
@@ -18,7 +19,7 @@ public class DebeziumInvalidRequestException extends DebeziumException {
      * Constructs a new runtime exception with {@code null} as its detail message. The cause is not initialized, and may
      * subsequently be initialized by a call to {@link #initCause}.
      */
-    public DebeziumInvalidRequestException() {
+    public DebeziumTimeoutException() {
     }
     
     /**
@@ -27,7 +28,7 @@ public class DebeziumInvalidRequestException extends DebeziumException {
      * 
      * @param message the message
      */
-    public DebeziumInvalidRequestException(String message) {
+    public DebeziumTimeoutException(String message) {
         super(message);
     }
     
@@ -39,7 +40,7 @@ public class DebeziumInvalidRequestException extends DebeziumException {
      * @param cause the cause. (A {@code null} value is permitted,
      *            and indicates that the cause is nonexistent or unknown.)
      */
-    public DebeziumInvalidRequestException(Throwable cause) {
+    public DebeziumTimeoutException(Throwable cause) {
         super(cause);
     }
     
@@ -53,7 +54,7 @@ public class DebeziumInvalidRequestException extends DebeziumException {
      * @param cause the cause. (A {@code null} value is permitted,
      *            and indicates that the cause is nonexistent or unknown.)
      */
-    public DebeziumInvalidRequestException(String message, Throwable cause) {
+    public DebeziumTimeoutException(String message, Throwable cause) {
         super(message, cause);
     }
     
@@ -69,7 +70,7 @@ public class DebeziumInvalidRequestException extends DebeziumException {
      * @param writableStackTrace whether or not the stack trace should
      *            be writable
      */
-    public DebeziumInvalidRequestException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    public DebeziumTimeoutException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
         super(message, cause, enableSuppression, writableStackTrace);
     }
     

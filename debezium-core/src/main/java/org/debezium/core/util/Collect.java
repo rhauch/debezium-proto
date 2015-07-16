@@ -6,7 +6,6 @@
 package org.debezium.core.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,7 +20,7 @@ import java.util.Set;
 public class Collect {
 
     public static <T> Set<T> unmodifiableSet( @SuppressWarnings( "unchecked" ) T... values ) {
-        return unmodifiableSet(Arrays.asList(values));
+        return unmodifiableSet(arrayListOf(values));
     }
 
     public static <T> Set<T> unmodifiableSet( Collection<T> values ) {

@@ -28,10 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An implementation of {@link Foundation} that uses in-memory queues as topics, and runs each registered
+ * An implementation of {@link MessageBus} that uses in-memory queues as topics, and runs each registered
  * {@link #subscribe(String, TopicFilter, int, Decoder, Decoder, MessageConsumer) subscriber} in a separate thread.
  */
-public class InMemoryAsyncFoundation implements Foundation {
+public class InMemoryAsyncMessageBus implements MessageBus {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String systemName;
@@ -41,9 +41,14 @@ public class InMemoryAsyncFoundation implements Foundation {
     private final Set<SystemStreamPartition> unmodssps = Collections.unmodifiableSet(ssps);
     private volatile boolean running = true;
 
-    public InMemoryAsyncFoundation(String systemName, Configuration config, Supplier<Executor> executor) {
+    public InMemoryAsyncMessageBus(String systemName, Supplier<Executor> executor) {
         this.systemName = systemName;
         this.executor = executor;
+    }
+    
+    @Override
+    public String getName() {
+        return systemName;
     }
     
     public void createStreams( String... streamNames ) {
@@ -55,7 +60,7 @@ public class InMemoryAsyncFoundation implements Foundation {
     protected InMemoryStream getStream(String streamName) {
         return streams.compute(streamName, (key,stream)->{
             if ( stream == null ) {
-                logger.trace("FOUNDATION: creating new topic '{}'",streamName);
+                logger.trace("BUS: creating new topic '{}'",streamName);
                 stream = new InMemoryStream(systemName, streamName);
                 ssps.add(stream.getSystemStreamPartition());
             }
@@ -80,7 +85,7 @@ public class InMemoryAsyncFoundation implements Foundation {
     @Override
     public <KeyType, MessageType> void subscribe(String groupId, TopicFilter topicFilter, int numThreads, Decoder<KeyType> keyDecoder,
                                                  Decoder<MessageType> messageDecoder, MessageConsumer<KeyType, MessageType> consumer) {
-        logger.trace("FOUNDATION: subscribing {} in group '{}' to topics {}",consumer,groupId,topicFilter);
+        logger.trace("BUS: subscribing {} in group '{}' to topics {}",consumer,groupId,topicFilter);
         // Accumulate the consumer group for each topic that this subscriber will need to check ...
         List<ConsumerGroup> suppliers = new ArrayList<>();
         boolean excludeInternalTopics = false;
@@ -92,13 +97,13 @@ public class InMemoryAsyncFoundation implements Foundation {
         // Add a single thread that continually checks the consumer group for each of the matching topics ...
         AtomicLong offset = new AtomicLong();
         executor.get().execute(() -> {
-            logger.trace("FOUNDATION: adding thread to execute consumer {}",consumer);
+            logger.debug("BUS: adding thread to execute consumer {}",consumer);
             while (running) {
                 suppliers.forEach(consumerGroup -> {
                     KeyedMessage<byte[], byte[]> message = consumerGroup.get(offset);
                     if (message != null && running) {
                         if ( logger.isTraceEnabled() ) {
-                            logger.trace("FOUNDATION: got message '{}' from group '{}'",new String(message.key()),consumerGroup);
+                            logger.trace("BUS: got message '{}' from group '{}'",new String(message.key()),consumerGroup);
                         }
                         KeyType key = keyDecoder.fromBytes(message.key());
                         MessageType m = messageDecoder.fromBytes(message.message());
@@ -115,6 +120,7 @@ public class InMemoryAsyncFoundation implements Foundation {
                     }
                 });
             }
+            logger.debug("BUS: Completed thread to execute consumer {}", consumer);
         });
     }
 
@@ -134,7 +140,7 @@ public class InMemoryAsyncFoundation implements Foundation {
         @Override
         public synchronized void accept(KeyedMessage<byte[], byte[]> message) {
             if ( logger.isTraceEnabled() ) {
-            logger.trace("FOUNDATION: consumer group '{}' received message '{}' on topic '{}'; adding to queue",groupId,new String(message.key()),message.topic());
+                logger.trace("BUS: consumer group '{}' received message '{}' on topic '{}'; adding to queue",groupId,new String(message.key()),message.topic());
             }
             queue.add(message);
             offset.incrementAndGet();
@@ -144,7 +150,7 @@ public class InMemoryAsyncFoundation implements Foundation {
             offset.set(this.offset.get());
             KeyedMessage<byte[],byte[]> message = queue.poll();
             if ( message != null && logger.isTraceEnabled() ) {
-                logger.trace("FOUNDATION: consumer group '{}' consuming message '{}' on topic '{}'",groupId,new String(message.key()),message.topic());
+                logger.trace("BUS: consumer group '{}' consuming message '{}' on topic '{}'",groupId,new String(message.key()),message.topic());
             }
             return message;
         }
@@ -170,7 +176,7 @@ public class InMemoryAsyncFoundation implements Foundation {
         @Override
         public boolean send(KeyedMessage<byte[], byte[]> message) {
             if ( logger.isTraceEnabled() ) {
-                logger.trace("FOUNDATION: sending message '{}' on topic '{}' to consumer groups: {}",new String(message.key()),message.topic(),consumersByGroupId.keySet());
+                logger.trace("BUS: sending message '{}' on topic '{}' to consumer groups: {}",new String(message.key()),message.topic(),consumersByGroupId.keySet());
             }
             // Write out to each of the consumer groups (if there are any) ...
             consumersByGroupId.forEach((groupId, group) -> group.accept(message));
