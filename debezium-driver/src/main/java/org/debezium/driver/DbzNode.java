@@ -184,7 +184,7 @@ final class DbzNode {
      */
     public void registerStart(Callable notified) {
         if (notified != null && this.startListeners.addIfAbsent(notified)) {
-            logger.trace("Registering start listener: {}", notified);
+            logger.trace("NODE: Registering start listener: {}", notified);
         }
     }
 
@@ -196,7 +196,7 @@ final class DbzNode {
      */
     public void registerPreShutdown(Callable notified) {
         if (notified != null && this.preShutdownListeners.addIfAbsent(notified)) {
-            logger.trace("Registering pre-shutdown listener: {}", notified);
+            logger.trace("NODE: Registering pre-shutdown listener: {}", notified);
         }
     }
 
@@ -208,7 +208,7 @@ final class DbzNode {
      */
     public void registerPostShutdown(Callable notified) {
         if (notified != null && this.postShutdownListeners.addIfAbsent(notified)) {
-            logger.trace("Registering post-shutdown listener: {}", notified);
+            logger.trace("NODE: Registering post-shutdown listener: {}", notified);
         }
     }
 
@@ -224,7 +224,7 @@ final class DbzNode {
               .filter(Predicates.notNull())
               .forEach(service -> {
                   if (this.services.addIfAbsent(service)) {
-                      logger.debug("Added service {}", service.getName());
+                      logger.debug("NODE: Added service {}", service.getName());
                       whenRunning(() -> service.start(this));
                   }
               });
@@ -241,12 +241,12 @@ final class DbzNode {
               .filter(Predicates.notNull())
               .forEach(service -> {
                   if (this.services.remove(service)) {
-                      logger.debug("Removed service {}", service);
+                      logger.debug("NODE: Removed service {}", service);
                       whenNotRunning(() -> {
-                          logger.debug("Beginning shutdown of service {}", service);
+                          logger.debug("NODE: Beginning shutdown of service {}", service);
                           service.beginShutdown();
                           service.completeShutdown();
-                          logger.debug("Completed shutdown of service {}", service);
+                          logger.debug("NODE: Completed shutdown of service {}", service);
                       });
                   }
               });

@@ -5,6 +5,7 @@
  */
 package org.debezium.core.message;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -410,19 +411,56 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         Optional<P> endIfChanged();
     }
 
+    /**
+     * Create a patch that destroys the identified target.
+     * 
+     * @param target the target identifier; may not be null
+     * @return the patch; never null
+     */
     public static <T extends Identifier> Patch<T> destroy(T target) {
         return edit(target).remove("/").end();
     }
 
+    /**
+     * Create a patch that overwrites the identified target with the given representation.
+     * 
+     * @param target the target identifier; may not be null
+     * @param value the new representation for the target; may not be null
+     * @return the patch; never null
+     */
+    public static <T extends Identifier> Patch<T> replace(T target, Document value) {
+        assert value != null;
+        return edit(target).add("/", Value.create(value)).end();
+    }
+
+    /**
+     * Create a patch that creates the identified target with the given representation.
+     * 
+     * @param target the target identifier; may not be null
+     * @param value the new representation for the target; may not be null
+     * @return the patch; never null
+     */
     public static <T extends Identifier> Patch<T> create(T target, Document value) {
         assert value != null;
         return edit(target).add("/", Value.create(value)).end();
     }
 
+    /**
+     * Create a patch that creates the identified target with an empty representation.
+     * 
+     * @param target the target identifier; may not be null
+     * @return the patch; never null
+     */
     public static <T extends Identifier> Patch<T> create(T target) {
         return create(target, Document.create());
     }
 
+    /**
+     * Create a patch that reads the identified target.
+     * 
+     * @param target the target identifier; may not be null
+     * @return the patch; never null
+     */
     public static <T extends Identifier> Patch<T> read(T target) {
         return edit(target).end();
     }
@@ -436,66 +474,78 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
      * @param <T> the type of identifier (or target) that should be edit
      */
     public static <T extends Identifier> Editor<Patch<T>> edit(T id) {
-        return new Editor<Patch<T>>() {
-            private List<Operation> ops = new LinkedList<>();
+        return new PatchEditor<T>(id);
+    }
 
-            @Override
-            public Editor<Patch<T>> add(String path, Value value) {
-                ops.add(new AddOp(path, value));
-                return this;
-            }
+    protected static final class PatchEditor<T extends Identifier> implements Editor<Patch<T>> {
+        private T id;
+        private List<Operation> ops = new LinkedList<>();
 
-            @Override
-            public Editor<Patch<T>> remove(String path) {
-                ops.add(new RemoveOp(path));
-                return this;
-            }
+        protected PatchEditor(T id) {
+            this(id, null);
+        }
 
-            @Override
-            public Editor<Patch<T>> replace(String path, Value newValue) {
-                ops.add(new ReplaceOp(path, newValue));
-                return this;
-            }
+        protected PatchEditor(T id, Collection<Operation> initialOps) {
+            this.id = id;
+            if (initialOps != null) ops.addAll(initialOps);
+        }
 
-            @Override
-            public Editor<Patch<T>> copy(String fromPath, String toPath) {
-                ops.add(new CopyOp(fromPath, toPath));
-                return this;
-            }
+        @Override
+        public Editor<Patch<T>> add(String path, Value value) {
+            ops.add(new AddOp(path, value));
+            return this;
+        }
 
-            @Override
-            public Editor<Patch<T>> move(String fromPath, String toPath) {
-                ops.add(new MoveOp(fromPath, toPath));
-                return this;
-            }
+        @Override
+        public Editor<Patch<T>> remove(String path) {
+            ops.add(new RemoveOp(path));
+            return this;
+        }
 
-            @Override
-            public Editor<Patch<T>> require(String path, Value expectedValue) {
-                ops.add(new RequireOp(path, expectedValue));
-                return this;
-            }
+        @Override
+        public Editor<Patch<T>> replace(String path, Value newValue) {
+            ops.add(new ReplaceOp(path, newValue));
+            return this;
+        }
 
-            @Override
-            public Editor<Patch<T>> increment(String path, Number increment) {
-                ops.add(new IncrementOp(path, increment));
-                return this;
-            }
+        @Override
+        public Editor<Patch<T>> copy(String fromPath, String toPath) {
+            ops.add(new CopyOp(fromPath, toPath));
+            return this;
+        }
 
-            @Override
-            public Patch<T> end() {
-                return new Patch<T>(id, ops);
-            }
+        @Override
+        public Editor<Patch<T>> move(String fromPath, String toPath) {
+            ops.add(new MoveOp(fromPath, toPath));
+            return this;
+        }
 
-            @Override
-            public Optional<Patch<T>> endIfChanged() {
-                return ops.isEmpty() ? Optional.empty() : Optional.of(end());
-            }
+        @Override
+        public Editor<Patch<T>> require(String path, Value expectedValue) {
+            ops.add(new RequireOp(path, expectedValue));
+            return this;
+        }
 
-            @Override
-            public String toString() {
-                return "Patch editor for '" + id + "'";
-            }
-        };
+        @Override
+        public Editor<Patch<T>> increment(String path, Number increment) {
+            ops.add(new IncrementOp(path, increment));
+            return this;
+        }
+
+        @Override
+        public Patch<T> end() {
+            return new Patch<T>(id, ops);
+        }
+
+        @Override
+        public Optional<Patch<T>> endIfChanged() {
+            return ops.isEmpty() ? Optional.empty() : Optional.of(end());
+        }
+
+        @Override
+        public String toString() {
+            return "Patch editor for '" + id + "'";
+        }
     }
 
     protected static final class AddOp implements Add {
@@ -850,6 +900,10 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         this.ops = ops;
     }
 
+    /**
+     * Get the identifier of the target for this patch.
+     * @return the target's identifier; never null
+     */
     public IdType target() {
         return id;
     }
@@ -859,19 +913,27 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return Iterators.readOnly(ops.iterator());
     }
 
+    /**
+     * Get the stream of operations in this patch.
+     * @return the stream of operations; never null
+     */
     public Stream<Operation> stream() {
         return ops.stream();
     }
 
+    /**
+     * Get the number of operations in this patch.
+     * @return the number of operations; never negative
+     */
     public int operationCount() {
         return ops.size();
     }
-    
+
     @Override
     public boolean equals(Object obj) {
-        if ( obj == this ) return true;
-        if ( obj instanceof Patch ) {
-            Patch<?> that = (Patch<?>)obj;
+        if (obj == this) return true;
+        if (obj instanceof Patch) {
+            Patch<?> that = (Patch<?>) obj;
             return this.target().equals(that.target()) && this.ops.equals(that.ops);
         }
         return false;
@@ -882,19 +944,36 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return id.toString() + " : { " + ops.stream().map(Object::toString).collect(Collectors.joining(", ")) + " }";
     }
 
+    /**
+     * Determine if this patch has no operations.
+     * @return {@code true} if this patch has no operations, or {@code false} otherwise
+     */
     public boolean isEmpty() {
         return ops.isEmpty();
     }
 
+    /**
+     * Determine if this patch reads the target.
+     * @return {@code true} if this patch reads the target, or {@code false} otherwise
+     */
     public boolean isReadRequest() {
         return isEmpty();
     }
 
+    /**
+     * Determine if this patch only {@link Add adds} a document at the "/" path on the target.
+     * @return {@code true} if this patch creates the target, or {@code false} otherwise
+     */
     public boolean isCreation() {
         if (ops.size() != 1) return false;
         return ops.stream().anyMatch(Patch::isCreationOperation);
     }
 
+    /**
+     * Determine if this patch performs a deletion of the target, which is true if an only if the patch contains a single
+     * {@link Remove remove operation} of the "/" path.
+     * @return {@code true} if this patch deletes the target, or {@code false} otherwise
+     */
     public boolean isDeletion() {
         if (ops.size() != 1) return false;
         return ops.stream().anyMatch(Patch::isDeletionOperation);
@@ -912,6 +991,10 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return op instanceof Remove && ((Remove) op).path().equals("/");
     }
 
+    /**
+     * Consume the newly created document if and only if this patch is a {@link #isCreation() creation operation}.
+     * @param consumer the function that should consume the document if this patch creates the target.
+     */
     public void ifCreation(Consumer<Document> consumer) {
         if (isCreation()) {
             Add addOp = (Add) ops.get(0);
@@ -919,6 +1002,11 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         }
     }
 
+    /**
+     * Obtain the {@link Document} representation of this patch, which includes the fields for the {@link #target()}'s identifier.
+     * 
+     * @return the document representation; never null
+     */
     public Document asDocument() {
         Document doc = Document.create();
         doc.putAll(id.fields());
@@ -926,43 +1014,94 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         return doc;
     }
 
+    /**
+     * Obtain the {@link Array} representation of this patch, which does <em>not</em> include the fields for the {@link #target()}
+     * 's identifier.
+     * 
+     * @return the document representation; never null
+     */
+    public Array asArray() {
+        return Array.create(ops.stream().map(Operation::asValue).collect(Collectors.toList()));
+    }
+
+    /**
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document, where the identifier
+     * of the database target is given by the {@value Field#DATABASE_ID} field value.
+     * 
+     * @param doc the document; may not be null
+     * @return the patch, or null if the document did not contain a patch
+     */
     public static Patch<DatabaseId> forDatabase(Document doc) {
         return from(doc);
     }
 
+    /**
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document, where the identifier
+     * of the target entity type is given by the {@value Field#DATABASE_ID} and {@value Field#COLLECTION} field values.
+     * 
+     * @param doc the document; may not be null
+     * @return the patch, or null if the document did not contain a patch
+     */
     public static Patch<EntityType> forEntityType(Document doc) {
         return from(doc);
     }
 
     /**
-     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document, where the identifier
+     * of the entity target is given by the {@value Field#DATABASE_ID}, {@value Field#COLLECTION}, {@value Field#ZONE_ID} and
+     * {@value Field#ENTITY} field values.
+     * 
      * @param doc the document; may not be null
      * @return the patch, or null if the document did not contain a patch
      */
     public static Patch<EntityId> forEntity(Document doc) {
-        return from(doc,null);
+        return from(doc, null);
     }
 
     /**
-     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document, where the identifier
+     * of the database, collection, zone or entity target is given by the {@value Field#DATABASE_ID}, {@value Field#COLLECTION},
+     * {@value Field#ZONE_ID} and {@value Field#ENTITY} field values.
+     * 
      * @param doc the document; may not be null
      * @return the patch, or null if the document did not contain a patch
      */
     public static <IdType extends Identifier> Patch<IdType> from(Document doc) {
-        return from(doc,null);
+        return from(doc, null);
     }
+
     /**
-     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document.
+     * Reconstruct the patch in the {@link Field#OPS "ops"} field within the specified document, and optionally the identifier
+     * of the database, collection, zone or entity target given by the {@value Field#DATABASE_ID}, {@value Field#COLLECTION},
+     * {@value Field#ZONE_ID} and {@value Field#ENTITY} field values.
+     * 
      * @param doc the document; may not be null
-     * @param databaseId the database identifier; may be null if the document contains the {@link Field#DATABASE_ID "databaseId"} field
+     * @param databaseId the database identifier; may be null if the document contains the {@link Field#DATABASE_ID "databaseId"}
+     *            field
      * @return the patch, or null if the document did not contain a patch
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static <IdType extends Identifier> Patch<IdType> from(Document doc, DatabaseId databaseId ) {
-        Identifier id = Message.getId(doc,databaseId);
+    public static <IdType extends Identifier> Patch<IdType> from(Document doc, DatabaseId databaseId) {
+        Identifier id = Message.getId(doc, databaseId);
         if (id == null) return null;
         Array ops = doc.getArray(Field.OPS);
-        if ( ops == null ) return null;
+        if (ops == null) return null;
+        List<Operation> operations = ops.streamValues().filter(Value::isDocument)
+                                        .map(Patch::toOperation)
+                                        .filter(Predicates.notNull())
+                                        .collect(Collectors.toList());
+        return new Patch(id, operations);
+    }
+
+    /**
+     * Reconstruct the patch from the operations and a given identifier.
+     * 
+     * @param id the identifier of the patch's target; may not be null
+     * @param ops the array containing the operations in the patch; may not be null
+     * @return the patch, or null if the document did not contain a patch
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static <IdType extends Identifier> Patch<IdType> from(Identifier id, Array ops) {
         List<Operation> operations = ops.streamValues().filter(Value::isDocument)
                                         .map(Patch::toOperation)
                                         .filter(Predicates.notNull())
@@ -1011,5 +1150,15 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
             return false;
         }
         return ops.stream().map(op -> op.apply(document, invalidPath -> failed.accept(op))).count() > 0;
+    }
+
+    /**
+     * Obtain an {@link Editor} for this patch, which always leaves this patch unmodified and instead always results in a
+     * new updated patch object.
+     * 
+     * @return the patch editor; never null
+     */
+    public Editor<Patch<IdType>> edit() {
+        return new PatchEditor<IdType>(this.id, this.ops);
     }
 }

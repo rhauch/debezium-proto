@@ -1,0 +1,39 @@
+{
+    "entityChanges": [
+        /* Add an age to Sally's contact, which should make 'age' a required field. */
+        {
+            "db": "my-db", 
+            "collection": "Contacts", 
+            "zone": "default",
+            "entity": "400cb092-00af-4e44-bdcb-1a0c536692bf",
+            "clientid": "c297cf20-18bd-40e2-827d-9b563ca28ccd", 
+            "request": 10, 
+            "user": "jsmith", 
+            "begun": 1415747166290, 
+            "parts": 1, 
+            "ops": [
+                {
+                    "op": "add", 
+                    "path": "age", 
+                    "value": 32
+                }
+            ], 
+            "status": 1, 
+            "before": {
+                "firstName": "Sally", 
+                "lastName": "Anderson",
+                "phone": {
+                    "home": "1-222-555-1234"
+                }
+            },
+            "after": {
+                "firstName": "Sally", 
+                "lastName": "Anderson",
+                "phone": {
+                    "home": "1-222-555-1234"
+                },
+                "age": 32
+            }
+        }
+    ]
+}

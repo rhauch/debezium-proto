@@ -17,79 +17,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.debezium</groupId>
     <artifactId>parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <name>Debezium Parent POM</name>
     <packaging>pom</packaging>
-    <properties>
-
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-        <!-- Major dependencies -->
-        <samza.version>0.9.0</samza.version>
-        <kafka.version>0.8.2.1</kafka.version>
-        <scala.version>2.10.4</scala.version>
-        <scala.label.version>2.10</scala.label.version>
-        <curator.version>2.4.0</curator.version>
-        <zookeeper.version>3.4.6</zookeeper.version>
-        <junit.version>4.11</junit.version>
-        <fest.version>1.4</fest.version>
-        <jackson.version>2.4.0</jackson.version>
-        <!-- Kafka uses Metrics 2.2.0, but Metrics 3.x uses a different package
-             structure so it can be used alongside 2.x within the same classloader -->
-        <metrics.version>3.1.0</metrics.version>
-
-        <!-- Logging stuff -->
-        <!--jboss.logging.version>3.1.4.GA</jboss.logging.version>
-        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version-->
-        <log4j.version>1.2.16</log4j.version>
-        <org.slf4j.version>1.7.2</org.slf4j.version>
-        <slf4j.log4j.version>1.7.2</slf4j.log4j.version>
-        <jboss.slf4j.logmanager.version>1.0.3.GA</jboss.slf4j.logmanager.version>
-
-        <!-- Maven Plugins -->
-        <version.resources.plugin>2.4.2</version.resources.plugin>
-        <version.assembly.plugin>2.4</version.assembly.plugin>
-        <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
-        <version.google.formatter.plugin>0.3.1</version.google.formatter.plugin>
-        <version.spotify.docker.plugin>0.1.2</version.spotify.docker.plugin>
-        <version.scala.plugin>2.15.2</version.scala.plugin>
-
-        <maven.compiler.argument.source>1.8</maven.compiler.argument.source>
-        <maven.compiler.argument.target>1.8</maven.compiler.argument.target>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-
-        <docker.maintainer>Debezium community</docker.maintainer>
-
-    </properties>
-    <modules>
-        <module>debezium-core</module>
-        <module>debezium-docker-jre8</module>
-        <module>debezium-docker-zookeeper</module>
-        <module>debezium-docker-kafka</module>
-        <module>debezium-samza</module>
-        <module>debezium-assembly-descriptors</module>
-        <module>debezium-service</module>
-        <module>debezium-service-entity-batch</module>
-        <module>debezium-service-entity-storage</module>
-        <module>debezium-service-schema-storage</module>
-        <!--module>debezium-service-schema-learning-partitioner</module>
-        <module>debezium-service-schema-learning</module>
-        <module>debezium-service-metrics</module-->
-        <module>debezium-service-response-accumulator</module>
-        <module>debezium-driver</module>
-        <!--module>debezium-docker-mini</module-->
-        <module>debezium-integration-tests</module>
-        <module>debezium-example-app</module>
-        <module>debezium-example-load-app</module>
-    </modules>
-    <developers>
-        <developer>
-            <id>rhauch</id>
-            <name>Randall Hauch</name>
-            <timezone>-6</timezone>
-        </developer>
-    </developers>
+    <url>http://debezium.io</url>
     <scm>
         <connection>scm:git:git@github.com:rhauch/debezium.git</connection>
         <developerConnection>scm:git:git@github.com:rhauch/debezium.git</developerConnection>
@@ -102,6 +33,63 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+    <developers>
+        <developer>
+            <id>rhauch</id>
+            <name>Randall Hauch</name>
+            <timezone>-6</timezone>
+        </developer>
+    </developers>
+    <properties>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Major dependencies -->
+        <samza.version>0.9.0</samza.version>
+        <kafka.version>0.8.3-SNAPSHOT</kafka.version>
+        <scala.version>2.11.7</scala.version>
+        <scala.label.version>2.11</scala.label.version>
+        <curator.version>2.4.0</curator.version>
+        <zookeeper.version>3.4.6</zookeeper.version>
+        <junit.version>4.11</junit.version>
+        <fest.version>1.4</fest.version>
+        <jackson.version>2.4.0</jackson.version>
+        <!-- Kafka uses Metrics 2.2.0, but Metrics 3.x uses a different package
+             structure so it can be used alongside 2.x within the same classloader -->
+        <metrics.version>3.1.0</metrics.version>
+        <version.resteasy>3.0.11.Final</version.resteasy>
+        <version.io.undertow>1.2.9.Final</version.io.undertow>
+
+        <!-- Logging stuff -->
+        <!--jboss.logging.version>3.1.4.GA</jboss.logging.version>
+        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version-->
+        <log4j.version>1.2.16</log4j.version>
+        <org.slf4j.version>1.7.2</org.slf4j.version>
+        <slf4j.log4j.version>1.7.2</slf4j.log4j.version>
+        <jboss.slf4j.logmanager.version>1.0.3.GA</jboss.slf4j.logmanager.version>
+        <version.jboss.spec.javaee.7.0>1.0.3.Final</version.jboss.spec.javaee.7.0>
+
+        <!-- Maven Plugins -->
+        <version.resources.plugin>2.4.2</version.resources.plugin>
+        <version.assembly.plugin>2.4</version.assembly.plugin>
+        <version.war.plugin>2.5</version.war.plugin>
+        <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
+        <version.google.formatter.plugin>0.3.1</version.google.formatter.plugin>
+        <version.spotify.docker.plugin>0.1.2</version.spotify.docker.plugin>
+        <version.scala.plugin>2.15.2</version.scala.plugin>
+        <version.wildfly.maven.plugin>1.0.2.Final</version.wildfly.maven.plugin>
+
+        <maven.compiler.argument.source>1.8</maven.compiler.argument.source>
+        <maven.compiler.argument.target>1.8</maven.compiler.argument.target>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+
+        <docker.maintainer>Debezium community</docker.maintainer>
+
+    </properties>
+    <modules>
+        <module>debezium</module>
+    </modules>
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -112,8 +100,39 @@
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>${kafka.version}</version>
+                <version>0.8.3-20150821.203430-3</version>
             </dependency>
+            <!-- BEGIN: needed for snapshots -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>0.8.3-20150821.203430-3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-log4j-appender</artifactId>
+                <version>0.8.3-20150821.203500-3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-stream</artifactId>
+                <version>0.8.3-20150821.203501-3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka_${scala.label.version}</artifactId>
+                <version>0.8.3-20150821.203430-3</version>
+                <classifier>test</classifier>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-stream</artifactId>
+                <version>0.8.3-20150821.203501-3</version>
+                <classifier>test</classifier>
+                <scope>test</scope>
+            </dependency>
+            <!-- END: needed for snapshots -->
             <dependency>
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
@@ -217,6 +236,46 @@
                 <version>${log4j.version}</version>
                 <scope>test</scope>
             </dependency>
+            <!-- Server-related dependencies -->
+            <dependency>
+                <groupId>org.jboss.spec</groupId>
+                <artifactId>jboss-javaee-7.0</artifactId>
+                <version>${version.jboss.spec.javaee.7.0}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.jboss.resteasy</groupId>
+                <artifactId>resteasy-bom</artifactId>
+                <version>${version.resteasy}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!--dependency>
+                <groupId>org.jboss.resteasy</groupId>
+                <artifactId>resteasy-undertow</artifactId>
+                <version>${version.resteasy}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-core</artifactId>
+                <version>${version.io.undertow}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-servlet</artifactId>
+                <version>${version.io.undertow}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-websockets-jsr</artifactId>
+                <version>${version.io.undertow}</version>
+                <scope>test</scope>
+            </dependency-->
+
             <!-- Test depedencies -->
             <dependency>
                 <groupId>junit</groupId>
@@ -234,13 +293,6 @@
                 <groupId>org.easytesting</groupId>
                 <artifactId>fest-assert</artifactId>
                 <version>${fest.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>${kafka.version}</version>
-                <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -266,6 +318,11 @@
             <dependency>
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-driver</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium-server</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -325,6 +382,11 @@
             </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
+                <artifactId>debezium-integration-tests</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
                 <artifactId>debezium-driver</artifactId>
                 <version>${project.version}</version>
                 <scope>test</scope>
@@ -334,8 +396,8 @@
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-integration-tests</artifactId>
                 <version>${project.version}</version>
-                <type>test-jar</type>
                 <scope>test</scope>
+                <type>test-jar</type>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -425,6 +487,11 @@
                     <groupId>org.scala-tools</groupId>
                     <artifactId>maven-scala-plugin</artifactId>
                     <version>${version.scala.plugin}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.wildfly.plugins</groupId>
+                    <artifactId>wildfly-maven-plugin</artifactId>
+                    <version>${version.wildfly.maven.plugin}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -521,6 +588,22 @@
                 <artifactId>docker-maven-plugin</artifactId>
                 <configuration>
                     <skipDockerBuild>true</skipDockerBuild>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemProperties combine.children="append">
+                        <property>
+                            <name>java.io.tmpdir</name>
+                            <value>${basedir}/target</value>
+                        </property>
+                    </systemProperties>
+                    <argLine>-Djava.awt.headless=true</argLine>
+                    <!--runOrder>alphabetical</runOrder-->
+                    <useFile>false</useFile>
+                    <enableAssertions>true</enableAssertions>
                 </configuration>
             </plugin>
         </plugins>
@@ -635,16 +718,5 @@
             </build>
         </profile>
     </profiles>
-
-    <repositories>
-        <repository>
-            <id>jboss-repo</id>
-            <url>http://repository.jboss.org/nexus/content/groups/public/</url>
-        </repository>
-        <repository>
-            <id>jboss-thirdparty-repo</id>
-            <url>https://repository.jboss.org/nexus/service/local/repositories/thirdparty-releases/content</url>
-        </repository>
-    </repositories>
 
 </project>

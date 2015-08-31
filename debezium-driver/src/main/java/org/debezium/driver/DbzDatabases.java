@@ -50,12 +50,12 @@ final class DbzDatabases extends DbzNode.Service {
 
     @Override
     public String getName() {
-        return "DbzDatabases";
+        return "databases";
     }
 
     @Override
     protected void onStart(DbzNode node) {
-        logger.debug("Starting Databases. Subscribing to '{}'...", Topic.SCHEMA_UPDATES);
+        logger.debug("DATABASES: Starting and subscribing to '{}'...", Topic.SCHEMA_UPDATES);
         // Add a single-threaded consumer that will read the "schema-updates" topic to get all database schema updates.
         // We use a unique group ID so that we get *all* the messages on this topic.
         int numThreads = 1;
@@ -65,20 +65,20 @@ final class DbzDatabases extends DbzNode.Service {
             Document updatedSchema = Message.getAfter(msg);
             DatabaseId dbId = Identifier.parseDatabaseId(key);
             activeDatabases.put(dbId.asString(), new ActiveDatabase(dbId, updatedSchema));
-            logger.debug("Cached active database '{}'...", dbId);
+            logger.debug("DATABASES: Cached active database '{}'...", dbId);
             return true;
         });
     }
 
     @Override
     protected void beginShutdown(DbzNode node) {
-        logger.debug("Beginning shutdown of databases");
+        logger.debug("DATABASES: Beginning shutdown of databases");
     }
 
     @Override
     protected void completeShutdown(DbzNode node) {
         activeDatabases.clear();
-        logger.debug("Completed shutdown of databases");
+        logger.debug("DATABASES: Completed shutdown of databases");
     }
 
     void provision( String username, DatabaseId dbId, long timeout, TimeUnit unit ) {
@@ -87,23 +87,23 @@ final class DbzDatabases extends DbzNode.Service {
             if (db != null) {
                 throw new DebeziumProvisioningException("Database '" + dbId + "' already exists");
             }
-            logger.debug("Provisioning new database '{}'", dbId);
+            logger.debug("DATABASES: Provisioning new database '{}'", dbId);
             return responses.submit(Boolean.class, requestId -> {
-                logger.trace("Attempting to submit request to create schema for database '{}'", dbId);
+                logger.trace("DATABASES: Attempting to submit request to create schema for database '{}'", dbId);
                 Document request = Patch.create(dbId).asDocument();
                 Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), username);
                 if (!node.send(Topic.SCHEMA_PATCHES, dbId.asString(), request)) {
                     throw new DebeziumClientException("Unable to send request to create schema for " + dbId);
                 }
             }).onResponse(timeout,unit, response -> {
-                logger.debug("Reading schema for new database '{}'", dbId);
+                logger.debug("DATABASES: Reading schema for new database '{}'", dbId);
                 Message.getFirstFailureReason(response).ifPresent(msg->{
                     throw new DebeziumProvisioningException("Unable to provision database '" + dbId + "': " + msg);
                 });
                 assert Message.isSuccess(response);
                 Document schema = Message.getAfter(response);
                 activeDatabases.put(dbId.asString(), new ActiveDatabase(dbId, schema));
-                logger.debug("Caching updated schema for database '{}'", dbId);
+                logger.debug("DATABASES: Caching updated schema for database '{}'", dbId);
                 return Boolean.TRUE;
             }).onTimeout(() -> {
                 throw new DebeziumProvisioningException("Timed out while waiting for provision request to be processed.");

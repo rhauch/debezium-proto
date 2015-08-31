@@ -1,0 +1,841 @@
+[ {
+  "topic" : "entity-updates",
+  "offset" : 1,
+  "key" : "myDb/contact/default/344124dc-a2ed-4824-8774-6a79bd5832a8",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "344124dc-a2ed-4824-8774-6a79bd5832a8",
+    "clientid" : "client1",
+    "request" : 1,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345935,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "zipCode" : "12349",
+        "phoneNumber" : "1-123-555-1136",
+        "streetNumber" : "74",
+        "birthMonth" : "July",
+        "city" : "Plymouth",
+        "birthYear" : "1980",
+        "firstName" : "Phillip"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "zipCode" : "12349",
+      "phoneNumber" : "1-123-555-1136",
+      "streetNumber" : "74",
+      "birthMonth" : "July",
+      "city" : "Plymouth",
+      "birthYear" : "1980",
+      "firstName" : "Phillip",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "344124dc-a2ed-4824-8774-6a79bd5832a8"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 2,
+  "key" : "myDb/contact/default/2e1e504c-e8bc-4faf-8f40-e4965a9f1e53",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "2e1e504c-e8bc-4faf-8f40-e4965a9f1e53",
+    "clientid" : "client1",
+    "request" : 2,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345939,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "streetNumber" : "304",
+        "birthYear" : "1987",
+        "birthMonth" : "May",
+        "lastName" : "Johnson",
+        "firstName" : "Alex"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "streetNumber" : "304",
+      "birthYear" : "1987",
+      "birthMonth" : "May",
+      "lastName" : "Johnson",
+      "firstName" : "Alex",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "2e1e504c-e8bc-4faf-8f40-e4965a9f1e53"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 3,
+  "key" : "myDb/contact/default/3098aebd-82be-45fa-94ae-e7a86b5fafd3",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "3098aebd-82be-45fa-94ae-e7a86b5fafd3",
+    "clientid" : "client1",
+    "request" : 3,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345940,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "phoneNumber" : "1-123-555-1125",
+        "lastName" : "Phillips",
+        "birthYear" : "1961",
+        "state" : "New Mexico",
+        "city" : "Athens",
+        "firstName" : "Edward"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "phoneNumber" : "1-123-555-1125",
+      "lastName" : "Phillips",
+      "birthYear" : "1961",
+      "state" : "New Mexico",
+      "city" : "Athens",
+      "firstName" : "Edward",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "3098aebd-82be-45fa-94ae-e7a86b5fafd3"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 4,
+  "key" : "myDb/contact/default/0ad93abf-2e65-40e9-af13-d6d7f79bf5a7",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "0ad93abf-2e65-40e9-af13-d6d7f79bf5a7",
+    "clientid" : "client1",
+    "request" : 4,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345941,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "lastName" : "Phillips",
+        "phoneNumber" : "1-123-555-1130",
+        "zipCode" : "12332",
+        "city" : "New London",
+        "firstName" : "Jacob"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "lastName" : "Phillips",
+      "phoneNumber" : "1-123-555-1130",
+      "zipCode" : "12332",
+      "city" : "New London",
+      "firstName" : "Jacob",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "0ad93abf-2e65-40e9-af13-d6d7f79bf5a7"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 5,
+  "key" : "myDb/contact/default/0811f86a-bf13-4be5-8a05-d2701de77006",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "0811f86a-bf13-4be5-8a05-d2701de77006",
+    "clientid" : "client1",
+    "request" : 5,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345942,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "lastName" : "Davis",
+        "phoneNumber" : "1-123-555-1114",
+        "firstName" : "Sheldon",
+        "streetNumber" : "1",
+        "birthMonth" : "March",
+        "state" : "Michigan"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "lastName" : "Davis",
+      "phoneNumber" : "1-123-555-1114",
+      "firstName" : "Sheldon",
+      "streetNumber" : "1",
+      "birthMonth" : "March",
+      "state" : "Michigan",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "0811f86a-bf13-4be5-8a05-d2701de77006"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 6,
+  "key" : "myDb/contact/default/e2a97281-5c75-44dd-8fa8-1533c993960c",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "e2a97281-5c75-44dd-8fa8-1533c993960c",
+    "clientid" : "client1",
+    "request" : 6,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345942,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "city" : "St. Charles",
+        "firstName" : "Phillip",
+        "zipCode" : "12343"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "city" : "St. Charles",
+      "firstName" : "Phillip",
+      "zipCode" : "12343",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "e2a97281-5c75-44dd-8fa8-1533c993960c"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 7,
+  "key" : "myDb/contact/default/3d752ba3-0cf4-4c8b-968b-3f90ac89c72c",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "3d752ba3-0cf4-4c8b-968b-3f90ac89c72c",
+    "clientid" : "client1",
+    "request" : 7,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345943,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "state" : "Michigan",
+        "zipCode" : "12334",
+        "firstName" : "Abby",
+        "streetName" : "South Dakota Street"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "state" : "Michigan",
+      "zipCode" : "12334",
+      "firstName" : "Abby",
+      "streetName" : "South Dakota Street",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "3d752ba3-0cf4-4c8b-968b-3f90ac89c72c"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 8,
+  "key" : "myDb/contact/default/dac4795c-bf0e-4071-a1ce-705ac99d8f7c",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "dac4795c-bf0e-4071-a1ce-705ac99d8f7c",
+    "clientid" : "client1",
+    "request" : 8,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345943,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "streetNumber" : "304",
+        "city" : "London",
+        "firstName" : "Sarah",
+        "streetName" : "Oregon Street"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "streetNumber" : "304",
+      "city" : "London",
+      "firstName" : "Sarah",
+      "streetName" : "Oregon Street",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "dac4795c-bf0e-4071-a1ce-705ac99d8f7c"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 9,
+  "key" : "myDb/contact/default/48132d62-05e6-4995-901d-af49439d423a",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "48132d62-05e6-4995-901d-af49439d423a",
+    "clientid" : "client1",
+    "request" : 9,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345944,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "streetNumber" : "2012",
+        "lastName" : "Johnston",
+        "state" : "Florida",
+        "firstName" : "Zachary"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "streetNumber" : "2012",
+      "lastName" : "Johnston",
+      "state" : "Florida",
+      "firstName" : "Zachary",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "48132d62-05e6-4995-901d-af49439d423a"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 10,
+  "key" : "myDb/contact/default/7771f3d2-b8cf-45f8-9feb-8c4061499cdd",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "7771f3d2-b8cf-45f8-9feb-8c4061499cdd",
+    "clientid" : "client1",
+    "request" : 10,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345944,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "streetName" : "Arbor Street",
+        "birthMonth" : "April",
+        "zipCode" : "12351",
+        "state" : "New York",
+        "birthYear" : "1984",
+        "city" : "Augusta",
+        "firstName" : "Bartholomew"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "streetName" : "Arbor Street",
+      "birthMonth" : "April",
+      "zipCode" : "12351",
+      "state" : "New York",
+      "birthYear" : "1984",
+      "city" : "Augusta",
+      "firstName" : "Bartholomew",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "7771f3d2-b8cf-45f8-9feb-8c4061499cdd"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 11,
+  "key" : "myDb/contact/default/bb021ef3-4c89-4b08-b25f-30adb62e30ce",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "bb021ef3-4c89-4b08-b25f-30adb62e30ce",
+    "clientid" : "client1",
+    "request" : 11,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345945,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "phoneNumber" : "1-123-555-1125",
+        "birthMonth" : "January",
+        "state" : "Arizona",
+        "city" : "Springfield",
+        "streetNumber" : "2012"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "phoneNumber" : "1-123-555-1125",
+      "birthMonth" : "January",
+      "state" : "Arizona",
+      "city" : "Springfield",
+      "streetNumber" : "2012",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "bb021ef3-4c89-4b08-b25f-30adb62e30ce"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 12,
+  "key" : "myDb/contact/default/1a620736-829a-41fb-9ca3-49c96ccb8f5f",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "1a620736-829a-41fb-9ca3-49c96ccb8f5f",
+    "clientid" : "client1",
+    "request" : 12,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345946,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "streetNumber" : "13",
+        "birthMonth" : "August",
+        "state" : "California",
+        "phoneNumber" : "1-123-555-1127",
+        "city" : "Norman",
+        "streetName" : "Bridge Street"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "streetNumber" : "13",
+      "birthMonth" : "August",
+      "state" : "California",
+      "phoneNumber" : "1-123-555-1127",
+      "city" : "Norman",
+      "streetName" : "Bridge Street",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "1a620736-829a-41fb-9ca3-49c96ccb8f5f"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 13,
+  "key" : "myDb/contact/default/1e6c4b8d-c620-4cda-b413-ca7ffad6de83",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "1e6c4b8d-c620-4cda-b413-ca7ffad6de83",
+    "clientid" : "client1",
+    "request" : 13,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345946,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "state" : "New Mexico",
+        "zipCode" : "12335",
+        "streetName" : "Main Street",
+        "phoneNumber" : "1-123-555-1133",
+        "firstName" : "Ernesto"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "state" : "New Mexico",
+      "zipCode" : "12335",
+      "streetName" : "Main Street",
+      "phoneNumber" : "1-123-555-1133",
+      "firstName" : "Ernesto",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "1e6c4b8d-c620-4cda-b413-ca7ffad6de83"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 14,
+  "key" : "myDb/contact/default/91d6d9ce-12d8-464a-ac15-148dda3ebde9",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "91d6d9ce-12d8-464a-ac15-148dda3ebde9",
+    "clientid" : "client1",
+    "request" : 14,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345947,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "lastName" : "O'Malley",
+        "firstName" : "Jacob",
+        "phoneNumber" : "1-123-555-1132",
+        "city" : "Plymouth"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "lastName" : "O'Malley",
+      "firstName" : "Jacob",
+      "phoneNumber" : "1-123-555-1132",
+      "city" : "Plymouth",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "91d6d9ce-12d8-464a-ac15-148dda3ebde9"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 15,
+  "key" : "myDb/contact/default/98e4a14b-34ec-4271-b63d-f1838be47faf",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "98e4a14b-34ec-4271-b63d-f1838be47faf",
+    "clientid" : "client1",
+    "request" : 15,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345948,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "phoneNumber" : "1-123-555-1111",
+        "zipCode" : "12344",
+        "streetNumber" : "22",
+        "state" : "New Mexico",
+        "firstName" : "Carla"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "phoneNumber" : "1-123-555-1111",
+      "zipCode" : "12344",
+      "streetNumber" : "22",
+      "state" : "New Mexico",
+      "firstName" : "Carla",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "98e4a14b-34ec-4271-b63d-f1838be47faf"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 16,
+  "key" : "myDb/contact/default/35d74c76-b648-40dd-92a1-c80e74663560",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "35d74c76-b648-40dd-92a1-c80e74663560",
+    "clientid" : "client1",
+    "request" : 16,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345948,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "lastName" : "Hart",
+        "phoneNumber" : "1-123-555-1119",
+        "firstName" : "Ernesto",
+        "state" : "New Mexico",
+        "streetName" : "South Main Street"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "lastName" : "Hart",
+      "phoneNumber" : "1-123-555-1119",
+      "firstName" : "Ernesto",
+      "state" : "New Mexico",
+      "streetName" : "South Main Street",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "35d74c76-b648-40dd-92a1-c80e74663560"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 17,
+  "key" : "myDb/contact/default/d3d58b7a-c808-4d5a-aa8b-31fcb15cf2f1",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "d3d58b7a-c808-4d5a-aa8b-31fcb15cf2f1",
+    "clientid" : "client1",
+    "request" : 17,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345949,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "lastName" : "Johnston",
+        "streetNumber" : "395",
+        "firstName" : "Ernie"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "lastName" : "Johnston",
+      "streetNumber" : "395",
+      "firstName" : "Ernie",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "d3d58b7a-c808-4d5a-aa8b-31fcb15cf2f1"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 18,
+  "key" : "myDb/contact/default/2870ee28-3475-4c38-a8b6-eb7a240b7967",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "2870ee28-3475-4c38-a8b6-eb7a240b7967",
+    "clientid" : "client1",
+    "request" : 18,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345949,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "zipCode" : "12349",
+        "phoneNumber" : "1-123-555-1119",
+        "firstName" : "Larry",
+        "city" : "New London"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "zipCode" : "12349",
+      "phoneNumber" : "1-123-555-1119",
+      "firstName" : "Larry",
+      "city" : "New London",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "2870ee28-3475-4c38-a8b6-eb7a240b7967"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 19,
+  "key" : "myDb/contact/default/e98bb077-9112-477d-95e9-8aa1fb0ab755",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "e98bb077-9112-477d-95e9-8aa1fb0ab755",
+    "clientid" : "client1",
+    "request" : 19,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345950,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "birthMonth" : "December",
+        "phoneNumber" : "1-123-555-1125",
+        "state" : "Washington",
+        "streetNumber" : "3A",
+        "birthYear" : "1986",
+        "streetName" : "Pine Street"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "birthMonth" : "December",
+      "phoneNumber" : "1-123-555-1125",
+      "state" : "Washington",
+      "streetNumber" : "3A",
+      "birthYear" : "1986",
+      "streetName" : "Pine Street",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "e98bb077-9112-477d-95e9-8aa1fb0ab755"
+    },
+    "$rev" : 1
+  }
+}, {
+  "topic" : "entity-updates",
+  "offset" : 20,
+  "key" : "myDb/contact/default/be090512-045f-40f9-a8a3-dd8bb8942bc1",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "be090512-045f-40f9-a8a3-dd8bb8942bc1",
+    "clientid" : "client1",
+    "request" : 20,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440430345950,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "state" : "Minnesota",
+        "zipCode" : "12349",
+        "birthMonth" : "March",
+        "phoneNumber" : "1-123-555-1112",
+        "city" : "Smithwich",
+        "lastName" : "Inders"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "state" : "Minnesota",
+      "zipCode" : "12349",
+      "birthMonth" : "March",
+      "phoneNumber" : "1-123-555-1112",
+      "city" : "Smithwich",
+      "lastName" : "Inders",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "be090512-045f-40f9-a8a3-dd8bb8942bc1"
+    },
+    "$rev" : 1
+  }
+} ]

@@ -5,10 +5,11 @@
  */
 package org.debezium.driver;
 
+import java.util.Objects;
+
 import org.debezium.core.annotation.Immutable;
 import org.debezium.core.component.EntityId;
 import org.debezium.core.doc.Document;
-import org.fest.util.Objects;
 
 /**
  * A representation of an {@link Entity} that may or may not exist.
@@ -51,7 +52,7 @@ final class DbzEntity implements Entity {
         if ( obj == this ) return true;
         if ( obj instanceof Entity ) {
             Entity that = (Entity)obj;
-            return this.id.equals(that.id()) && Objects.areEqual(this.doc, that.asDocument());
+            return this.id.equals(that.id()) && Objects.equals(this.doc, that.asDocument());
         }
         return false;
     }

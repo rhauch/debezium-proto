@@ -3,7 +3,7 @@
  * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.test;
+package org.debezium.driver;
 
 import java.util.concurrent.TimeUnit;
 
@@ -12,14 +12,6 @@ import org.debezium.core.component.EntityId;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.doc.Document;
 import org.debezium.core.message.Patch;
-import org.debezium.driver.AbstractDebeziumTest;
-import org.debezium.driver.BatchResult;
-import org.debezium.driver.Debezium;
-import org.debezium.driver.DebeziumProvisioningException;
-import org.debezium.driver.EmbeddedDebezium;
-import org.debezium.driver.Entity;
-import org.debezium.driver.EntityChange;
-import org.debezium.driver.Schema;
 import org.debezium.driver.Debezium.BatchBuilder;
 import org.debezium.driver.EntityChange.ChangeStatus;
 import org.junit.Test;
@@ -35,7 +27,7 @@ public class EmbeddedDebeziumTest extends AbstractDebeziumTest {
 
     protected void printStatistics(String desc) {
         if (Testing.Print.isEnabled()) {
-            ((EmbeddedDebezium) dbz).printStatistics(desc);
+            ((EmbeddedDebezium) dbz).printStatistics(desc,Testing::print);
         }
     }
 

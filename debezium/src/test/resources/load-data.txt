@@ -1,0 +1,275 @@
+firstName:
+	Jamie
+	Arnie
+	Zachary
+	Jonathon
+	Sarah
+	Jacob
+	Gillian
+	Phillip
+	Lisa
+	Larry
+	Bartholomew
+	Ernie
+	Abby
+	Elizabeth
+	Sheldon
+	Ernesto
+	Juan
+	Karl
+	Carla
+	Sammy
+	David
+	Edward
+	Norbert
+	Arthur
+	Mary
+	Fender
+	Xander
+	Alex
+	Chris
+	Jackie
+	Nate
+
+lastName:
+	Anderson
+	Donald
+	Edwards
+	Furth
+	Gilligan
+	Hart
+	Inders
+	Jacobson
+	Kraus
+	Lanister
+	McDonald
+	Nantes
+	O'Malley
+	Phillips
+	Rivers
+	Stanton
+	Tillers
+	Urstead
+	Victors
+	Washington
+	Davis
+	Johnson
+	Johnston
+	Norton
+	Abbott
+	Darby
+
+phoneNumber:
+	1-123-555-1111
+	1-123-555-1112
+	1-123-555-1113
+	1-123-555-1114
+	1-123-555-1115
+	1-123-555-1116
+	1-123-555-1117
+	1-123-555-1118
+	1-123-555-1119
+	1-123-555-1120
+	1-123-555-1121
+	1-123-555-1122
+	1-123-555-1123
+	1-123-555-1124
+	1-123-555-1125
+	1-123-555-1126
+	1-123-555-1127
+	1-123-555-1128
+	1-123-555-1129
+	1-123-555-1130
+	1-123-555-1131
+	1-123-555-1132
+	1-123-555-1133
+	1-123-555-1134
+	1-123-555-1135
+	1-123-555-1136
+	1-123-555-1137
+	1-123-555-1138
+	1-123-555-1139
+	1-123-555-1130
+
+streeNumber:
+	1
+	2
+	3
+	4
+	10
+	201
+	395
+	5115
+	2012
+	3A
+	3B
+	13
+	22
+	74
+	399
+	763
+	19311
+	304
+	3954
+	334
+	5546
+
+streetName
+	Main Street
+	Arbor Street
+	Bridge Street
+	Washington Street
+	Forest Street
+	Stone Street
+	Wolf Street
+	Timberlane Street
+	Addison Street
+	Samuels Street
+	Maple Street
+	Oak Street
+	Linden Street
+	Pine Street
+	Pinehurst Street
+	California Street
+	Arizona Street
+	Michigan Street
+	Virginia Street
+	South Carolina Street
+	North Carolina Street
+	North Dakota Street
+	South Dakota Street
+	Oregon Street
+	Montanna Street
+	1st Street
+	2nd Street
+	3rd Street
+	4th Street
+	5th Street
+	South Main Street
+	21st Street
+	18th Street
+
+city:
+	Victorville
+	Butte
+	Augusta
+	Austin
+	Lexington
+	Springfield
+	Norman
+	Preston
+	Columbus
+	Georgetown
+	Smithwich
+	Las Vegas
+	Peoria
+	Athens
+	Paris
+	London
+	New London
+	Columbia
+	Jackson
+	Palmdale
+	Charleston
+	St. Louis
+	St. Charles
+	St. Arthur
+	Plymouth
+	Evansville
+	Evanston
+
+state:
+	Virginia
+	Florida
+	California
+	Oregon
+	Washington
+	New York
+	Michigan
+	Illinois
+	Ohio
+	Arizona
+	Vermont
+	New Hampshire
+	New Mexico
+	Wisconsin
+	Minnesota
+	Iowa
+
+zipCode:
+	12330
+	12331
+	12332
+	12333
+	12334
+	12335
+	12336
+	12337
+	12338
+	12339
+	12340
+	12341
+	12342
+	12343
+	12344
+	12345
+	12346
+	12347
+	12348
+	12349
+	12350
+	12351
+	12352
+	12353
+	12354
+	12355
+	12356
+	12357
+	12358
+	12359
+
+birthYear:
+	1960
+	1961
+	1962
+	1963
+	1964
+	1965
+	1966
+	1967
+	1968
+	1969
+	1970
+	1971
+	1972
+	1973
+	1974
+	1975
+	1976
+	1977
+	1978
+	1979
+	1980
+	1981
+	1982
+	1983
+	1984
+	1985
+	1986
+	1987
+	1988
+	1989
+
+birthMonth:
+	January
+	February
+	March
+	April
+	May
+	June
+	July
+	August
+	September
+	October
+	November
+	December

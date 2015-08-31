@@ -14,7 +14,7 @@ import org.debezium.core.util.Collect;
  * A pass-through security provider.
  * @author Randall Hauch
  */
-final class PassthroughSecurityProvider implements SecurityProvider {
+public final class PassthroughSecurityProvider implements SecurityProvider {
     
     private static interface Token {
         public String includesDatabase( String dbId );

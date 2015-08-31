@@ -60,6 +60,7 @@ public final class Message {
         public static final String ACTION = "action";
         public static final String ENTITY_TYPE = "$type";
         public static final String ENTITY_TAGS = "$tags";
+        public static final String ENTITY_ETAG = "$etag";
     }
 
     public static enum Action {

@@ -5,13 +5,8 @@
  */
 package org.debezium.example;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +22,7 @@ import org.debezium.core.component.DatabaseId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.component.Identifier;
 import org.debezium.core.util.CommandLineOptions;
+import org.debezium.core.util.IoUtil;
 import org.debezium.core.util.Stopwatch;
 import org.debezium.driver.Debezium;
 import org.debezium.driver.DebeziumAuthorizationException;
@@ -182,34 +178,12 @@ public class LoadApp {
     }
 
     protected static InputStream findConfiguration(String path) {
-        try {
-            printVerbose("Looking for configuration on classpath at '" + path + "'");
-            InputStream stream = LoadApp.class.getClassLoader().getResourceAsStream(path);
-            if (stream == null) {
-                // Try path as-is ...
-                Path filePath = FileSystems.getDefault().getPath(path).toAbsolutePath();
-                printVerbose("Looking for configuration at '" + filePath + "'");
-                File f = filePath.toFile();
-                if (f == null || !f.exists() || f.isDirectory()) {
-                    // Try relative to current working directory ...
-                    Path current = FileSystems.getDefault().getPath(".").toAbsolutePath();
-                    Path absolute = current.resolve(Paths.get(path)).toAbsolutePath();
-                    printVerbose("Looking for configuration relative to '" + current + "' at '" + absolute + "'");
-                    f = absolute.toFile();
-                }
-                if (f != null) {
-                    path = f.getAbsolutePath();
-                    stream = new FileInputStream(f);
-                }
-            }
-            return stream;
-        } catch (IOException e) {
-            print("Unable to read Debezium client configuration file at '" + path + "': " + e.getMessage());
+        InputStream stream = IoUtil.getResourceAsStream(path, LoadApp.class.getClassLoader(), null, "configuration file", LoadApp::printVerbose);
+        if (stream == null) {
+            print("Unable to read Debezium client configuration file at '" + path + "': file not found");
             exit(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
         }
-        print("Unable to read Debezium client configuration file at '" + path + "': file not found");
-        exit(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
-        return null;
+        return stream;
     }
 
     protected static void error(Object msg) {

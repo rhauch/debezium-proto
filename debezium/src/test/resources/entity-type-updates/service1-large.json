@@ -1,0 +1,478 @@
+[{
+  "topic" : "entity-type-updates",
+  "offset" : 1,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "ops" : [ {
+      "op" : "replace",
+      "path" : "/fields/phoneNumber/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/streetNumber/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/lastName/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/streetName/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/city/type",
+      "value" : "STRING"
+    } ],
+    "clientid" : "5b148e22-5b23-497a-8598-a5be7db4605e",
+    "$rev" : 1,
+    "begun" : 0,
+    "ended" : 1000,
+    "after" : {
+      "fields" : {
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetNumber" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 1,
+        "totalRemoves" : 0,
+        "recentAdds" : 1,
+        "recentRemoves" : 0,
+        "fields" : {
+          "lastName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 1000,
+      "$rev" : 1
+    }
+  }
+}, {
+  "topic" : "entity-type-updates",
+  "offset" : 2,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "ops" : [ {
+      "op" : "replace",
+      "path" : "/fields/birthMonth/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/birthYear/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/firstName/type",
+      "value" : "STRING"
+    } ],
+    "clientid" : "5b148e22-5b23-497a-8598-a5be7db4605e",
+    "$rev" : 2,
+    "begun" : 1000,
+    "ended" : 1000,
+    "after" : {
+      "fields" : {
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetName" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "birthMonth" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "birthYear" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "firstName" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 2,
+        "totalRemoves" : 0,
+        "recentAdds" : 1,
+        "recentRemoves" : 0,
+        "fields" : {
+          "lastName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "birthMonth" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "firstName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "birthYear" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 1000,
+      "$rev" : 2
+    }
+  }
+}, {
+  "topic" : "entity-type-updates",
+  "offset" : 3,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "ops" : [ {
+      "op" : "replace",
+      "path" : "/fields/zipCode/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/state/type",
+      "value" : "STRING"
+    } ],
+    "clientid" : "5b148e22-5b23-497a-8598-a5be7db4605e",
+    "$rev" : 3,
+    "begun" : 1000,
+    "ended" : 1000,
+    "after" : {
+      "fields" : {
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "streetNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.33333334
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "streetName" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "birthMonth" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "birthYear" : {
+          "type" : "STRING",
+          "$usage" : 0.33333334
+        },
+        "firstName" : {
+          "type" : "STRING",
+          "$usage" : 0.6666667
+        },
+        "zipCode" : {
+          "type" : "STRING",
+          "$usage" : 0.33333334
+        },
+        "state" : {
+          "type" : "STRING",
+          "$usage" : 0.33333334
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 3,
+        "totalRemoves" : 0,
+        "recentAdds" : 1,
+        "recentRemoves" : 0,
+        "fields" : {
+          "lastName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "birthMonth" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "firstName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "zipCode" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "birthYear" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "state" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 1000,
+      "$rev" : 3
+    }
+  }
+},{
+  "topic" : "entity-type-updates",
+  "offset" : 1,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "clientid" : "5b148e22-5b23-497a-8598-a5be7db4605e",
+    "$rev" : 4,
+    "begun" : 1000,
+    "ended" : 2000,
+    "after" : {
+      "fields" : {
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.455
+        },
+        "streetNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.46
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 0.53
+        },
+        "streetName" : {
+          "type" : "STRING",
+          "$usage" : 0.47
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 0.425
+        },
+        "birthMonth" : {
+          "type" : "STRING",
+          "$usage" : 0.59
+        },
+        "birthYear" : {
+          "type" : "STRING",
+          "$usage" : 0.525
+        },
+        "firstName" : {
+          "type" : "STRING",
+          "$usage" : 0.435
+        },
+        "zipCode" : {
+          "type" : "STRING",
+          "$usage" : 0.515
+        },
+        "state" : {
+          "type" : "STRING",
+          "$usage" : 0.555
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 200,
+        "totalRemoves" : 0,
+        "recentAdds" : 197,
+        "recentRemoves" : 0,
+        "fields" : {
+          "lastName" : {
+            "totalAdds" : 106,
+            "totalRemoves" : 0,
+            "recentAdds" : 104,
+            "recentRemoves" : 0
+          },
+          "birthMonth" : {
+            "totalAdds" : 118,
+            "totalRemoves" : 0,
+            "recentAdds" : 116,
+            "recentRemoves" : 0
+          },
+          "firstName" : {
+            "totalAdds" : 87,
+            "totalRemoves" : 0,
+            "recentAdds" : 85,
+            "recentRemoves" : 0
+          },
+          "zipCode" : {
+            "totalAdds" : 103,
+            "totalRemoves" : 0,
+            "recentAdds" : 102,
+            "recentRemoves" : 0
+          },
+          "streetName" : {
+            "totalAdds" : 94,
+            "totalRemoves" : 0,
+            "recentAdds" : 92,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 91,
+            "totalRemoves" : 0,
+            "recentAdds" : 89,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 85,
+            "totalRemoves" : 0,
+            "recentAdds" : 83,
+            "recentRemoves" : 0
+          },
+          "birthYear" : {
+            "totalAdds" : 105,
+            "totalRemoves" : 0,
+            "recentAdds" : 104,
+            "recentRemoves" : 0
+          },
+          "state" : {
+            "totalAdds" : 111,
+            "totalRemoves" : 0,
+            "recentAdds" : 110,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 92,
+            "totalRemoves" : 0,
+            "recentAdds" : 91,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 2000,
+      "$rev" : 4
+    }
+  }
+}]

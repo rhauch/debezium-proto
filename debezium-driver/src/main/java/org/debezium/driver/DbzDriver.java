@@ -51,6 +51,11 @@ final class DbzDriver implements Debezium {
         this.databases = new DbzDatabases(this.partialResponses);
         this.node.add(this.databases, this.partialResponses);
     }
+    
+    @Override
+    public Configuration getConfiguration() {
+        return config;
+    }
 
     public DbzDriver start() {
         node.start();

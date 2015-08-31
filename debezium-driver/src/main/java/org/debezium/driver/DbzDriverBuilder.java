@@ -8,6 +8,7 @@ package org.debezium.driver;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,7 +29,11 @@ import org.debezium.driver.Debezium.Compression;
  *
  */
 final class DbzDriverBuilder implements Builder {
-
+    
+    private static final String SYSTEM_PROPERTY_NAME_PREFIX = "DEBEZIUM_";
+    private static final int SYSTEM_PROPERTY_NAME_PREFIX_LENGTH = SYSTEM_PROPERTY_NAME_PREFIX.length();
+    
+    
     private final Properties props = new Properties();
     private final Set<BrokerAddress> kafkaBrokerAddresses = new HashSet<>();
     private final Set<String> compressedTopics = new HashSet<>();
@@ -56,6 +61,24 @@ final class DbzDriverBuilder implements Builder {
             props.setProperty(propName,properties.getProperty(propName));
         }
         return this;
+    }
+    
+    @Override
+    public Builder loadFromSystemProperties() {
+        Properties systemProps = System.getProperties();
+        Properties props = new Properties();
+        for ( String key : systemProps.stringPropertyNames() ) {
+            if ( key.startsWith(SYSTEM_PROPERTY_NAME_PREFIX) ) {
+                String keyWithoutPrefix = key.substring(SYSTEM_PROPERTY_NAME_PREFIX_LENGTH).trim();
+                if ( keyWithoutPrefix.length() > 0 ) {
+                    // Convert to a properties format ...
+                    String propertyName = keyWithoutPrefix.toLowerCase().replaceAll("[_]", ".");
+                    String value = systemProps.getProperty(key);
+                    props.setProperty(propertyName, value);
+                }
+            }
+        }
+        return load(props);
     }
 
     @Override
@@ -107,7 +130,14 @@ final class DbzDriverBuilder implements Builder {
 
     @Override
     public DbzDriverBuilder clientId(String id) {
-        if (id == null) id = "";
+        if (id == null) id = UUID.randomUUID().toString();
+        return setProducerProperty("client.id", id);
+    }
+
+    @Override
+    public DbzDriverBuilder clientIdPrefix(String prefix) {
+        if (prefix == null) prefix = "";
+        String id = prefix + UUID.randomUUID().toString();
         return setProducerProperty("client.id", id);
     }
 

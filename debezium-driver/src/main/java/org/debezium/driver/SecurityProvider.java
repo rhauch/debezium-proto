@@ -432,5 +432,4 @@ public interface SecurityProvider {
          */
         void record(String username, String device, String appVersion);
     }
-
 }

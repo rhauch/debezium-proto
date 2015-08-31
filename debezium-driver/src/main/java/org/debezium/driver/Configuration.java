@@ -32,7 +32,7 @@ import org.debezium.core.util.Collect;
  * @author Randall Hauch
  */
 @Immutable
-interface Configuration {
+public interface Configuration {
 
     /**
      * Obtain an empty configuration.

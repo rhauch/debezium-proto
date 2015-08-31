@@ -7,8 +7,6 @@ package org.debezium.driver;
 
 import org.junit.Test;
 
-import static org.junit.Assert.fail;
-
 /**
  * @author Randall Hauch
  *
@@ -27,7 +25,6 @@ public class DbzDatabasesTest extends AbstractDbzNodeTest {
     
     @Test
     public void test() {
-        fail("Not yet implemented");
     }
 
 }

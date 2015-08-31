@@ -17,6 +17,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -24,6 +25,7 @@ import org.debezium.core.component.EntityId;
 import org.debezium.core.component.EntityType;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Editor;
+import org.debezium.core.util.IoUtil;
 
 /**
  * @author Randall Hauch
@@ -124,6 +126,34 @@ public interface Debezium {
         }
 
         /**
+         * Load the configuration properties from the resource at the given path on the given classpath, overwriting any
+         * similarly-named properties already in this configuration.
+         * 
+         * @param path the relative path to the classpath resource containing the configuration properties; may not be null
+         * @param classLoader the class loader that should be used; may be null if the current classloader should be used
+         * @return this builder instance for chaining together methods; never null
+         * @throws IOException if there is an error connecting to the resource at the given URL
+         */
+        default public Builder load(String path, ClassLoader classLoader) throws IOException {
+            try (InputStream stream = IoUtil.getResourceAsStream(path, classLoader, null, null, null)) {
+                Properties properties = new Properties();
+                properties.load(stream);
+                return load(properties);
+            }
+        }
+
+        /**
+         * Load configuration properties in the {@link Properties} object supplied by the given function, overwriting any
+         * similarly-named properties already in this configuration.
+         * 
+         * @param propertiesSupplier the supplier of the Properties object; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        default public Builder load(Supplier<Properties> propertiesSupplier) {
+            return load(propertiesSupplier.get());
+        }
+
+        /**
          * Load the configuration properties, overwriting any similarly-named properties already in this
          * configuration.
          * 
@@ -131,6 +161,30 @@ public interface Debezium {
          * @return this builder instance for chaining together methods; never null
          */
         public Builder load(Properties properties);
+
+        /**
+         * Load the known configuration properties from the system properties, overwriting any similarly-named properties already
+         * in this configuration. This method will only use system properties that begin with "{@code DEBEZIUM_}", and will
+         * generate the property name by converting to lower case and replacing all underscore ('{@code _}') characters with
+         * period (' {@code .}') characters. All such property names will be loaded into a {@link Properties} object along
+         * with the corresponding system property values and passed to {@link #load(Properties)}.
+         * 
+         * @return this builder instance for chaining together methods; never null
+         */
+        public Builder loadFromSystemProperties();
+
+        /**
+         * Call the supplied function, passing this builder.
+         * 
+         * @param configurator the configurator function
+         * @return this builder instance for chaining together methods; never null
+         */
+        default public Builder accept(Consumer<Builder> configurator) {
+            if ( configurator != null ) {
+                configurator.accept(this);
+            }
+            return this;
+        }
 
         /**
          * Set the Zookeeper connection string.
@@ -257,6 +311,15 @@ public interface Debezium {
          * @return this builder instance for chaining together methods; never null
          */
         Builder clientId(String id);
+
+        /**
+         * Specify a client identifier that is sent with all messages to help trace requests through the system.
+         * This should logically represent the application, but will be appended with a random identifier.
+         * 
+         * @param prefix the prefix for the unique client identifier; may not be null
+         * @return this builder instance for chaining together methods; never null
+         */
+        Builder clientIdPrefix(String prefix);
 
         /**
          * Specify the size of the buffer used to write to a socket.
@@ -502,6 +565,12 @@ public interface Debezium {
      * @throws DebeziumTimeoutException if the operation timed out
      */
     public void shutdown(long timeout, TimeUnit unit);
+    
+    /**
+     * Get the immutable configuration used by this instance.
+     * @return the configuration; never null
+     */
+    public Configuration getConfiguration();
 
     /**
      * A builder of a batch request, used to record the operations for a single database that are to be

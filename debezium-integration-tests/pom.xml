@@ -9,16 +9,13 @@
     <parent>
         <groupId>org.debezium</groupId>
         <artifactId>parent</artifactId>
-        <version>0.1-SNAPSHOT</version>
+        <version>0.2-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>debezium-integration-tests</artifactId>
     <name>Debezium Integration Tests</name>
     <packaging>jar</packaging>
-    <properties>
-        <module-name>org.debezium.client</module-name>
-    </properties>
     <dependencies>
         <!-- Logging and other test utilities -->
         <dependency>
@@ -37,57 +34,56 @@
             <groupId>org.easytesting</groupId>
             <artifactId>fest-assert</artifactId>
         </dependency>
-        <!-- Debezium artifacts that we'll test -->
+        <!-- Debezium non-test artifacts that we'll use in these tests -->
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-core</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-driver</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-entity-batch-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-entity-storage-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-response-accumulator-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-schema-learning-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-schema-learning-partitioner-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-schema-storage-service</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.samza</groupId>
             <artifactId>samza-api</artifactId>
-            <scope>test</scope>
         </dependency>
-        <!-- Debezium test JARs -->
+        <!-- Debezium test JARs for unit test utilities -->
         <dependency>
             <groupId>org.debezium</groupId>
             <artifactId>debezium-service</artifactId>
             <type>test-jar</type>
+            <!-- Used in the non-test JAR for this project -->
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-webapp</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
@@ -98,59 +94,8 @@
             <groupId>org.debezium</groupId>
             <artifactId>debezium-driver</artifactId>
             <type>test-jar</type>
-        </dependency>
-        <!-- Used for unit testing with Kafka -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_${scala.label.version}</artifactId>
-            <classifier>test</classifier>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_${scala.label.version}</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-test</artifactId>
+            <!-- Used in the non-test JAR for this project -->
+            <scope>compile</scope>
         </dependency>
     </dependencies>
-    <build>
-        <plugins>
-            <!-- skip the assembly of all JARs -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <configuration>
-                    <skipSource>true</skipSource>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>test-jar</id>
-                        <phase>never</phase>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>jar</id>
-                        <phase>never</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
 </project>

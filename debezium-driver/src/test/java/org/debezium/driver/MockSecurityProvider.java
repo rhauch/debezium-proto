@@ -24,6 +24,10 @@ public class MockSecurityProvider implements SecurityProvider {
     private final AtomicLong authenticated = new AtomicLong();
     private final AtomicLong checked = new AtomicLong();
 
+    public MockSecurityProvider() {
+        this(new PassthroughSecurityProvider());
+    }
+    
     public MockSecurityProvider( SecurityProvider delegate) {
         this.delegate = delegate;
     }

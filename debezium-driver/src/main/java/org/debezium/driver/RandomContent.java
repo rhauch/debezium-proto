@@ -6,16 +6,12 @@
 package org.debezium.driver;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Stream;
+import java.util.function.Supplier;
 
 import org.debezium.core.component.Entity;
 import org.debezium.core.component.EntityId;
@@ -27,6 +23,7 @@ import org.debezium.core.message.Batch;
 import org.debezium.core.message.Patch;
 import org.debezium.core.message.Patch.Action;
 import org.debezium.core.message.Patch.Editor;
+import org.debezium.core.util.IoUtil;
 import org.debezium.driver.Debezium.BatchBuilder;
 
 /**
@@ -94,12 +91,12 @@ public final class RandomContent {
          * @return the supplied batch builder; never null
          */
         default public BatchBuilder addToBatch(BatchBuilder builder, int numEdits, int numRemoves, EntityType type) {
-            IdGenerator generator = generateIds(numEdits,numRemoves,type);
+            IdGenerator generator = generateIds(numEdits, numRemoves, type);
             generateBatch(generator).forEach(builder::changeEntity);
             return builder;
         }
     }
-    
+
     private static IdGenerator generateIds(int editCount, int removeCount, EntityType type) {
         return new IdGenerator() {
             @Override
@@ -129,21 +126,49 @@ public final class RandomContent {
      * @return the random content data; never null
      */
     public static RandomContent load() {
-        try {
-            return load(RandomContent.class.getClassLoader().getResource("load-data.txt").toURI());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        return load("load-data.txt", RandomContent.class);
     }
 
     /**
-     * Load the random content data from the file at the specified URI.
+     * Load the random content data from the specified file on the classpath.
      * 
-     * @param uri the URI of the data file; may not be null
+     * @param pathToResource the path to the classpath resource that is to be loaded; may not be null
+     * @param clazz the class whose class loader will be used to load the resource; if null, this class' class loader will be used
      * @return the random content data; never null
      */
-    public static RandomContent load(URI uri) {
-        return load(Paths.get(uri));
+    public static RandomContent load(String pathToResource, Class<?> clazz) {
+        return load(pathToResource, () -> clazz != null ? clazz.getClassLoader() : null);
+    }
+
+    /**
+     * Load the random content data from the specified file on the classpath.
+     * 
+     * @param pathToResource the path to the classpath resource that is to be loaded; may not be null
+     * @param classLoader the class loader will be used to load the resource; if null, this class' class loader will be used
+     * @return the random content data; never null
+     */
+    public static RandomContent load(String pathToResource, ClassLoader classLoader) {
+        return load(pathToResource, () -> classLoader != null ? classLoader : null);
+    }
+
+    /**
+     * Load the random content data from the specified file on the classpath.
+     * 
+     * @param pathToResource the path to the classpath resource that is to be loaded; may not be null
+     * @param classLoaderSupplier the supplier of the class loader that will be used to load the resource; if null or if it
+     *            returns null, this class' class loader will be used
+     * @return the random content data; never null
+     */
+    public static RandomContent load(String pathToResource, Supplier<ClassLoader> classLoaderSupplier) {
+        try {
+            ClassLoader classLoader = classLoaderSupplier != null ? classLoaderSupplier.get() : null;
+            if (classLoader == null) classLoader = RandomContent.class.getClassLoader();
+            Reader reader = new Reader();
+            IoUtil.readLines(pathToResource, classLoader, null, reader::process);
+            return new RandomContent(reader);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -153,13 +178,14 @@ public final class RandomContent {
      * @return the random content data; never null
      */
     public static RandomContent load(Path path) {
-        Reader reader = new Reader();
-        try (Stream<String> lines = Files.lines(path)) {
-            lines.forEach(reader::process);
+        if (path == null) throw new IllegalArgumentException("Unable to load content data from a null path");
+        try {
+            Reader reader = new Reader();
+            IoUtil.readLines(path, reader::process);
+            return new RandomContent(reader);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return new RandomContent(reader);
     }
 
     private static class Reader {
@@ -230,6 +256,7 @@ public final class RandomContent {
         this.minFields = Math.min(minFields, this.maxFields);
         assert this.maxFields > 0;
         assert this.minFields > 0;
+        assert this.maxFields >= this.minFields;
         assert this.values != null;
         this.numValues = this.values.length;
     }
@@ -242,7 +269,7 @@ public final class RandomContent {
      */
     public ContentGenerator createGenerator() {
         ++generated;
-        int fieldCount = minFields + fieldCountSelector.nextInt(maxFields - minFields);
+        int fieldCount = minFields + fieldCountSelector.nextInt(maxFields - minFields + 1);
         return new ContentGenerator() {
             Random rng = new Random(initialSeed * generated);
 
