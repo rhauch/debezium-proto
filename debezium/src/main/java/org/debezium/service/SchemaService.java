@@ -15,6 +15,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.stream.state.InMemoryKeyValueStore;
 import org.apache.kafka.stream.state.KeyValueStore;
 import org.debezium.Debezium;
+import org.debezium.annotation.NotThreadSafe;
 import org.debezium.message.Document;
 import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
@@ -99,7 +100,8 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Randall Hauch
  */
-public class SchemaService extends ServiceProcessor {
+@NotThreadSafe
+public final class SchemaService extends ServiceProcessor {
 
     /**
      * Run this service using the Kafka Streams library. This will start the number of threads specified in the configuration and
@@ -108,16 +110,26 @@ public class SchemaService extends ServiceProcessor {
      * @param args the command-line arguments
      */
     public static void main(String[] args) {
-        ServiceRunner.use(SchemaService.class, SchemaLearningTopology.class)
-                     .setVersion(Debezium.getVersion())
-                     .run(args);
+        runner().run(args);
+    }
+
+    /**
+     * Obtain a ServiceRunner that will run this service using the Kafka Streams library. When the runner is run, it will
+     * start the number of threads specified in the configuration and determine the partitions to be read by coordinating with the
+     * other instances.
+     * 
+     * @return the ServiceRunner instance; never null
+     */
+    public static ServiceRunner runner() {
+        return ServiceRunner.use(SchemaService.class, SchemaLearningTopology.class)
+                            .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
      */
-    private static class SchemaLearningTopology extends PTopology {
+    public static final class SchemaLearningTopology extends PTopology {
 
         @SuppressWarnings("unchecked")
         @Override
@@ -256,7 +268,7 @@ public class SchemaService extends ServiceProcessor {
                 Document before = model.recreateDocumentBeforeRecentUsageChanges();
                 Patch<EntityType> patch = model.recalculateFieldUsages().getPatch(streamTime).orElse(null);
                 Document request = null;
-                if ( patch != null ) {
+                if (patch != null) {
                     // Update the model with the new field usages by applying our patch ...
                     patch.apply(model.asDocument(), (failedPath, failedOp) -> {
                         LOGGER.error("Unable to apply {} to model {}: {}", failedOp, model.type(), model);

@@ -76,7 +76,7 @@ public class KafkaServer {
         setPort(port);
         populateDefaultConfiguration(this.config);
     }
-    
+
     protected int brokerId() {
         return brokerId;
     }
@@ -97,7 +97,8 @@ public class KafkaServer {
     }
 
     /**
-     * Set a configuration property.
+     * Set a configuration property. Several key properties that deal with Zookeeper, the host name, and the broker ID,
+     * may not be set via this method and are ignored since they are controlled elsewhere in this instance.
      * 
      * @param name the property name; may not be null
      * @param value the property value; may be null
@@ -106,9 +107,31 @@ public class KafkaServer {
      */
     public KafkaServer setProperty(String name, String value) {
         if (server != null) throw new IllegalStateException("Unable to change the properties when already running");
-        this.config.setProperty(name, value);
+        if (!KafkaConfig.ZkConnectProp().equalsIgnoreCase(name)
+                && !KafkaConfig.BrokerIdProp().equalsIgnoreCase(name)
+                && !KafkaConfig.HostNameProp().equalsIgnoreCase(name)) {
+            this.config.setProperty(name, value);
+        }
         return this;
     }
+    
+    /**
+     * Set multiple configuration properties. Several key properties that deal with Zookeeper, the host name, and the broker ID,
+     * may not be set via this method and are ignored since they are controlled elsewhere in this instance.
+     * 
+     * @param properties the configuration properties; may be null or empty
+     * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the server is running when this method is called
+     */
+    public KafkaServer setProperties( Properties properties ) {
+        if (server != null) throw new IllegalStateException("Unable to change the properties when already running");
+        properties.stringPropertyNames().forEach(propName -> {
+            setProperty(propName, properties.getProperty(propName));
+        });
+        return this;
+    }
+    
+
 
     /**
      * Set the port for the server.

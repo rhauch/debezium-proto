@@ -9,6 +9,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.processor.KafkaProcessor;
 import org.apache.kafka.clients.processor.ProcessorContext;
 import org.apache.kafka.clients.processor.ProcessorProperties;
+import org.debezium.annotation.NotThreadSafe;
 import org.debezium.message.Array;
 import org.debezium.message.Document;
 
@@ -18,6 +19,7 @@ import org.debezium.message.Document;
  * 
  * @author Randall Hauch
  */
+@NotThreadSafe
 public abstract class ServiceProcessor extends KafkaProcessor<String, Document, String, Document> {
 
     private final boolean useManualCommit;

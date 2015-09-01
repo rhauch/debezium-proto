@@ -12,6 +12,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.stream.state.InMemoryKeyValueStore;
 import org.apache.kafka.stream.state.KeyValueStore;
 import org.debezium.Debezium;
+import org.debezium.annotation.NotThreadSafe;
 import org.debezium.message.Document;
 import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
@@ -103,7 +104,8 @@ import org.debezium.model.EntityType;
  * 
  * @author Randall Hauch
  */
-public class EntityStorageService extends ServiceProcessor {
+@NotThreadSafe
+public final class EntityStorageService extends ServiceProcessor {
 
     /**
      * Run this service using the Kafka Streams library. This will start the number of threads specified in the configuration and
@@ -112,16 +114,26 @@ public class EntityStorageService extends ServiceProcessor {
      * @param args the command-line arguments
      */
     public static void main(String[] args) {
-        ServiceRunner.use(EntityStorageService.class, EntityStorageTopology.class)
-                     .setVersion(Debezium.getVersion())
-                     .run(args);
+        runner().run(args);
+    }
+
+    /**
+     * Obtain a ServiceRunner that will run this service using the Kafka Streams library. When the runner is run, it will
+     * start the number of threads specified in the configuration and determine the partitions to be read by coordinating with the
+     * other instances.
+     * 
+     * @return the ServiceRunner instance; never null
+     */
+    public static ServiceRunner runner() {
+        return ServiceRunner.use(EntityStorageService.class, EntityStorageTopology.class)
+                            .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
      */
-    private static class EntityStorageTopology extends PTopology {
+    public static final class EntityStorageTopology extends PTopology {
 
         @SuppressWarnings("unchecked")
         @Override
@@ -134,16 +146,16 @@ public class EntityStorageService extends ServiceProcessor {
     private KeyValueStore<String, Document> store;
 
     public EntityStorageService(ProcessorProperties config) {
-        super("entity-storage",config);
+        super("entity-storage", config);
     }
-    
+
     @Override
     protected void init() {
         this.store = new InMemoryKeyValueStore<>("entity-storage", context());
     }
-    
+
     @Override
-    protected void process(String topic, int partition, long offset, String idStr, Document request) {
+    protected void process(String topic, int partition, long offset, final String entityId, final Document request) {
         // Construct the patch from the request ...
         Patch<EntityId> patch = Patch.from(request);
         EntityId id = patch.target();
@@ -152,12 +164,12 @@ public class EntityStorageService extends ServiceProcessor {
         Document response = Message.createResponseFromRequest(request);
 
         // Look up the entity in the store ...
-        Document storedEntity = store.get(idStr);
+        Document storedEntity = store.get(entityId);
 
         if (patch.isReadRequest()) {
             // We're just reading the entity, and because reads don't can be re-done after a crash we don't need to update
             // the vector clock ...
-            performRead(idStr, id, storedEntity, response);
+            performRead(entityId, id, storedEntity, response);
             return;
         }
 
@@ -217,7 +229,7 @@ public class EntityStorageService extends ServiceProcessor {
         }
 
         // No matter whether the patch failed or succeeded, send the response to the partial-response output stream ...
-        sendResponse(response, idStr);
+        sendResponse(response, entityId);
 
         // And finally store the changed entity in its wrapper.
         //
@@ -225,7 +237,7 @@ public class EntityStorageService extends ServiceProcessor {
         // messages. That way, if the service crashes after having already sent the output messages but before we persist
         // the updated entity, the client will get the response(s). Then when the service recovers, it might re-process some
         // input message(s) and re-send the output messages, but the output messages will be valid.
-        store.put(idStr, storedEntity);
+        store.put(entityId, storedEntity);
     }
 
     protected void performRead(String idStr, EntityId id, Document storedEntity, Document response) {

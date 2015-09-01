@@ -29,22 +29,23 @@ public final class NamedThreadFactory implements ThreadFactory {
     private final int stackSize;
     private final Consumer<String> afterThreadCreation;
 
-    public NamedThreadFactory(String prefix, String name) {
-        this(prefix, name, DEFAULT_DAEMON_THREAD, DEFAULT_STACK_SIZE);
+    public NamedThreadFactory(String prefix) {
+        this(prefix, DEFAULT_DAEMON_THREAD, DEFAULT_STACK_SIZE);
     }
 
-    public NamedThreadFactory(String prefix, String name, boolean daemonThreads) {
-        this(prefix, name, daemonThreads, DEFAULT_STACK_SIZE);
+    public NamedThreadFactory(String prefix, boolean daemonThreads) {
+        this(prefix, daemonThreads, DEFAULT_STACK_SIZE);
     }
 
-    public NamedThreadFactory(String prefix, String name, boolean daemonThreads, int stackSize) {
-        this(prefix, name, daemonThreads, stackSize, null);
+    public NamedThreadFactory(String prefix, boolean daemonThreads, int stackSize) {
+        this(prefix, daemonThreads, stackSize, null);
     }
 
-    public NamedThreadFactory(String prefix, String name, boolean daemonThreads, int stackSize, Consumer<String> afterThreadCreation) {
+    public NamedThreadFactory(String prefix, boolean daemonThreads, int stackSize, Consumer<String> afterThreadCreation) {
+        if ( prefix == null ) throw new IllegalArgumentException("The thread prefix may not be null");
         final SecurityManager s = System.getSecurityManager();
         this.group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
-        this.namePrefix = prefix + "-" + name + "-thread-";
+        this.namePrefix = prefix;
         this.daemonThreads = daemonThreads;
         this.stackSize = stackSize;
         this.afterThreadCreation = afterThreadCreation;

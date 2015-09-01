@@ -51,6 +51,12 @@ import org.slf4j.LoggerFactory;
  * 
  * <h1>Configuration</h1>
  * <p>
+ * Each SchemaLearningService has a logical <em>service identifier</em> that will be sent in output messages and consumed by the
+ * {@link SchemaService} to identify previously-read messages from the same service instance. Therefore, each service instance
+ * should have a unique service ID, and by default the service will generate a unique service ID and persist it so that it can
+ * will reuse the same ID upon restart. However, it can be explicitly set via the "{@code service.id}" configuration property, and
+ * doing so will overwrite any previously-generated and -persisted ID.
+ * <p>
  * This service uses local storage to persist the schema learned information for each entity type. Therefore, if multiple service
  * instances are used, each service should be configured with a static range of partitions that it will consume, ensuring that all
  * changes to entities for a given entity type will always be sent to the same service instance and stored locally within that
@@ -81,7 +87,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Randall Hauch
  */
-public class SchemaLearningService extends ServiceProcessor {
+public final class SchemaLearningService extends ServiceProcessor {
 
     /**
      * Run this service using the Kafka Streams library. This will start the number of threads specified in the configuration and
@@ -90,17 +96,27 @@ public class SchemaLearningService extends ServiceProcessor {
      * @param args the command-line arguments
      */
     public static void main(String[] args) {
-        ServiceRunner.use(SchemaLearningService.class, SchemaLearningTopology.class)
-                     .setVersion(Debezium.getVersion())
-                     .run(args);
+        runner().run(args);
+    }
+
+    /**
+     * Obtain a ServiceRunner that will run this service using the Kafka Streams library. When the runner is run, it will
+     * start the number of threads specified in the configuration and determine the partitions to be read by coordinating with the
+     * other instances.
+     * 
+     * @return the ServiceRunner instance; never null
+     */
+    public static ServiceRunner runner() {
+        return ServiceRunner.use(SchemaLearningService.class, SchemaLearningTopology.class)
+                            .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
      */
-    private static class SchemaLearningTopology extends PTopology {
-
+    public static final class SchemaLearningTopology extends PTopology {
+        
         @SuppressWarnings("unchecked")
         @Override
         public void build() {
@@ -139,7 +155,7 @@ public class SchemaLearningService extends ServiceProcessor {
 
     public SchemaLearningService(ProcessorProperties config) {
         super("schema-learning", config);
-        serviceId = property("service.id", (String)null);
+        serviceId = property("service.id", (String) null);
     }
 
     @Override
@@ -154,14 +170,14 @@ public class SchemaLearningService extends ServiceProcessor {
         });
         // Get or create a unique ID for this service group ...
         Document meta = this.persistedModels.get(METADATA_KEY);
-        if ( serviceId != null ) {
+        if (serviceId != null) {
             // Set via the config properties ...
             meta.setString(SERVICE_ID_KEY, serviceId);
             this.persistedModels.put(METADATA_KEY, meta);
         } else {
             // Read or create one ...
-            if ( meta == null ) meta = Document.create();
-            if ( serviceId == null ) serviceId = UUID.randomUUID().toString();
+            if (meta == null) meta = Document.create();
+            if (serviceId == null) serviceId = UUID.randomUUID().toString();
             meta.setString(SERVICE_ID_KEY, serviceId);
             this.persistedModels.put(METADATA_KEY, meta);
         }
@@ -202,17 +218,17 @@ public class SchemaLearningService extends ServiceProcessor {
         model.adapt(beforePatch, patch, afterPatch, context().timestamp(), false, (before, previouslyModified, entityTypePatch) -> {
             String dbIdStr = type.databaseId().asString();
             Document request = entityTypePatch.filter(this::removeUsages).asDocument();
-            //Message.setBefore(request, before);
-            Message.setClient(request, serviceId);
-            Message.setRevision(request, model.revision());
-            Message.setBegun(request, previouslyModified);
-            Message.setEnded(request, model.lastModified());
-            Message.setAfter(request, model.asDocument().clone());
-            persistedRevisions.put(idStr, new EntityRevisions(revision, model.revision()));
-            context().send(Topic.ENTITY_TYPE_UPDATES, dbIdStr, request);
-            persistedModels.put(type.asString(), model.resetChangeStatistics().asDocument());
-            updated.set(true);
-        });
+            // Message.setBefore(request, before);
+                    Message.setClient(request, serviceId);
+                    Message.setRevision(request, model.revision());
+                    Message.setBegun(request, previouslyModified);
+                    Message.setEnded(request, model.lastModified());
+                    Message.setAfter(request, model.asDocument().clone());
+                    persistedRevisions.put(idStr, new EntityRevisions(revision, model.revision()));
+                    context().send(Topic.ENTITY_TYPE_UPDATES, dbIdStr, request);
+                    persistedModels.put(type.asString(), model.resetChangeStatistics().asDocument());
+                    updated.set(true);
+                });
 
         if (!updated.get()) {
             // The model was not updated but the statistics were, so store the updated model and entity status ...
@@ -234,14 +250,14 @@ public class SchemaLearningService extends ServiceProcessor {
             // And send the update ...
             model.recalculateFieldUsages().getPatch(streamTime).ifPresent(patch -> {
                 // Update the model with the new field usages by applying our patch ...
-                //Document before = model.asDocument().clone();
+                // Document before = model.asDocument().clone();
                 patch.apply(model.asDocument(), (failedPath, failedOp) -> {
                     LOGGER.error("Unable to apply {} to model {}: {}", failedOp, model.type(), model);
                 });
                 // Create the request message without the usage patch ...
                 Document request = patch.asDocument();
                 request.remove(Field.OPS);
-                //Message.setBefore(request, before);
+                // Message.setBefore(request, before);
                 Message.setClient(request, serviceId);
                 Message.setRevision(request, model.revision());
                 Message.setBegun(request, previouslyModified);
@@ -265,11 +281,11 @@ public class SchemaLearningService extends ServiceProcessor {
         this.persistedRevisions.close();
         this.persistedModels.close();
     }
-    
-    private boolean removeUsages( Patch.Operation operation ) {
-        if ( operation instanceof Replace ) {
-            Replace replace = (Replace)operation;
-            if ( replace.path().endsWith("/" + EntityCollection.FieldName.USAGE) ) return false;
+
+    private boolean removeUsages(Patch.Operation operation) {
+        if (operation instanceof Replace) {
+            Replace replace = (Replace) operation;
+            if (replace.path().endsWith("/" + EntityCollection.FieldName.USAGE)) return false;
         }
         return true;
     }

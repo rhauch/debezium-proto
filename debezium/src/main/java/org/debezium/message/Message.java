@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongPredicate;
 import java.util.stream.Collectors;
 
 import org.debezium.annotation.Immutable;
@@ -202,9 +203,10 @@ public final class Message {
      * 
      * @param aggregateResponse the aggregate response document; may not be null
      * @param partialResponse the partial response to be added to the aggregate response; may not be null
+     * @param completionTimestamp the timestamp that should be used when this aggregate response is completed
      * @return true if the aggregate response is complete and has all of the partial responses, or false otherwise
      */
-    public static boolean addToAggregateResponse(Document aggregateResponse, Document partialResponse) {
+    public static boolean addToAggregateResponse(Document aggregateResponse, Document partialResponse, long completionTimestamp ) {
         // Set only some of the headers ...
         assert aggregateResponse.getString(Field.CLIENT_ID).equals(partialResponse.getString(Field.CLIENT_ID));
         assert aggregateResponse.getLong(Field.REQUEST).equals(partialResponse.getLong(Field.REQUEST));
@@ -219,10 +221,22 @@ public final class Message {
         responses.setDocument(index, partialResponse);
         if (responses.streamValues().allMatch(Value::isNotNull)) {
             // The aggregate is complete ...
-            aggregateResponse.setNumber(Field.ENDED, System.currentTimeMillis());
+            aggregateResponse.setNumber(Field.ENDED, completionTimestamp);
             return true;
         }
         return false;
+    }
+    
+    /**
+     * Determine whether the supplied aggregate response has been completed and is expired according to the given expiry predicate.
+     * @param aggregateResponse the aggregate response document; may not be null
+     * @param expiryFunction the function that is to be used to determine if the response is expired given the completion timestamp
+     * @return {@code true} if the aggregate response is complete and expired, or {@code false} otherwise
+     */
+    public static boolean isAggregateResponseCompletedAndExpired( Document aggregateResponse, LongPredicate expiryFunction ) {
+        // Determine if this is complete ...
+        Long ended = aggregateResponse.getLong(Field.ENDED);
+        return ended == null ? false : expiryFunction.test(ended.longValue());
     }
 
     /**

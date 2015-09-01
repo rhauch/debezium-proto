@@ -60,13 +60,18 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class KafkaCluster {
 
+    public static final boolean DEFAULT_DELETE_DATA_UPON_SHUTDOWN = true;
+    
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaCluster.class);
 
     private final ConcurrentMap<Integer, KafkaServer> kafkaServers = new ConcurrentHashMap<>();
     private final ZookeeperServer zkServer = new ZookeeperServer();
     private volatile File dataDir = null;
-    private volatile boolean deleteDataUponShutdown = true;
+    private volatile boolean deleteDataUponShutdown = DEFAULT_DELETE_DATA_UPON_SHUTDOWN;
     private volatile boolean running = false;
+    private volatile Properties kafkaConfig = null;
+    private volatile int startingKafkaPort = -1;
+    private final AtomicLong nextKafkaPort = new AtomicLong(startingKafkaPort);
 
     /**
      * Create a new embedded cluster.
@@ -102,6 +107,8 @@ public class KafkaCluster {
                 added.incrementAndGet();
                 KafkaServer server = new KafkaServer(zkServer::getConnection, id);
                 if (dataDir != null) server.setStateDirectory(dataDir);
+                if (kafkaConfig != null) server.setProperties(kafkaConfig);
+                if (startingKafkaPort >= 0 ) server.setPort((int) this.nextKafkaPort.getAndIncrement());
                 return server;
             });
         }
@@ -113,13 +120,52 @@ public class KafkaCluster {
      * 
      * @param dataDir the parent directory for the server's logs and snapshots; may be null if a temporary directory will be used
      * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the cluster is running
      * @throws IllegalArgumentException if the supplied file is not a directory or not writable
      */
     public KafkaCluster usingDirectory(File dataDir) {
+        if (running) throw new IllegalStateException("Unable to add a broker when the cluster is already running");
         if (dataDir != null && dataDir.exists() && !dataDir.isDirectory() && !dataDir.canWrite() && !dataDir.canRead()) {
             throw new IllegalArgumentException("The directory must be readable and writable");
         }
         this.dataDir = dataDir;
+        return this;
+    }
+
+    /**
+     * Set the configuration properties for each of the brokers. This method does nothing if the supplied properties are null or
+     * empty.
+     * 
+     * @param properties the Kafka configuration properties
+     * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the cluster is running
+     */
+    public KafkaCluster withKafkaConfiguration(Properties properties) {
+        if (running) throw new IllegalStateException("Unable to add a broker when the cluster is already running");
+        if (properties != null && !properties.isEmpty()) {
+            kafkaConfig = new Properties(properties);
+            kafkaServers.values().forEach(kafka -> kafka.setProperties(kafkaConfig));
+        }
+        return this;
+    }
+
+    /**
+     * Set the port numbers for Zookeeper and the Kafka brokers.
+     * 
+     * @param zkPort the port number that Zookeeper should use; may be -1 if an available port should be discovered
+     * @param firstKafkaPort the port number for the first Kafka broker (additional brokers will use subsequent port numbers);
+     *            may be -1 if available ports should be discovered
+     * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the cluster is running
+     */
+    public KafkaCluster withPorts(int zkPort, int firstKafkaPort) {
+        if (running) throw new IllegalStateException("Unable to add a broker when the cluster is already running");
+        this.zkServer.setPort(zkPort);
+        this.startingKafkaPort = firstKafkaPort;
+        if (this.startingKafkaPort >= 0) {
+            this.nextKafkaPort.set(this.startingKafkaPort);
+            kafkaServers.values().forEach(kafka -> kafka.setPort((int) this.nextKafkaPort.getAndIncrement()));
+        }
         return this;
     }
 
@@ -155,7 +201,7 @@ public class KafkaCluster {
             zkServer.setStateDirectory(zkDir); // does error checking
             this.dataDir = dataDir;
             File kafkaDir = new File(dataDir, "kafka");
-            kafkaServers.values().forEach(server -> server.setStateDirectory(new File(kafkaDir,"broker" + server.brokerId())));
+            kafkaServers.values().forEach(server -> server.setStateDirectory(new File(kafkaDir, "broker" + server.brokerId())));
 
             zkServer.startup();
             kafkaServers.values().forEach(KafkaServer::startup);
