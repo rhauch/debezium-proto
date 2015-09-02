@@ -19,13 +19,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.apache.kafka.clients.processor.PTopology;
 import org.apache.kafka.clients.processor.ProcessorProperties;
 import org.apache.kafka.stream.KStreamProcess;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
+import org.debezium.driver.Configuration;
 import org.debezium.util.CommandLineOptions;
 import org.debezium.util.IoUtil;
 
@@ -101,7 +101,6 @@ public class ServiceRunner {
     private final String appName;
     private final Class<? extends PTopology> topology;
     private ClassLoader classLoader = getClass().getClassLoader();
-    private Function<Properties, Properties> configFilter = null;
     private String systemPropertyNamePrefix = DEFAULT_SYSTEM_PROPERTY_NAME_PREFIX;
     private String version = Debezium.getVersion();
     private Consumer<ReturnCode> completionHandler;
@@ -266,18 +265,6 @@ public class ServiceRunner {
     }
 
     /**
-     * Set a function that will be used to filter the configuration properties during {@link #run(String[])}.
-     * class loader that loaded this class.
-     * 
-     * @param filter the filter function; may not be null
-     * @return this service runner instance so that methods can be chained together; never null
-     */
-    public ServiceRunner filterConfig(Function<Properties, Properties> filter) {
-        configFilter = filter;
-        return this;
-    }
-
-    /**
      * Run the service by reading the configuration, applying any system properties that match the configuration property rule,
      * and that starts the Kafka Streams framework to consume and process the desired topics.
      * <p>
@@ -293,7 +280,7 @@ public class ServiceRunner {
         if (running != null) return;
         try {
             running = new CompletableFuture();
-            Properties config = null;
+            Configuration config = null;
             try {
                 final CommandLineOptions options = CommandLineOptions.parse(args);
                 if (options.getOption("-?", "--help", false) || options.hasParameter("help")) {
@@ -309,8 +296,8 @@ public class ServiceRunner {
                 final String pathToConfigFile = options.getOption("-c", "--config", "debezium.json");
                 verbose = options.getOption("-v", "--verbose", false);
 
-                config = readConfiguration(pathToConfigFile);
-                if (config == null) {
+                config = Configuration.load(pathToConfigFile, classLoader,this::printVerbose);
+                if (config.isEmpty()) {
                     print("Unable to read Debezium client configuration file at '" + pathToConfigFile + "': file not found");
                     completionHandler.accept(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
                     return;
@@ -321,11 +308,8 @@ public class ServiceRunner {
 
                 // Adjust the properties by setting any system properties to the configuration ...
                 printVerbose("Applying system properties to configuration");
-                config = adjustConfigurationProperties(config);
+                config = config.withSystemProperties(DEFAULT_SYSTEM_PROPERTY_NAME_PREFIX);
                 printVerbose(config);
-
-                // Filter the properties last ...
-                if (configFilter != null) config = configFilter.apply(config);
             } catch (Throwable t) {
                 print("Unexpected exception while processing the configuration: " + t.getMessage());
                 t.printStackTrace();
@@ -363,7 +347,7 @@ public class ServiceRunner {
             running = new CompletableFuture();
             try {
                 // Start the stream processing framework ...
-                execute(config);
+                execute(Configuration.from(config));
                 completionHandler.accept(ReturnCode.SUCCESS);
             } catch (Throwable t) {
                 errorHandler.accept(t);
@@ -392,7 +376,7 @@ public class ServiceRunner {
         running = executor.submit(() -> {
             try {
                 // Start the stream processing framework ...
-                execute(config != null ? config : new Properties());
+                execute(Configuration.from(config));
                 completionHandler.accept(ReturnCode.SUCCESS);
             } catch (Throwable t) {
                 errorHandler.accept(t);
@@ -409,9 +393,9 @@ public class ServiceRunner {
      * @param config the configuration properties for the service
      * @throws Exception if there is a problem configuring or executing the streaming process
      */
-    private void execute(Properties config) throws Exception {
+    private void execute(Configuration config) throws Exception {
         // Start the stream processing framework ...
-        ProcessorProperties processorProps = new ProcessorProperties(config);
+        ProcessorProperties processorProps = new ProcessorProperties(config.asProperties());
         if ( processorProps.timestampExtractor() == null ) {
             // Use the system time extractor ...
             processorProps.timestampExtractor((topic,key,value)->System.currentTimeMillis());
@@ -485,32 +469,6 @@ public class ServiceRunner {
             error(e.getMessage());
         }
         return null;
-    }
-
-    protected Properties adjustConfigurationProperties(Properties configuration) {
-        Properties system = readConfigurationPropertiesFromSystem();
-        if (system == null || system.isEmpty()) return configuration;
-        Properties props = new Properties(configuration);
-        props.putAll(system);
-        return props;
-    }
-
-    protected Properties readConfigurationPropertiesFromSystem() {
-        int prefixLength = systemPropertyNamePrefix.length();
-        Properties systemProps = System.getProperties();
-        Properties props = new Properties();
-        for (String key : systemProps.stringPropertyNames()) {
-            if (key.startsWith(systemPropertyNamePrefix)) {
-                String keyWithoutPrefix = key.substring(prefixLength).trim();
-                if (keyWithoutPrefix.length() > 0) {
-                    // Convert to a properties format ...
-                    String propertyName = keyWithoutPrefix.toLowerCase().replaceAll("[_]", ".");
-                    String value = systemProps.getProperty(key);
-                    props.setProperty(propertyName, value);
-                }
-            }
-        }
-        return props;
     }
 
     protected void error(Object msg) {

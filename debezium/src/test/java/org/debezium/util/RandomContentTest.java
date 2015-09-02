@@ -13,7 +13,6 @@ import org.debezium.model.Entity;
 import org.debezium.model.EntityId;
 import org.debezium.model.EntityType;
 import org.debezium.model.Identifier;
-import org.debezium.util.RandomContent;
 import org.debezium.util.RandomContent.ContentGenerator;
 import org.debezium.util.RandomContent.IdGenerator;
 import org.junit.Before;
@@ -41,7 +40,7 @@ public class RandomContentTest {
         Entity entity = generator.generateEntity(id);
         assertThat(entity).isNotNull();
         assertThat(entity.id()).isEqualTo(id);
-        assertThat(entity.document().size()).isGreaterThan(1);  // more than just the ID
+        assertThat(entity.asDocument().size()).isGreaterThan(1);  // more than just the ID
     }
     
     @Test

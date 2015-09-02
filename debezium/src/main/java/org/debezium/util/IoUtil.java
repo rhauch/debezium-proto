@@ -24,6 +24,7 @@ import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -190,14 +191,16 @@ public class IoUtil {
     }
 
     /**
-     * Get the {@link InputStream input stream} to the resource given by the supplied path. If a class loader is supplied, the
-     * method attempts to resolve the resource using the {@link ClassLoader#getResourceAsStream(String)} method; if the result is
-     * non-null, it is returned. Otherwise, if a class is supplied, this method attempts to resolve the resource using the
-     * {@link Class#getResourceAsStream(String)} method; if the result is non-null, it is returned. Otherwise, this method then
-     * uses the Class' ClassLoader to load the resource; if non-null, it is returned . Otherwise, this method looks for an
-     * existing and readable {@link File file} at the path; if found, a buffered stream to that file is returned. Otherwise, this
-     * method attempts to parse the resource path into a valid {@link URL}; if this succeeds, the method attempts to open a stream
-     * to that URL. If all of these fail, this method returns null.
+     * Get the {@link InputStream input stream} to the resource given by the supplied path. This method performs these operations
+     * in order, returning as soon as a file is found:
+     * <ol>
+     * <li>look for a file on the file system at the given absolute path; otherwise</li>
+     * <li>look for a file on the file system at the given path relative to the JVM process; otherwise</li>
+     * <li>if a {@code classloader} is supplied, use it to load the file on the classpath at the given path; otherwise</li>
+     * <li>if a {@code clazz} is supplied, use it to load the file on its classpath at the given path; otherwise</li>
+     * <li>try to convert the path to a URL and obtain the referenced resource</li>
+     * </ol>
+     * If all of these fail, this method returns null.
      * 
      * @param resourcePath the logical path to the classpath, file, or URL resource
      * @param classLoader the classloader that should be used to load the resource as a stream; may be null
@@ -213,20 +216,6 @@ public class IoUtil {
         if (resourcePath == null) throw new IllegalArgumentException("resourcePath may not be null");
         if (resourceDesc == null && logger != null) resourceDesc = resourcePath;
         InputStream result = null;
-        if (classLoader != null) {
-            // Try using the class loader first ...
-            result = classLoader.getResourceAsStream(resourcePath);
-            logMessage(result, logger, resourceDesc, "on classpath");
-        }
-        if (result == null && clazz != null) {
-            // Not yet found, so try the class ...
-            result = clazz.getResourceAsStream(resourcePath);
-            if (result == null) {
-                // Not yet found, so try the class's class loader ...
-                result = clazz.getClassLoader().getResourceAsStream(resourcePath);
-            }
-            logMessage(result, logger, resourceDesc, "on classpath");
-        }
         if (result == null) {
             try {
                 // Try absolute path ...
@@ -236,6 +225,8 @@ public class IoUtil {
                     result = new BufferedInputStream(new FileInputStream(f));
                 }
                 logMessage(result, logger, resourceDesc, "on filesystem at " + filePath);
+            } catch (InvalidPathException e) {
+                // just continue ...
             } catch (FileNotFoundException e) {
                 // just continue ...
             }
@@ -250,9 +241,25 @@ public class IoUtil {
                     result = new BufferedInputStream(new FileInputStream(f));
                 }
                 logMessage(result, logger, resourceDesc, "on filesystem relative to '" + current + "' at '" + absolute + "'");
+            } catch (InvalidPathException e) {
+                // just continue ...
             } catch (FileNotFoundException e) {
                 // just continue ...
             }
+        }
+        if (result == null && classLoader != null) {
+            // Try using the class loader ...
+            result = classLoader.getResourceAsStream(resourcePath);
+            logMessage(result, logger, resourceDesc, "on classpath");
+        }
+        if (result == null && clazz != null) {
+            // Not yet found, so try the class ...
+            result = clazz.getResourceAsStream(resourcePath);
+            if (result == null) {
+                // Not yet found, so try the class's class loader ...
+                result = clazz.getClassLoader().getResourceAsStream(resourcePath);
+            }
+            logMessage(result, logger, resourceDesc, "on classpath");
         }
         if (result == null) {
             // Still not found, so try to construct a URL out of it ...
@@ -351,7 +358,7 @@ public class IoUtil {
      * @throws IOException if there is a problem deleting the file at the given path
      */
     public static void delete(File... filesOrFolder) throws IOException {
-        for ( File fileOrFolder : filesOrFolder ) {
+        for (File fileOrFolder : filesOrFolder) {
             delete(fileOrFolder);
         }
     }

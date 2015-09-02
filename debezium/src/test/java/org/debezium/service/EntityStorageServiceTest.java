@@ -67,7 +67,7 @@ public class EntityStorageServiceTest extends ServiceTest {
         assertLastMessage().partCount().isEqualTo(1);
         assertLastMessage().partsCount().isEqualTo(1);
         assertLastMessage().before().isNull();
-        assertLastMessage().after().hasAll(contact1.document());
+        assertLastMessage().after().hasAll(contact1.asDocument());
         assertLastMessage().revision().isEqualTo(1);
         printLastMessage();
         // Read the update response ...
@@ -78,7 +78,7 @@ public class EntityStorageServiceTest extends ServiceTest {
         assertLastMessage().partCount().isEqualTo(1);
         assertLastMessage().partsCount().isEqualTo(1);
         assertLastMessage().before().isNull();
-        assertLastMessage().after().hasAll(contact1.document());
+        assertLastMessage().after().hasAll(contact1.asDocument());
         assertLastMessage().after().integerAt(Field.REVISION).isEqualTo(1);
         assertLastMessage().revision().isEqualTo(1);
         printLastMessage();

@@ -15,6 +15,8 @@ import java.util.function.Supplier;
 
 import org.debezium.annotation.NotThreadSafe;
 import org.debezium.annotation.ThreadSafe;
+import org.debezium.driver.DebeziumDriver;
+import org.debezium.driver.DebeziumDriver.BatchBuilder;
 import org.debezium.message.Batch;
 import org.debezium.message.Batch.Builder;
 import org.debezium.message.Document;
@@ -169,6 +171,22 @@ public final class RandomContent {
         default public Builder<EntityId> addToBatch(Builder<EntityId> builder, int numEdits, int numRemoves, EntityType type) {
             IdGenerator generator = generateIds(numEdits, numRemoves, type);
             generateBatch(generator).forEach(builder::patch);
+            return builder;
+        }
+
+        /**
+         * Add the specified number of edits and specified number of removes to the given {@link BatchBuilder} from the
+         * {@link DebeziumDriver}.
+         * 
+         * @param builder the batch builder; never null
+         * @param numEdits the number of edits (including creates); must be greater than or equal to 0
+         * @param numRemoves the number of removes; must be greater than or equal to 0
+         * @param type the type of entity to create; may not be null
+         * @return the supplied batch builder; never null
+         */
+        default public BatchBuilder addToBatch(BatchBuilder builder, int numEdits, int numRemoves, EntityType type) {
+            IdGenerator generator = generateIds(numEdits, numRemoves, type);
+            generateBatch(generator).forEach(builder::changeEntity);
             return builder;
         }
     }

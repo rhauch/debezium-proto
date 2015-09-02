@@ -5,11 +5,13 @@
  */
 package org.debezium.model;
 
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.debezium.message.Document;
-import org.debezium.message.Path;
 import org.debezium.message.Document.Field;
+import org.debezium.message.Path;
 
 /**
  * @author Randall Hauch
@@ -38,20 +40,39 @@ public final class Schema {
         return id;
     }
     
-    public Document document() {
+    /**
+     * Get the representation of this schema as a JSON document.
+     * 
+     * @return the document representation of this schema; never null
+     */
+    public Document asDocument() {
         return doc;
     }
     
-    public Stream<? extends SchemaComponent<? extends SchemaComponentId>> components() {
-        return collections();
-        //return Stream.concat(collections(), b);
+    /**
+     * Get descriptions of the entity types defined in this schema.
+     * 
+     * @return the map of entity types keyed by their simple name; never null, but possibly empty
+     */
+    public Map<String, EntityCollection> entityTypes() {
+        return collections().collect(Collectors.toMap(col->col.id().entityTypeName(), col->col));
     }
 
+    // public Stream<? extends SchemaComponent<? extends SchemaComponentId>> components() {
+    // return collections();
+    // //return Stream.concat(collections(), b);
+    // }
+
+    /**
+     * Get the stream of {@link EntityCollection}s defined in this schema.
+     * 
+     * @return the stream of entity collections; never null but possibly empty
+     */
     public Stream<EntityCollection> collections() {
-        return doc.children(COLLECTIONS_PATH).filter(this::isDocument).map(this::toEntityCollection);
+        return doc.children(COLLECTIONS_PATH).filter(this::isDocumentValue).map(this::toEntityCollection);
     }
     
-    protected boolean isDocument( Field field ) {
+    protected boolean isDocumentValue( Field field ) {
         return field != null && field.getValue().isDocument();
     }
     

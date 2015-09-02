@@ -304,7 +304,7 @@ public abstract class ServiceTest implements Testing {
     }
 
     protected Patch<EntityId> createPatch(Entity entity) {
-        return Patch.create(entity.id(), entity.document());
+        return Patch.create(entity.id(), entity.asDocument());
     }
 
     protected Patch.Editor<Patch<EntityId>> edit(EntityId id) {
