@@ -10,7 +10,9 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.kafka.clients.processor.PTopology;
+import org.apache.kafka.streams.StreamingConfig;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.debezium.Configuration;
 import org.debezium.Testing;
 import org.debezium.kafka.KafkaCluster;
 import org.debezium.kafka.KafkaCluster.InteractiveConsumer;
@@ -25,18 +27,20 @@ import static org.fest.assertions.Assertions.assertThat;
 
 /**
  * Base class for integration tests that verify the behavior of a service while using an embedded Kafka cluster and embedded
- * Zookeeper server. To use, simply extend this class, override the abstract methods to provide the {@link #getTopology() Kafka
- * Stream topology} and the {@link #getConsumerTopics() topics to consume} during the tests. Then, create test methods that:
+ * Zookeeper server. To use, simply extend this class, override the abstract methods to provide the
+ * {@link #getTopologyBuilder(Configuration) Kafka Stream topology}, the set of {@link #getAllTopics() all topics} (required
+ * to initialize the Kafka broker), and the {@link #getOutputTopics() output topics to consume} during the tests. Then, create
+ * test methods that:
  * <ol>
- * <li>{@link #startService(String...)} to start the service with the command-line arguments for the service</li>
- * <li>use the {@link #inputs()} to write messages that will be inputs for the service</li>
- * <li>use the {@link #outputs()} to read the messages from the
+ * <li>{@link #startTopology(String...)} to start the service with the command-line arguments for the service</li>
+ * <li>use the {@link #inputs()} to write messages that will be inputs for the topology</li>
+ * <li>use the {@link #outputs()} to read the messages from the topology's output streams</li>
  * <li>perform the various operations to load messages into the input stream(s)</li>
  * <li>
  * 
  * @author Randall Hauch
  */
-public abstract class ServiceIntegrationTest implements Testing {
+public abstract class TopologyIntegrationTest implements Testing {
 
     private KafkaCluster cluster;
     private ServiceRunner serviceRunner;
@@ -47,21 +51,20 @@ public abstract class ServiceIntegrationTest implements Testing {
 
     @Before
     public void beforeEach() throws IOException {
-        removeAllDataFiles();
-        cluster = new KafkaCluster().deleteDataUponShutdown(true);
-        serviceRunner = ServiceRunner.use(getClass().getName(), getTopology())
+        cluster = new KafkaCluster().deleteDataUponShutdown(true).deleteDataPriorToStartup(true);
+        serviceRunner = ServiceRunner.use(getClass().getName(), this::getTopologyBuilder)
                                      .withCompletionHandler(this::setReturnCode)
                                      .withClassLoader(getClass().getClassLoader());
         cluster.startup();
-        
+
         // Create all the topics needed during the test ...
         Set<String> topics = getAllTopics();
         cluster.createTopics(topics.toArray(new String[topics.size()]));
-        
+
         // Create the producer and consumer...
         consumerCompletion = new CountDownLatch(1);
         inputProducer = cluster.useTo().createProducer("input-producer1");
-        outputConsumer = cluster.useTo().createConsumer("output-consumer", "output-consumer", getConsumerTopics(),
+        outputConsumer = cluster.useTo().createConsumer("output-consumer", "output-consumer", getOutputTopics(),
                                                         consumerCompletion::countDown);
     }
 
@@ -84,15 +87,10 @@ public abstract class ServiceIntegrationTest implements Testing {
                 } finally {
                     try {
                         // Stop the service ...
-                        stopService(10, TimeUnit.SECONDS);
+                        stopTopology(10, TimeUnit.SECONDS);
                     } finally {
-                        try {
-                            // Shut down the cluster ...
-                            cluster.shutdown();
-                        } finally {
-                            // And clean up the cluster's storage files
-                            removeAllDataFiles();
-                        }
+                        // Shut down the cluster (and clean up all the data files) ...
+                        cluster.shutdown();
                     }
                 }
             }
@@ -110,7 +108,7 @@ public abstract class ServiceIntegrationTest implements Testing {
     }
 
     /**
-     * Get the {@link InteractiveConsumer consumer} to read message from all of the {@link #getConsumerTopics() consumer topics}.
+     * Get the {@link InteractiveConsumer consumer} to read message from all of the {@link #getOutputTopics() consumer topics}.
      * 
      * @return the producer; never null during a test method
      */
@@ -119,22 +117,34 @@ public abstract class ServiceIntegrationTest implements Testing {
     }
 
     /**
-     * Get the {@link PTopology} class that the service-under-test uses.
-     * @return the topology class; may not be null
+     * Get the {@link TopologyBuilder} that creates a topology using the service(s).
+     * 
+     * @param config the configuration for the topology
+     * @return the topology builder; may not be null
      */
-    protected abstract Class<? extends PTopology> getTopology();
+    protected abstract TopologyBuilder getTopologyBuilder(Configuration config);
 
     /**
      * Get the set of the all topic names used during these tests.
+     * 
      * @return the topology class; may not be null
      */
     protected abstract Set<String> getAllTopics();
 
     /**
      * Get the set of the names for the topics {@link #outputs() read} by the test methods.
+     * 
      * @return the topology class; may not be null
      */
-    protected abstract Set<String> getConsumerTopics();
+    protected abstract Set<String> getOutputTopics();
+
+    /**
+     * Return the names of the stores that will be used by the topology.
+     * 
+     * @param config the streaming configuration
+     * @return the store names; may be null or empty
+     */
+    protected abstract String[] storeNames(StreamingConfig config);
 
     private void setReturnCode(ReturnCode code) {
         actualReturnCode = code;
@@ -144,7 +154,7 @@ public abstract class ServiceIntegrationTest implements Testing {
         cluster.addBrokers(numBrokers);
     }
 
-    protected synchronized void startService(String... args) {
+    protected synchronized void startTopology(String... args) {
         // Start the ZK+Kafka cluster (if needed) ...
         if (!cluster.isRunning()) {
             try {
@@ -153,17 +163,14 @@ public abstract class ServiceIntegrationTest implements Testing {
                 Fail.fail("Failed to start Kafka cluster", e);
             }
         }
-        // Create and start a thread to run the service ...
-        Thread t = new Thread(() -> serviceRunner.run(args));
-        t.setName("service-thread");
-        t.start();
+        serviceRunner.run(args);
     }
 
-    protected synchronized void stopService(long timeout, TimeUnit unit) {
-        stopService(timeout, unit, null);
+    protected synchronized void stopTopology(long timeout, TimeUnit unit) {
+        stopTopology(timeout, unit, null);
     }
 
-    protected synchronized void stopService(long timeout, TimeUnit unit, ReturnCode expectedReturnCode) {
+    protected synchronized void stopTopology(long timeout, TimeUnit unit, ReturnCode expectedReturnCode) {
         boolean shutdown = serviceRunner.shutdown(timeout, unit);
         if (expectedReturnCode != null) {
             assertThat(actualReturnCode).isEqualTo(expectedReturnCode);
@@ -174,10 +181,4 @@ public abstract class ServiceIntegrationTest implements Testing {
     protected boolean isServiceRunning() {
         return serviceRunner.isRunning();
     }
-
-    private void removeAllDataFiles() {
-        Testing.Files.delete("target/data/zk");
-        Testing.Files.delete("target/data/kafka");
-    }
-
 }

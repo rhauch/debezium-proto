@@ -6,11 +6,9 @@
 package org.debezium.service;
 
 import java.io.IOException;
-import java.util.Properties;
 
-import org.apache.kafka.clients.processor.KafkaProcessor;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.debezium.message.Document;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.debezium.Configuration;
 import org.debezium.message.Message.Field;
 import org.debezium.message.Message.Status;
 import org.debezium.message.Patch;
@@ -18,7 +16,6 @@ import org.debezium.message.Records;
 import org.debezium.message.Topic;
 import org.debezium.model.Entity;
 import org.debezium.model.EntityId;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -26,23 +23,24 @@ import org.junit.Test;
  * 
  * @author Randall Hauch
  */
-public class EntityStorageServiceTest extends ServiceTest {
+public class EntityStorageServiceTest extends TopologyTest {
 
     @Override
-    protected KafkaProcessor<String, Document, String, Document> createProcessor() {
-        return new EntityStorageService(new ProcessorProperties(new Properties()));
+    protected TopologyBuilder createTopologyBuilder(Configuration config) {
+        return EntityStorageService.topology(config);
     }
-
+    
     @Override
-    @Before
-    public void beforeEach() throws IOException {
-        super.beforeEach();
+    protected String[] storeNames(Configuration config) {
+        return new String[]{EntityStorageService.ENTITY_STORE_NAME};
     }
-
+    
     @Test
     public void shouldSendFailureResponseWhenReadingNonExistantEntity() {
+        // Submit a request to read an entity that does not exist ...
         EntityId contactId = generateContactId();
-        send(Topic.ENTITY_PATCHES, Patch.read(contactId));
+        process(Topic.ENTITY_PATCHES, Patch.read(contactId));
+
         // Read the partial response ...
         nextOutputMessage(Topic.PARTIAL_RESPONSES);
         assertLastMessageIsPartialResponse();
@@ -58,7 +56,8 @@ public class EntityStorageServiceTest extends ServiceTest {
     public void shouldCreateNewEntityWhenPatchingNonExistantEntity() {
         // Testing.Print.enable();
         Entity contact1 = createEntity(generateContactId());
-        send(Topic.ENTITY_PATCHES, createPatch(contact1));
+        process(Topic.ENTITY_PATCHES, createPatch(contact1));
+        
         // Read the partial response ...
         nextOutputMessage(Topic.PARTIAL_RESPONSES);
         assertLastMessageIsPartialResponse();
@@ -70,6 +69,7 @@ public class EntityStorageServiceTest extends ServiceTest {
         assertLastMessage().after().hasAll(contact1.asDocument());
         assertLastMessage().revision().isEqualTo(1);
         printLastMessage();
+        
         // Read the update response ...
         nextOutputMessage(Topic.ENTITY_UPDATES);
         assertLastMessageIsEntityUpdateResponse();
@@ -105,7 +105,7 @@ public class EntityStorageServiceTest extends ServiceTest {
     protected void generateInput(int count) {
         for (int i = 0; i != count; ++i) {
             Entity contact1 = createEntity(generateContactId());
-            send(Topic.ENTITY_PATCHES, createPatch(contact1));
+            process(Topic.ENTITY_PATCHES, createPatch(contact1));
         }
     }
 

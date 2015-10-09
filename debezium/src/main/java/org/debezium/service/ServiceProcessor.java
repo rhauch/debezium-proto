@@ -5,10 +5,10 @@
  */
 package org.debezium.service;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.processor.KafkaProcessor;
-import org.apache.kafka.clients.processor.ProcessorContext;
-import org.apache.kafka.clients.processor.ProcessorProperties;
+import org.apache.kafka.streams.processor.Processor;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.ProcessorDef;
+import org.debezium.Configuration;
 import org.debezium.annotation.NotThreadSafe;
 import org.debezium.message.Array;
 import org.debezium.message.Document;
@@ -20,30 +20,49 @@ import org.debezium.message.Document;
  * @author Randall Hauch
  */
 @NotThreadSafe
-public abstract class ServiceProcessor extends KafkaProcessor<String, Document, String, Document> {
+public abstract class ServiceProcessor implements Processor<String, Document> {
+    
+    /**
+     * Utility method to create a {@link ProcessorDef} for a given service.
+     * @param processorInstance the processor instance; may not be null
+     * @return the {@link ProcessorDef} instance; never null
+     */
+    protected static ProcessorDef processorDef( ServiceProcessor processorInstance ) {
+        return new ProcessorDef() {
+            
+            @Override
+            public Processor<String,Document> instance() {
+                return processorInstance;
+            }
+        };
+    }
 
-    private final boolean useManualCommit;
-    private final ProcessorProperties config;
+    private final Configuration config;
+    private final String name;
+    private boolean useManualCommit;
     private ProcessorContext context;
 
     /**
      * Create a new instance of the service
      * 
      * @param serviceName the name of the service; may not be null or empty
-     * @param config the processor configuration; may not be null
+     * @param config the configuration for this processor; may not be null
      */
-    protected ServiceProcessor(String serviceName, ProcessorProperties config) {
-        super(serviceName);
+    protected ServiceProcessor(String serviceName, Configuration config) {
         if (serviceName == null || serviceName.trim().isEmpty()) {
             throw new IllegalArgumentException("The service name may not be null or empty");
         }
-        if (config == null) throw new IllegalArgumentException("The processor properties may not be null");
+        if (config == null ) throw new IllegalArgumentException("The configuration may not be null or empty");
+        this.name = serviceName;
         this.config = config;
-
-        // Look in the processor properties for any process-specific configuration ...
-        boolean autoCommitEnabled = property(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
-        int autoCommitIntervalMs = property(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 60000);
-        this.useManualCommit = requireManaulCommit() || !autoCommitEnabled || autoCommitIntervalMs < 1;
+    }
+    
+    /**
+     * Get the name of this service.
+     * @return the name of this service; never null or empty
+     */
+    public String getName() {
+        return name;
     }
 
     /**
@@ -56,72 +75,13 @@ public abstract class ServiceProcessor extends KafkaProcessor<String, Document, 
     protected boolean requireManaulCommit() {
         return false;
     }
-
+    
     /**
-     * Get the named configuration property as a boolean value. This method is safe to be called within a constructor.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
+     * Get the configuration for this service.
+     * @return the configuration; never null
      */
-    protected boolean property(String name, boolean defaultValue) {
-        return Boolean.parseBoolean(property(name, Boolean.toString(defaultValue)));
-    }
-
-    /**
-     * Get the named configuration property as an integer value. This method is safe to be called within a constructor.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
-     */
-    protected int property(String name, int defaultValue) {
-        return Integer.parseInt(property(name, Integer.toString(defaultValue)));
-    }
-
-    /**
-     * Get the named configuration property as a long value. This method is safe to be called within a constructor.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
-     */
-    protected long property(String name, long defaultValue) {
-        return Long.parseLong(property(name, Long.toString(defaultValue)));
-    }
-
-    /**
-     * Get the named configuration property as a float value. This method is safe to be called within a constructor.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
-     */
-    protected float property(String name, float defaultValue) {
-        return Float.parseFloat(property(name, Float.toString(defaultValue)));
-    }
-
-    /**
-     * Get the named configuration property as a double value. This method is safe to be called within a constructor.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
-     */
-    protected double property(String name, double defaultValue) {
-        return Double.parseDouble(property(name, Double.toString(defaultValue)));
-    }
-
-    /**
-     * Get the named configuration property as a String value. This method is safe to be called within a constructor or any
-     * other methods. The configuration properties never change during the lifetime of this object.
-     * 
-     * @param name the name of the configuration property; may not be null
-     * @param defaultValue the default value to be returned if the configuration properties do not contain the named property
-     * @return the value of the configuration property, or the supplied default if there is none
-     */
-    protected String property(String name, String defaultValue) {
-        return this.config.config().getProperty(name, defaultValue);
+    protected Configuration config() {
+        return this.config;
     }
 
     /**
@@ -171,6 +131,10 @@ public abstract class ServiceProcessor extends KafkaProcessor<String, Document, 
      */
     protected abstract void process(String topic, int partition, long offset, String key, Document request);
 
+    @Override
+    public void punctuate(long streamTime) {
+    }
+    
     /**
      * Given the supplied {@link Array} representing a vector clock for a topic, record in the vector clock the offset in the
      * given partition and determine whether the message at the given offset has already been seen and recorded in the vector

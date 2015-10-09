@@ -8,6 +8,7 @@ package org.debezium.kafka;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -29,7 +30,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import org.apache.kafka.clients.consumer.CommitType;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -61,13 +61,15 @@ import org.slf4j.LoggerFactory;
 public class KafkaCluster {
 
     public static final boolean DEFAULT_DELETE_DATA_UPON_SHUTDOWN = true;
-    
+    public static final boolean DEFAULT_DELETE_DATA_PRIOR_TO_STARTUP = false;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaCluster.class);
 
     private final ConcurrentMap<Integer, KafkaServer> kafkaServers = new ConcurrentHashMap<>();
     private final ZookeeperServer zkServer = new ZookeeperServer();
     private volatile File dataDir = null;
     private volatile boolean deleteDataUponShutdown = DEFAULT_DELETE_DATA_UPON_SHUTDOWN;
+    private volatile boolean deleteDataPriorToStartup = DEFAULT_DELETE_DATA_PRIOR_TO_STARTUP;
     private volatile boolean running = false;
     private volatile Properties kafkaConfig = null;
     private volatile int startingKafkaPort = -1;
@@ -87,8 +89,21 @@ public class KafkaCluster {
      * @throws IllegalStateException if the cluster is running
      */
     public KafkaCluster deleteDataUponShutdown(boolean delete) {
-        if (running) throw new IllegalStateException("Unable to add a broker when the cluster is already running");
+        if (running) throw new IllegalStateException("Unable to change cluster settings when running");
         this.deleteDataUponShutdown = delete;
+        return this;
+    }
+
+    /**
+     * Specify whether the data is to be deleted prior to {@link #startup()}.
+     * 
+     * @param delete true if the data is to be deleted upon shutdown, or false otherwise
+     * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the cluster is running
+     */
+    public KafkaCluster deleteDataPriorToStartup(boolean delete) {
+        if (running) throw new IllegalStateException("Unable to change cluster settings when running");
+        this.deleteDataPriorToStartup = delete;
         return this;
     }
 
@@ -108,7 +123,7 @@ public class KafkaCluster {
                 KafkaServer server = new KafkaServer(zkServer::getConnection, id);
                 if (dataDir != null) server.setStateDirectory(dataDir);
                 if (kafkaConfig != null) server.setProperties(kafkaConfig);
-                if (startingKafkaPort >= 0 ) server.setPort((int) this.nextKafkaPort.getAndIncrement());
+                if (startingKafkaPort >= 0) server.setPort((int) this.nextKafkaPort.getAndIncrement());
                 return server;
             });
         }
@@ -196,6 +211,9 @@ public class KafkaCluster {
                 } catch (IOException e) {
                     throw new RuntimeException("Unable to create temporary directory", e);
                 }
+            } else if (deleteDataPriorToStartup) {
+                IoUtil.delete(dataDir);
+                dataDir.mkdirs();
             }
             File zkDir = new File(dataDir, "zk");
             zkServer.setStateDirectory(zkDir); // does error checking
@@ -260,7 +278,11 @@ public class KafkaCluster {
         kafkaServers.values().forEach(server -> consumer.accept(server.getStateDirectory()));
     }
 
-    private String brokerList() {
+    /**
+     * Get the list of brokers.
+     * @return the broker list
+     */
+    public String brokerList() {
         StringJoiner joiner = new StringJoiner(",");
         kafkaServers.values().forEach(server -> {
             joiner.add(server.getConnection());
@@ -777,13 +799,13 @@ public class KafkaCluster {
             Properties props = getConsumerProperties(groupId, clientId, autoOffsetReset);
             Thread t = new Thread(() -> {
                 LOGGER.debug("Starting consumer {} to read messages", clientId);
-                try (KafkaConsumer<K, V> consumer = new KafkaConsumer<>(props, null, keyDeserializer, valueDeserializer)) {
-                    topics.forEach(consumer::subscribe);
+                try (KafkaConsumer<K, V> consumer = new KafkaConsumer<>(props, keyDeserializer, valueDeserializer)) {
+                    consumer.subscribe(new ArrayList<>(topics));
                     while (continuation.getAsBoolean()) {
                         consumer.poll(10).forEach(record -> {
                             LOGGER.debug("Consumer {}: consuming message {}", clientId, record);
                             consumerFunction.accept(record);
-                            consumer.commit(CommitType.ASYNC);
+                            consumer.commitAsync();
                         });
                     }
                 } finally {

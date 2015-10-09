@@ -97,38 +97,33 @@
                 <artifactId>scala-library</artifactId>
                 <version>${scala.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>0.8.3-20150821.203430-3</version>
-            </dependency>
             <!-- BEGIN: needed for snapshots -->
             <dependency>
                 <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka_${scala.label.version}</artifactId>
+                <version>0.8.3-20150925.170053-11</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-clients</artifactId>
-                <version>0.8.3-20150821.203430-3</version>
+                <version>0.8.3-20150925.170053-11</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka-log4j-appender</artifactId>
-                <version>0.8.3-20150821.203500-3</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka-stream</artifactId>
-                <version>0.8.3-20150821.203501-3</version>
+                <artifactId>kafka-streams</artifactId>
+                <version>0.8.3-20150925.170127-4</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>0.8.3-20150821.203430-3</version>
+                <version>0.8.3-20150925.170053-11</version>
                 <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka-stream</artifactId>
-                <version>0.8.3-20150821.203501-3</version>
+                <artifactId>kafka-streams</artifactId>
+                <version>0.8.3-20150925.170127-4</version>
                 <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>

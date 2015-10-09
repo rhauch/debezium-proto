@@ -5,16 +5,14 @@
  */
 package org.debezium.service;
 
-import org.apache.kafka.clients.processor.KafkaSource;
-import org.apache.kafka.clients.processor.PTopology;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.stream.state.InMemoryKeyValueStore;
-import org.apache.kafka.stream.state.KeyValueStore;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.apache.kafka.streams.state.InMemoryKeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
+import org.debezium.kafka.Serdes;
 import org.debezium.message.Document;
-import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
 import org.debezium.message.Message.Field;
 import org.debezium.message.Message.Status;
@@ -31,13 +29,13 @@ import org.debezium.model.EntityType;
  * and outputs the result of the changes to the {@value Topic#ENTITY_UPDATES} topic. The service also outputs the changes
  * and all read-only requests or errors on the {@value Topic#PARTIAL_RESPONSES} topic.
  * 
- * <h1>Service execution</h1>
+ * <h2>Service execution</h2>
  * <p>
  * This service has a {@link #main(String[]) main} method that when run starts up a Kafka stream processing job with a custom
  * topology and configuration. Each instance of the KafkaProcess can run a configurable number of threads, and users can start
  * multiple instances of their process job by starting multiple JVMs to run this service's {@link #main(String[])} method.
  * 
- * <h1>Configuration</h1>
+ * <h2>Configuration</h2>
  * <p>
  * The {@link Patch}es in the {@value Topic#ENTITY_PATCHES} input topic are partitioned by {@link EntityType collection ID}, so
  * all patches for entities within a single collection will all be sent to the same partitions. Each service process configuration
@@ -56,7 +54,7 @@ import org.debezium.model.EntityType;
  * seconds. Simply set the "{@code auto.commit.enabled}" property to "{@code false}" to have the service explicitly commit after
  * completely processing every input message.
  * 
- * <h1>Exactly-once processing</h1>
+ * <h2>Exactly-once processing</h2>
  * <p>
  * The service takes a number of steps to ensure that all input messages are processed by the service <em>exactly once</em>. Even
  * if the service is stopped or crashes, it merely needs to be restarted and the service will continue processing each and every
@@ -125,33 +123,48 @@ public final class EntityStorageService extends ServiceProcessor {
      * @return the ServiceRunner instance; never null
      */
     public static ServiceRunner runner() {
-        return ServiceRunner.use(EntityStorageService.class, EntityStorageTopology.class)
+        return ServiceRunner.use(EntityStorageService.class, EntityStorageService::topology)
                             .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
+     * 
+     * @param config the configuration for the topology; may not be null
+     * @return the topology builder; never null
      */
-    public static final class EntityStorageTopology extends PTopology {
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public void build() {
-            KafkaSource<String, Document> source = addSource(new StringDeserializer(), new DocumentSerdes(), Topic.ENTITY_PATCHES);
-            addProcessor(new EntityStorageService(properties), source);
-        }
+    public static TopologyBuilder topology(Configuration config) {
+        TopologyBuilder topology = new TopologyBuilder();
+        topology.addSource("input", Serdes.stringDeserializer(), Serdes.document(), Topic.ENTITY_PATCHES);
+        topology.addProcessor("service", processorDef(new EntityStorageService(config)), "input");
+        topology.addSink("updates", Topic.ENTITY_UPDATES, Serdes.stringSerializer(), Serdes.document(), "service");
+        topology.addSink("responses", Topic.PARTIAL_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
+        return topology;
     }
+    
+    /**
+     * The name of the single store used by the service.
+     */
+    public static final String ENTITY_STORE_NAME = "entity-storage";
+
+    /**
+     * The name of this service.
+     */
+    public static final String SERVICE_NAME = "entity-storage";
+
+    private static final int UPDATES = 0;
+    private static final int RESPONSES = 1;
 
     private KeyValueStore<String, Document> store;
 
-    public EntityStorageService(ProcessorProperties config) {
-        super("entity-storage", config);
+    public EntityStorageService(Configuration config) {
+        super(SERVICE_NAME, config);
     }
 
     @Override
     protected void init() {
-        this.store = new InMemoryKeyValueStore<>("entity-storage", context());
+        this.store = new InMemoryKeyValueStore<>(ENTITY_STORE_NAME, context());
     }
 
     @Override
@@ -264,11 +277,6 @@ public final class EntityStorageService extends ServiceProcessor {
     }
 
     @Override
-    public void punctuate(long streamTime) {
-        // do nothing
-    }
-
-    @Override
     public void close() {
         this.store.close();
     }
@@ -276,12 +284,12 @@ public final class EntityStorageService extends ServiceProcessor {
     private void sendResponse(Document response, String idStr) {
         String clientId = Message.getClient(response);
         // TODO: Partition on the client ID, but now have to send it via the key ...
-        context().send(Topic.PARTIAL_RESPONSES, clientId, response);
+        context().forward(clientId, response, RESPONSES);
     }
 
     private void sendResult(Document response, EntityId id) {
         // TODO: Partition on the collection, but now have to send it via the key ...
-        context().send(Topic.ENTITY_UPDATES, id.asString(), response);
+        context().forward(id.asString(), response, UPDATES);
     }
 
     private void record(Path failedPath, Operation failedOperation, Document response) {

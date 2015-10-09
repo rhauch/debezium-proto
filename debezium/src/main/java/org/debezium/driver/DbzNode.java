@@ -27,6 +27,7 @@ import kafka.consumer.TopicFilter;
 import kafka.producer.KeyedMessage;
 
 import org.apache.kafka.common.serialization.Deserializer;
+import org.debezium.Configuration;
 import org.debezium.function.Callable;
 import org.debezium.function.Predicates;
 import org.debezium.kafka.Serdes;

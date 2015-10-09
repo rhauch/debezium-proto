@@ -7,15 +7,13 @@ package org.debezium.service;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.kafka.clients.processor.KafkaSource;
-import org.apache.kafka.clients.processor.PTopology;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
+import org.debezium.kafka.Serdes;
 import org.debezium.message.Batch;
 import org.debezium.message.Document;
-import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
 import org.debezium.message.Message.Field;
 import org.debezium.message.Message.Status;
@@ -30,13 +28,13 @@ import org.debezium.model.EntityId;
  * for batches extracts all individual patches within the batch and sends them (with updated {@link Field#PARTS part fields})
  * to {@link Topic#ENTITY_PATCHES}.
  * 
- * <h1>Service execution</h1>
+ * <h2>Service execution</h2>
  * <p>
  * This service has a {@link #main(String[]) main} method that when run starts up a Kafka stream processing job with a custom
  * topology and configuration. Each instance of the KafkaProcess can run a configurable number of threads, and users can start
  * multiple instances of their process job by starting multiple JVMs to run this service's {@link #main(String[])} method.
  * 
- * <h1>Configuration</h1>
+ * <h2>Configuration</h2>
  * <p>
  * The {@value Topic#ENTITY_PATCHES} input topic is partitioned by the request ID of each patch and batch message, ensuring that
  * all batch and patch requests from a single client will all be sent to the same partition and processed by the service instance,
@@ -55,7 +53,7 @@ import org.debezium.model.EntityId;
  * after processing each input message, reducing the likelihood of this service generating a duplicate output message. To disable
  * automatic commits, set the "{@code auto.commit.enabled}" property to "{@code false}".
  * 
- * <h1>Exactly-once and At-least once processing</h1>
+ * <h2>Exactly-once and At-least once processing</h2>
  * <p>
  * This service will consume all input messages <em>exactly once</em> when operating normally. However, if the service crashes, it
  * is likely to produce some messages that are duplicates of some messages output prior to the crash. How many messages might be
@@ -98,26 +96,36 @@ public final class EntityBatchService extends ServiceProcessor {
      * @return the ServiceRunner instance; never null
      */
     public static ServiceRunner runner() {
-        return ServiceRunner.use(EntityBatchService.class, EntityStorageTopology.class)
+        return ServiceRunner.use(EntityBatchService.class, EntityBatchService::topology)
                             .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
+     * 
+     * @param config the configuration for the topology; may not be null
+     * @return the topology builder; never null
      */
-    public static final class EntityStorageTopology extends PTopology {
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public void build() {
-            KafkaSource<String, Document> source = addSource(new StringDeserializer(), new DocumentSerdes(), Topic.ENTITY_BATCHES);
-            addProcessor(new EntityBatchService(properties), source);
-        }
+    public static TopologyBuilder topology(Configuration config) {
+        TopologyBuilder topology = new TopologyBuilder();
+        topology.addSource("input", Serdes.stringDeserializer(), Serdes.document(), Topic.ENTITY_BATCHES);
+        topology.addProcessor("service", processorDef(new EntityBatchService(config)), "input");
+        topology.addSink("patches", Topic.ENTITY_PATCHES, Serdes.stringSerializer(), Serdes.document(), "service");
+        topology.addSink("responses", Topic.PARTIAL_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
+        return topology;
     }
+    
+    /**
+     * The name of this service.
+     */
+    public static final String SERVICE_NAME = "entity-batch";
+    
+    private static final int PATCHES = 0;
+    private static final int RESPONSES = 1;
 
-    public EntityBatchService(ProcessorProperties config) {
-        super("entity-batch", config);
+    public EntityBatchService(Configuration config) {
+        super(SERVICE_NAME, config);
     }
 
     @Override
@@ -133,7 +141,7 @@ public final class EntityBatchService extends ServiceProcessor {
             EntityId id = Message.getEntityId(request);
             if (id != null) {
                 Message.setParts(request, 1, 1);
-                context().send(Topic.ENTITY_PATCHES, id.asString(), request);
+                context().forward(id.asString(), request,PATCHES);
             }
             return;
         }
@@ -158,7 +166,7 @@ public final class EntityBatchService extends ServiceProcessor {
             EntityId entityId = patch.target();
             if (dbId.equals(entityId.databaseId())) {
                 // Send the message for this patch (only if the patched entity is in the same database as the batch request) ...
-                context().send(Topic.ENTITY_PATCHES, entityId.asString(), request);
+                context().forward(entityId.type().asString(), request, PATCHES);
             } else {
                 // The batch was poorly formed, so write it out to the partial response topic ...
                 Document response = Message.createResponseFromRequest(request);
@@ -166,8 +174,12 @@ public final class EntityBatchService extends ServiceProcessor {
                 Message.addFailureReason(response, "Malformed batch: entity '" + patch.target()
                         + "' is not in the same batch's target database of '" + dbId + "'");
                 Message.setEnded(response, context().timestamp());
-                context().send(Topic.PARTIAL_RESPONSES, requestId, response);
+                context().forward(requestId, response, RESPONSES);
             }
         });
+    }
+
+    @Override
+    public void close() {
     }
 }

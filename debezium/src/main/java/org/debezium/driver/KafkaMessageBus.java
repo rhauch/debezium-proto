@@ -26,6 +26,7 @@ import kafka.serializer.DefaultDecoder;
 import kafka.utils.VerifiableProperties;
 
 import org.apache.kafka.common.serialization.Deserializer;
+import org.debezium.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -7,6 +7,7 @@ package org.debezium.driver;
 
 import java.util.concurrent.TimeUnit;
 
+import org.debezium.Configuration;
 import org.debezium.message.Patch;
 import org.debezium.message.Patch.Editor;
 import org.debezium.model.Entity;

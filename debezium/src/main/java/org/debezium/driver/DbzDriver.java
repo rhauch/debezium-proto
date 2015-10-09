@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
+import org.debezium.Configuration;
 import org.debezium.driver.SecurityProvider.CompositeAction;
 import org.debezium.message.Batch;
 import org.debezium.message.Document;

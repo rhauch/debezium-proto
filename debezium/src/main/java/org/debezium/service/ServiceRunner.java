@@ -19,24 +19,27 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
-import org.apache.kafka.clients.processor.PTopology;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.apache.kafka.stream.KStreamProcess;
+import org.apache.kafka.streams.KafkaStreaming;
+import org.apache.kafka.streams.StreamingConfig;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
-import org.debezium.driver.Configuration;
+import org.debezium.annotation.ThreadSafe;
 import org.debezium.util.CommandLineOptions;
 import org.debezium.util.IoUtil;
 
 /**
  * An abstraction of a service that provides standard command-line processing, configuration file reading, and startup logic.
+ * <h2>Stand alone execution</h2>
  * <p>
  * This class is normally used to run a Debezium service from within a main method:
  * 
  * <pre>
  * public static void main(String[] args) {
- *     ServiceRunner.use(EntityStorageService.class, EntityStorageTopology.class)
+ *     ServiceRunner.use(EntityStorageService.class, EntityStorageService::topology)
  *                  .setVersion(Debezium.getVersion())
  *                  .run(args);
  * }
@@ -46,7 +49,7 @@ import org.debezium.util.IoUtil;
  * 
  * <pre>
  * public static void main(String[] args) {
- *     ServiceRunner.use(&quot;EntityStorageService&quot;, EntityStorageTopology.class)
+ *     ServiceRunner.use(&quot;EntityStorageService&quot;, EntityStorageService::topology)
  *                  .setVersion(Debezium.getVersion())
  *                  .withClassLoader(myClassLoader)
  *                  .withOption('s', &quot;storage&quot;, &quot;The directory where the storage should be located&quot;)
@@ -55,9 +58,25 @@ import org.debezium.util.IoUtil;
  * </pre>
  * 
  * The {@link ServiceRunner} can be configured using any of the {@code set...} or {@code with...} methods. However, once the
- * {@link #run(String[])} method is called, the runner blocks forever.
+ * {@link #run(String[])} method is called, the runner's configuration cannot be changed.
  * <p>
- * To stop the service, simply kill the process.
+ * To stop the service running as a {@code main} application, simply kill the process.
+ * 
+ * <h2>Embedded execution</h2>
+ * <p>
+ * This class can also be used to run a streaming topology from within another JVM process. For example, you might start the
+ * service runner like this:
+ * 
+ * <pre>
+ * Properties props = ...
+ * Future&lt;Void> runner = ServiceRunner.use("Debezium Entity Storage", EntityStorageTopology.class)
+ *                                    .setVersion(Debezium.getVersion())
+ *                                    .run(props);
+ * </pre>
+ * and later on stop the service runner by canceling it:
+ * <pre>
+ * runner.cancel(true);
+ * </pre>
  * 
  * @author Randall Hauch
  */
@@ -68,11 +87,11 @@ public class ServiceRunner {
      * Create a ServiceRunner instance with the application name and stream processing topology.
      * 
      * @param appName the application name; may not be null or empty
-     * @param topology the stream processing topology class; may not be null
+     * @param topologySupplier the supplier of the stream processing topology builder; may not be null
      * @return the service runner; never null
      */
-    public static ServiceRunner use(String appName, Class<? extends PTopology> topology) {
-        return new ServiceRunner(appName, topology);
+    public static ServiceRunner use(String appName, Function<Configuration, TopologyBuilder> topologySupplier) {
+        return new ServiceRunner(appName, topologySupplier);
     }
 
     /**
@@ -80,61 +99,59 @@ public class ServiceRunner {
      * The resulting service runner uses the supplied class' class loader by default.
      * 
      * @param mainClass the main class; may not be null
-     * @param topology the stream processing topology class; may not be null
+     * @param topologySupplier the supplier of the stream processing topology builder; may not be null
      * @return the service runner; never null
      */
-    public static ServiceRunner use(Class<?> mainClass, Class<? extends PTopology> topology) {
-        return new ServiceRunner(mainClass.getSimpleName(), topology).withClassLoader(mainClass.getClassLoader());
+    public static ServiceRunner use(Class<?> mainClass, Function<Configuration, TopologyBuilder> topologySupplier) {
+        return new ServiceRunner(mainClass.getSimpleName(), topologySupplier).withClassLoader(mainClass.getClassLoader());
     }
 
     private static final String DEFAULT_SYSTEM_PROPERTY_NAME_PREFIX = "DEBEZIUM_";
 
     protected static enum ReturnCode {
-        SUCCESS,
-        UNABLE_TO_READ_CONFIGURATION,
-        CONFIGURATION_ERROR,
-        ERROR_DURING_EXECUTION,
+        SUCCESS, UNABLE_TO_READ_CONFIGURATION, CONFIGURATION_ERROR, ERROR_DURING_EXECUTION,
     }
 
     private boolean verbose = false;
     private final List<Option> options = new ArrayList<>();
     private final String appName;
-    private final Class<? extends PTopology> topology;
+    private final Function<Configuration, TopologyBuilder> topologySupplier;
     private ClassLoader classLoader = getClass().getClassLoader();
     private String systemPropertyNamePrefix = DEFAULT_SYSTEM_PROPERTY_NAME_PREFIX;
     private String version = Debezium.getVersion();
-    private Consumer<ReturnCode> completionHandler;
-    private Consumer<Throwable> errorHandler;
-    private volatile Future<Void> running = null;
+    private final CurrentStatus status = new CurrentStatus();
+    private volatile Consumer<ReturnCode> completionHandler;
+    private volatile Consumer<Throwable> errorHandler;
 
-    protected ServiceRunner(String appName, Class<? extends PTopology> topology) {
+    protected ServiceRunner(String appName, Function<Configuration, TopologyBuilder> topologySupplier) {
         if (appName == null || appName.trim().isEmpty())
             throw new IllegalArgumentException("The application name may not be null or empty");
-        if (topology == null) throw new IllegalArgumentException("The topology class may not be null");
+        if (topologySupplier == null) throw new IllegalArgumentException("The topology supplier may not be null");
         this.appName = appName;
-        this.topology = topology;
+        this.topologySupplier = topologySupplier;
         this.completionHandler = this::exit;
         this.errorHandler = this::recordError;
         withOption('c', "config", "The path to the configuration file");
     }
-    
+
     @Override
     public int hashCode() {
         return getName().hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj) {
-        if ( obj == this ) return true;
-        if ( obj instanceof ServiceRunner ) {
+        if (obj == this) return true;
+        if (obj instanceof ServiceRunner) {
             ServiceRunner that = (ServiceRunner) obj;
-            return Objects.equals(this.getName(), that.getName()) && Objects.equals(this.getVersion(),that.getVersion());
+            return Objects.equals(this.getName(), that.getName()) && Objects.equals(this.getVersion(), that.getVersion());
         }
         return super.equals(obj);
     }
-    
+
     /**
      * Get the name of this application or service name.
+     * 
      * @return the name; never null
      */
     public String getName() {
@@ -271,36 +288,33 @@ public class ServiceRunner {
      * This method block until the thread calling it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
      * 
      * @param args the command line arguments
+     * @return the current status of this runner; never null
      * @see #run(Properties)
      * @see #run(Properties, ExecutorService)
      * @see #shutdown(long, TimeUnit)
      * @see #isRunning()
      */
-    public synchronized void run(String[] args) {
-        if (running != null) return;
-        try {
-            running = new CompletableFuture();
+    public synchronized Future<Void> run(String[] args) {
+        if (!status.isRunning()) {
+            status.start(new CompletableFuture());
             Configuration config = null;
             try {
                 final CommandLineOptions options = CommandLineOptions.parse(args);
                 if (options.getOption("-?", "--help", false) || options.hasParameter("help")) {
                     printUsage();
-                    completionHandler.accept(ReturnCode.SUCCESS);
-                    return;
+                    return status.complete(ReturnCode.SUCCESS);
                 }
                 if (options.hasOption("--version")) {
                     print(getClass().getSimpleName() + " version " + version);
-                    completionHandler.accept(ReturnCode.SUCCESS);
-                    return;
+                    return status.complete(ReturnCode.SUCCESS);
                 }
                 final String pathToConfigFile = options.getOption("-c", "--config", "debezium.json");
                 verbose = options.getOption("-v", "--verbose", false);
 
-                config = Configuration.load(pathToConfigFile, classLoader,this::printVerbose);
+                config = Configuration.load(pathToConfigFile, classLoader, this::printVerbose);
                 if (config.isEmpty()) {
                     print("Unable to read Debezium client configuration file at '" + pathToConfigFile + "': file not found");
-                    completionHandler.accept(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
-                    return;
+                    return status.complete(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
                 }
 
                 printVerbose("Found configuration at " + pathToConfigFile + ":");
@@ -313,20 +327,17 @@ public class ServiceRunner {
             } catch (Throwable t) {
                 print("Unexpected exception while processing the configuration: " + t.getMessage());
                 t.printStackTrace();
-                completionHandler.accept(ReturnCode.CONFIGURATION_ERROR);
-                return;
+                return status.complete(ReturnCode.CONFIGURATION_ERROR);
             }
 
             try {
                 execute(config);
-                completionHandler.accept(ReturnCode.SUCCESS);
             } catch (Throwable t) {
                 errorHandler.accept(t);
-                completionHandler.accept(ReturnCode.ERROR_DURING_EXECUTION);
+                return status.complete(ReturnCode.ERROR_DURING_EXECUTION);
             }
-        } finally {
-            ((CompletableFuture) running).complete();
         }
+        return status;
     }
 
     /**
@@ -336,26 +347,24 @@ public class ServiceRunner {
      * This method block until the thread calling it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
      * 
      * @param config the configuration properties for the service
+     * @return the current status of this runner; never null
      * @see #run(String[])
      * @see #run(Properties, ExecutorService)
      * @see #shutdown(long, TimeUnit)
      * @see #isRunning()
      */
-    public synchronized void run(Properties config) {
-        if (running != null) return;
-        try {
-            running = new CompletableFuture();
+    public synchronized Future<Void> run(Properties config) {
+        if (!status.isRunning()) {
+            status.start(new CompletableFuture());
             try {
                 // Start the stream processing framework ...
                 execute(Configuration.from(config));
-                completionHandler.accept(ReturnCode.SUCCESS);
             } catch (Throwable t) {
                 errorHandler.accept(t);
-                completionHandler.accept(ReturnCode.ERROR_DURING_EXECUTION);
+                status.complete(ReturnCode.ERROR_DURING_EXECUTION);
             }
-        } finally {
-            ((CompletableFuture) running).complete();
         }
+        return status;
     }
 
     /**
@@ -366,48 +375,45 @@ public class ServiceRunner {
      * 
      * @param config the configuration properties for the service; may be null
      * @param executor the executor that should be used to asynchronously run the service
+     * @return the current status of this runner; never null
      * @see #run(String[])
      * @see #run(Properties)
      * @see #shutdown(long, TimeUnit)
      * @see #isRunning()
      */
-    public synchronized void run(Properties config, ExecutorService executor) {
-        if (running != null) return;
-        running = executor.submit(() -> {
-            try {
-                // Start the stream processing framework ...
-                execute(Configuration.from(config));
-                completionHandler.accept(ReturnCode.SUCCESS);
-            } catch (Throwable t) {
-                errorHandler.accept(t);
-                completionHandler.accept(ReturnCode.ERROR_DURING_EXECUTION);
-            }
-            return null;
-        });
+    public synchronized Future<Void> run(Properties config, ExecutorService executor) {
+        if (!status.isRunning()) {
+            status.start(executor.submit(() -> {
+                try {
+                    // Start the stream processing framework ...
+                    execute(Configuration.from(config));
+                } catch (Throwable t) {
+                    errorHandler.accept(t);
+                    status.complete(ReturnCode.ERROR_DURING_EXECUTION);
+                }
+                return null;
+            }));
+        }
+        return status;
     }
 
     /**
-     * The internal method that actually executes the streaming process. This method will block until the thread that is calling
-     * it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
+     * The internal method that actually executes the streaming process. This method does not block.
      * 
      * @param config the configuration properties for the service
      * @throws Exception if there is a problem configuring or executing the streaming process
+     * @see #shutdown(long, TimeUnit)
      */
     private void execute(Configuration config) throws Exception {
         // Start the stream processing framework ...
-        ProcessorProperties processorProps = new ProcessorProperties(config.asProperties());
-        if ( processorProps.timestampExtractor() == null ) {
-            // Use the system time extractor ...
-            processorProps.timestampExtractor((topic,key,value)->System.currentTimeMillis());
-        }
-        KStreamProcess streaming = new KStreamProcess(topology,processorProps);
-        printVerbose("Starting Kafka streaming process using topology " + topology.getName());
-        streaming.run(); // must be interrupted to complete, but the interrupt is caught and handled within run()
-        completionHandler.accept(ReturnCode.SUCCESS);
+        StreamingConfig processorProps = new StreamingConfig(config.asProperties());
+        KafkaStreaming streaming = new KafkaStreaming(topologySupplier.apply(config), processorProps);
+        printVerbose("Starting Kafka streaming process using topology for " + appName);
+        streaming.start();
     }
 
     /**
-     * Determine if this service runner is still running.
+     * Determine if this service runner is still running. This is equivalent to {@code status().isRunning()}.
      * 
      * @return true if its still running, or false otherwise
      * @see #run(String[])
@@ -416,7 +422,17 @@ public class ServiceRunner {
      * @see #shutdown(long, TimeUnit)
      */
     public boolean isRunning() {
-        return running != null;
+        return status.isRunning();
+    }
+
+    /**
+     * Get the current status. The result is always the same object returned by one of the {@link #run(Properties) run} methods,
+     * although its state does change based upon the running state of this runner.
+     * 
+     * @return the current status of this runner; never null
+     */
+    public Future<Void> status() {
+        return status;
     }
 
     /**
@@ -428,21 +444,18 @@ public class ServiceRunner {
      * @see #run(String[])
      * @see #isRunning()
      */
-    public boolean shutdown(long timeout, TimeUnit unit) {
-        Future<Void> future = this.running;
-        if ( future != null ) {
-            future.cancel(true);
-            try {
-                future.get(timeout,unit);
-            } catch (InterruptedException e) {
-                // Had to interrupt the thread, but it still stopped ...
-            } catch ( ExecutionException e ) {
-                // Should not happen, but just in case ...
-                recordError(e);
-            } catch ( TimeoutException e ) {
-                // Could not shut it down in time ...
-                return false;
-            }
+    public synchronized boolean shutdown(long timeout, TimeUnit unit) {
+        this.status.cancel(true);
+        try {
+            this.status.get(timeout, unit);
+        } catch (InterruptedException e) {
+            // Had to interrupt the thread, but it still stopped ...
+        } catch (ExecutionException e) {
+            // Should not happen, but just in case ...
+            recordError(e);
+        } catch (TimeoutException e) {
+            // Could not shut it down in time ...
+            return false;
         }
         // There was no thread or no latch, so it's shutdown ...
         return true;
@@ -560,6 +573,60 @@ public class ServiceRunner {
                 return 1;
             }
             return 0;
+        }
+    }
+
+    @ThreadSafe
+    private final class CurrentStatus implements Future<Void> {
+        private Future<Void> delegate;
+        private boolean wasCancelled = false;
+
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            if (delegate == null) return false;
+            wasCancelled = delegate.cancel(mayInterruptIfRunning);
+            return wasCancelled;
+        }
+
+        @Override
+        public synchronized Void get() throws InterruptedException, ExecutionException {
+            return delegate != null ? delegate.get() : null;
+        }
+
+        @Override
+        public synchronized boolean isCancelled() {
+            return wasCancelled;
+        }
+
+        @Override
+        public synchronized Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            return delegate != null ? delegate.get(timeout, unit) : null;
+        }
+
+        @Override
+        public synchronized boolean isDone() {
+            return delegate != null ? delegate.isDone() : true;
+        }
+
+        public boolean isRunning() {
+            return delegate != null && (delegate.isDone() || delegate.isCancelled());
+        }
+
+        public synchronized CurrentStatus start(Future<Void> delegate) {
+            assert this.delegate == null;
+            this.delegate = delegate;
+            this.wasCancelled = false;
+            return this;
+        }
+
+        public synchronized CurrentStatus complete(ReturnCode result) {
+            if (delegate instanceof CompletableFuture) {
+                ((CompletableFuture) delegate).complete();
+            }
+            Consumer<ReturnCode> handler = completionHandler;
+            if (handler != null) handler.accept(result);
+            this.delegate = null;
+            return this;
         }
     }
 

@@ -8,40 +8,46 @@ package org.debezium.service;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.apache.kafka.clients.processor.KafkaProcessor;
-import org.apache.kafka.clients.processor.ProcessorProperties;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.debezium.Configuration;
 import org.debezium.Testing;
-import org.debezium.message.Document;
 import org.debezium.message.Topic;
 import org.debezium.model.EntityCollection.FieldName;
 import org.fest.assertions.Delta;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Test the SchemaService.
+ * Test the SchemaLearningService.
  * 
  * @author Randall Hauch
  */
-public class SchemaServiceTest extends ServiceTest {
+public class SchemaServiceTest extends TopologyTest {
 
     private final Delta TOLERANCE = Delta.delta(0.00001f);
+    private final long PUNCTUATE_INTERVAL = 30*1000;
 
     @Override
-    protected KafkaProcessor<String, Document, String, Document> createProcessor() {
-        return new SchemaService(new ProcessorProperties(new Properties()));
+    protected Properties getCustomConfigurationProperties() {
+        Properties props = new Properties();
+        props.setProperty("service.id", "learning");
+        props.setProperty("service.punctuate.interval.ms", Long.toString(PUNCTUATE_INTERVAL));
+        return props;
     }
-
+    
     @Override
-    @Before
-    public void beforeEach() throws IOException {
-        super.beforeEach();
+    protected TopologyBuilder createTopologyBuilder(Configuration config) {
+        return SchemaService.topology(config);
     }
-
+    
+    @Override
+    protected String[] storeNames(Configuration config) {
+        return new String[]{SchemaService.REVISIONS_STORE_NAME, SchemaLearningService.MODELS_STORE_NAME};
+    }
+    
     @Test
     public void shouldProcessOneEntityUpdateThatHasNotYetBeenSeenAndGenerateSchemaPatch() throws IOException {
         // Testing.Print.enable();
-        send(Testing.Files.readResourceAsStream("entity-type-updates/service1-single.json"));
+        process(Testing.Files.readResourceAsStream("entity-type-updates/service1-single.json"));
         // Read the schema patch ...
         nextOutputMessage(Topic.SCHEMA_UPDATES);
         printLastMessage();
@@ -68,9 +74,9 @@ public class SchemaServiceTest extends ServiceTest {
     @Test
     public void shouldProcessTwoEntityUpdatesThatHaveNotYetBeenSeenAndGenerateSchemaPatch() throws IOException {
         // Testing.Debug.enable();
-        send(Testing.Files.readResourceAsStream("entity-type-updates/service1-small.json"));
+        process(Testing.Files.readResourceAsStream("entity-type-updates/service1-small.json"));
         // Read the schema patch ...
-        readAllOutputMessages(Topic.SCHEMA_UPDATES);
+        outputMessages(Topic.SCHEMA_UPDATES);
         printLastMessage();
         assertLastMessage().revision().isEqualTo(2);
         assertLastMessage().after().documentAt("fields").documentAt("firstName").stringAt(FieldName.TYPE).isEqualTo("STRING");
@@ -101,7 +107,7 @@ public class SchemaServiceTest extends ServiceTest {
     @Test
     public void shouldProcessTwentyEntityUpdatesThatHaveNotYetBeenSeenAndGenerateSchemaPatch() throws IOException {
         // Testing.Print.enable();
-        send(Testing.Files.readResourceAsStream("entity-type-updates/service1-medium.json"));
+        process(Testing.Files.readResourceAsStream("entity-type-updates/service1-medium.json"));
         // Read the schema patch ...
         nextOutputMessage(Topic.SCHEMA_UPDATES);
         printLastMessage();
@@ -203,9 +209,9 @@ public class SchemaServiceTest extends ServiceTest {
     @Test
     public void shouldProcessTwoHundredEntityUpdatesThatHaveNotYetBeenSeenAndGenerateSchemaPatch() throws IOException {
         // Testing.Print.enable();
-        send(Testing.Files.readResourceAsStream("entity-type-updates/service1-large.json"));
+        process(Testing.Files.readResourceAsStream("entity-type-updates/service1-large.json"));
         // Read the schema patch ...
-        readAllOutputMessages(Topic.SCHEMA_UPDATES);
+        nextOutputMessage(Topic.SCHEMA_UPDATES);
         printLastMessage();
         assertLastMessage().revision().isEqualTo(3);
         assertLastMessage().after().documentAt("$metrics").integerAt("totalAdds").isEqualTo(3);
@@ -235,10 +241,10 @@ public class SchemaServiceTest extends ServiceTest {
         assertNoOutputMessages(Topic.SCHEMA_UPDATES);
         
         // Simulate that time passes ...
-        advanceTime();
+        advanceTime(PUNCTUATE_INTERVAL*2);
         // Now, punctuate the service so that it updates statistics ...
-        punctuate();
-        readAllOutputMessages(Topic.SCHEMA_UPDATES);
+        maybePunctuate();
+        outputMessages(Topic.SCHEMA_UPDATES);
         printLastMessage();
         assertLastMessage().revision().isEqualTo(4);
         assertLastMessage().after().hasNoFieldAt("$metrics");

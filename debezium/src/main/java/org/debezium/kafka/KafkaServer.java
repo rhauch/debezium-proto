@@ -11,15 +11,15 @@ import java.util.Properties;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import kafka.admin.AdminUtils;
-import kafka.server.KafkaConfig;
-import kafka.utils.Time;
-
 import org.I0Itec.zkclient.ZkClient;
 import org.debezium.annotation.ThreadSafe;
 import org.debezium.util.IoUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import kafka.admin.AdminUtils;
+import kafka.server.KafkaConfig;
+import kafka.utils.Time;
 
 /**
  * A small embedded Kafka server.
@@ -199,7 +199,7 @@ public class KafkaServer {
         // Start the server ...
         try {
             LOGGER.debug("Starting Kafka broker {} @ {} with storage in {}", brokerId, getConnection(), logsDir.getAbsolutePath());
-            server = new kafka.server.KafkaServer(new KafkaConfig(config), new SystemTime());
+            server = new kafka.server.KafkaServer(new KafkaConfig(config), new SystemTime(), null);
             server.startup();
             LOGGER.info("Started Kafka server {} @ {} with storage in {}", brokerId, getConnection(), logsDir.getAbsolutePath());
             return this;

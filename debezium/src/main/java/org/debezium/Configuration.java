@@ -3,7 +3,7 @@
  * 
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.debezium.driver;
+package org.debezium;
 
 import java.io.File;
 import java.io.FileInputStream;

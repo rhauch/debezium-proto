@@ -10,15 +10,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.kafka.clients.processor.KafkaSource;
-import org.apache.kafka.clients.processor.PTopology;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.stream.state.InMemoryKeyValueStore;
-import org.apache.kafka.stream.state.KeyValueStore;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.apache.kafka.streams.state.InMemoryKeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.debezium.Configuration;
 import org.debezium.Debezium;
+import org.debezium.kafka.Serdes;
 import org.debezium.message.Document;
-import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
 import org.debezium.message.Message.Field;
 import org.debezium.message.Patch;
@@ -43,13 +41,13 @@ import org.slf4j.LoggerFactory;
  * from each partition are handled by the same {@link SchemaLearningService} instance. The output of this service can also be
  * partitioned and then aggregated by the {@link SchemaService}.
  * 
- * <h1>Service execution</h1>
+ * <h2>Service execution</h2>
  * <p>
  * This service has a {@link #main(String[]) main} method that when run starts up a Kafka stream processing job with a custom
  * topology and configuration. Each instance of the KafkaProcess can run a configurable number of threads, and users can start
  * multiple instances of their process job by starting multiple JVMs to run this service's {@link #main(String[])} method.
  * 
- * <h1>Configuration</h1>
+ * <h2>Configuration</h2>
  * <p>
  * Each SchemaLearningService has a logical <em>service identifier</em> that will be sent in output messages and consumed by the
  * {@link SchemaService} to identify previously-read messages from the same service instance. Therefore, each service instance
@@ -73,7 +71,7 @@ import org.slf4j.LoggerFactory;
  * seconds. Simply set the "{@code auto.commit.enabled}" property to "{@code false}" to have the service explicitly commit after
  * completely processing every input message.
  * 
- * <h1>Exactly-once processing</h1>
+ * <h2>Exactly-once processing</h2>
  * <p>
  * The service is designed to process each entity update <em>exactly once</em>. When recovering from an unexpected crash, the
  * {@link EntityStorageService} may produce a small number of duplicate messages that it could not be sure were output before the
@@ -107,23 +105,39 @@ public final class SchemaLearningService extends ServiceProcessor {
      * @return the ServiceRunner instance; never null
      */
     public static ServiceRunner runner() {
-        return ServiceRunner.use(SchemaLearningService.class, SchemaLearningTopology.class)
+        return ServiceRunner.use(SchemaLearningService.class, SchemaLearningService::topology)
                             .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
+     * 
+     * @param config the configuration for the topology; may not be null
+     * @return the topology builder; never null
      */
-    public static final class SchemaLearningTopology extends PTopology {
-        
-        @SuppressWarnings("unchecked")
-        @Override
-        public void build() {
-            KafkaSource<String, Document> source = addSource(new StringDeserializer(), new DocumentSerdes(), Topic.SCHEMA_LEARNING);
-            addProcessor(new SchemaLearningService(properties), source);
-        }
+    public static TopologyBuilder topology(Configuration config) {
+        TopologyBuilder topology = new TopologyBuilder();
+        topology.addSource("input", Serdes.stringDeserializer(), Serdes.document(), Topic.ENTITY_UPDATES);
+        topology.addProcessor("service", processorDef(new SchemaLearningService(config)), "input");
+        topology.addSink("output", Topic.ENTITY_TYPE_UPDATES, Serdes.stringSerializer(), Serdes.document(), "service");
+        return topology;
     }
+
+    /**
+     * The name of the local store used by the service to track model revisions for last known entity revisions.
+     */
+    public static final String REVISIONS_STORE_NAME = "schema-learning-revisions";
+
+    /**
+     * The name of the local store used by the service to track the learning model for each entity type.
+     */
+    public static final String MODELS_STORE_NAME = "schema-learning-models";
+
+    /**
+     * The name of this service.
+     */
+    public static final String SERVICE_NAME = "schema-learning";
 
     private static final class EntityRevisions {
         protected final long entityRevision;
@@ -142,6 +156,7 @@ public final class SchemaLearningService extends ServiceProcessor {
     private KeyValueStore<String, EntityRevisions> persistedRevisions;
     private KeyValueStore<String, Document> persistedModels;
     private String serviceId;
+    private long punctuateInterval;
 
     // Some fields used in every single call to 'process' ...
     private transient final AtomicBoolean updated = new AtomicBoolean();
@@ -153,15 +168,16 @@ public final class SchemaLearningService extends ServiceProcessor {
     private transient Document beforePatch = null;
     private transient Document afterPatch = null;
 
-    public SchemaLearningService(ProcessorProperties config) {
-        super("schema-learning", config);
-        serviceId = property("service.id", (String) null);
+    public SchemaLearningService(Configuration config) {
+        super(SERVICE_NAME, config);
+        serviceId = config.getString("service.id");
+        punctuateInterval = config.getLong("service.punctuate.interval.ms", 30*1000);
     }
 
     @Override
     protected void init() {
-        this.persistedRevisions = new InMemoryKeyValueStore<>("schema-learning-revisions", context());
-        this.persistedModels = new InMemoryKeyValueStore<>("schema-learning-models", context());
+        this.persistedRevisions = new InMemoryKeyValueStore<>(REVISIONS_STORE_NAME, context());
+        this.persistedModels = new InMemoryKeyValueStore<>(MODELS_STORE_NAME, context());
         // Load the models from the store ...
         this.persistedModels.all().forEachRemaining(entry -> {
             EntityType type = Identifier.parseEntityType(entry.key());
@@ -181,6 +197,9 @@ public final class SchemaLearningService extends ServiceProcessor {
             meta.setString(SERVICE_ID_KEY, serviceId);
             this.persistedModels.put(METADATA_KEY, meta);
         }
+        
+        // And register ourselves for punctuation ...
+        if ( punctuateInterval > 0 ) context().schedule(punctuateInterval);
     }
 
     @Override
@@ -218,17 +237,16 @@ public final class SchemaLearningService extends ServiceProcessor {
         model.adapt(beforePatch, patch, afterPatch, context().timestamp(), false, (before, previouslyModified, entityTypePatch) -> {
             String dbIdStr = type.databaseId().asString();
             Document request = entityTypePatch.filter(this::removeUsages).asDocument();
-            // Message.setBefore(request, before);
-                    Message.setClient(request, serviceId);
-                    Message.setRevision(request, model.revision());
-                    Message.setBegun(request, previouslyModified);
-                    Message.setEnded(request, model.lastModified());
-                    Message.setAfter(request, model.asDocument().clone());
-                    persistedRevisions.put(idStr, new EntityRevisions(revision, model.revision()));
-                    context().send(Topic.ENTITY_TYPE_UPDATES, dbIdStr, request);
-                    persistedModels.put(type.asString(), model.resetChangeStatistics().asDocument());
-                    updated.set(true);
-                });
+            Message.setClient(request, serviceId);
+            Message.setRevision(request, model.revision());
+            Message.setBegun(request, previouslyModified);
+            Message.setEnded(request, model.lastModified());
+            Message.setAfter(request, model.asDocument().clone());
+            persistedRevisions.put(idStr, new EntityRevisions(revision, model.revision()));
+            context().forward(dbIdStr, request);
+            persistedModels.put(type.asString(), model.resetChangeStatistics().asDocument());
+            updated.set(true);
+        });
 
         if (!updated.get()) {
             // The model was not updated but the statistics were, so store the updated model and entity status ...
@@ -265,7 +283,7 @@ public final class SchemaLearningService extends ServiceProcessor {
                 Message.setAfter(request, model.asDocument());
                 // Send the message with the updated metrics ...
                 String dbIdStr = entityType.databaseId().asString();
-                context().send(Topic.ENTITY_TYPE_UPDATES, dbIdStr, request);
+                context().forward(dbIdStr, request);
             });
         });
 

@@ -7,29 +7,29 @@ package org.debezium.kafka;
 
 import java.util.List;
 
-import org.apache.kafka.clients.processor.ProcessorContext;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
-import org.apache.kafka.stream.state.Entry;
-import org.apache.kafka.stream.state.KeyValueIterator;
-import org.apache.kafka.stream.state.KeyValueStore;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.Entry;
+import org.apache.kafka.streams.state.KeyValueIterator;
+import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
  * A parameterized version of a {@link KeyValueStore} that uses RocksDB. This class wraps a
- * {@link org.apache.kafka.stream.state.RocksDBKeyValueStore} instance, which supports only {@code byte[]} key and values, and
+ * {@link org.apache.kafka.streams.state.RocksDBKeyValueStore} instance, which supports only {@code byte[]} key and values, and
  * uses the supplied {@link Serializer}s and {@link Deserializer}s to (de)serialize the keys and values to and from {@code byte[]}
  * s.
  * 
  * @author Randall Hauch
  * @param <K> the type of key
  * @param <V> the type of value
- * @see org.apache.kafka.stream.state.RocksDBKeyValueStore for a non-parameterized version
+ * @see org.apache.kafka.streams.state.RocksDBKeyValueStore for a non-parameterized version
  */
 public class RocksDBKeyValueStore<K, V> implements KeyValueStore<K, V> {
 
-    private final org.apache.kafka.stream.state.RocksDBKeyValueStore delegate;
+    private final org.apache.kafka.streams.state.RocksDBKeyValueStore delegate;
     private final String topic;
     private final Serializer<K> keySerializer;
     private final Serializer<V> valueSerializer;
@@ -45,7 +45,7 @@ public class RocksDBKeyValueStore<K, V> implements KeyValueStore<K, V> {
     public RocksDBKeyValueStore(String name, ProcessorContext context,
             Serializer<K> keySerializer, Deserializer<K> keyDeserializer,
             Serializer<V> valueSerializer, Deserializer<V> valueDeserializer, Time time) {
-        delegate = new org.apache.kafka.stream.state.RocksDBKeyValueStore(name, context, time);
+        delegate = new org.apache.kafka.streams.state.RocksDBKeyValueStore(name, context, time);
         this.topic = name;
         this.keySerializer = keySerializer;
         this.keyDeserializer = keyDeserializer;
@@ -108,8 +108,8 @@ public class RocksDBKeyValueStore<K, V> implements KeyValueStore<K, V> {
     }
 
     @Override
-    public void delete(K key) {
-        delegate.delete(rawKey(key));
+    public V delete(K key) {
+        return value( delegate.delete(rawKey(key)));
     }
 
     @Override

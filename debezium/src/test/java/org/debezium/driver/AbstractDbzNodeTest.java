@@ -15,6 +15,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import org.debezium.Configuration;
 import org.debezium.Testing;
 import org.debezium.message.Document;
 import org.debezium.message.Topics;

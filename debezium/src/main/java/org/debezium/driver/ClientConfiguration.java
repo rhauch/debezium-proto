@@ -11,6 +11,7 @@ import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
+import org.debezium.Configuration;
 import org.debezium.annotation.Immutable;
 
 /**

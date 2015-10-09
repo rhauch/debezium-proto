@@ -10,16 +10,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.kafka.clients.processor.KafkaSource;
-import org.apache.kafka.clients.processor.PTopology;
-import org.apache.kafka.clients.processor.ProcessorProperties;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.stream.state.InMemoryKeyValueStore;
-import org.apache.kafka.stream.state.KeyValueStore;
+import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.apache.kafka.streams.state.InMemoryKeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
+import org.debezium.kafka.Serdes;
 import org.debezium.message.Document;
-import org.debezium.message.DocumentSerdes;
 import org.debezium.message.Message;
 import org.debezium.message.Topic;
 import org.debezium.util.Collect;
@@ -31,13 +29,13 @@ import org.debezium.util.Collect;
  * response for a batch request, adding the partial response for each part of the larger request. When complete, this service
  * outputs the aggregate response to the {@value Topic#COMPLETE_RESPONSES} topic partitioned by client ID.
  * 
- * <h1>Service execution</h1>
+ * <h2>Service execution</h2>
  * <p>
  * This service has a {@link #main(String[]) main} method that when run starts up a Kafka stream processing job with a custom
  * topology and configuration. Each instance of the KafkaProcess can run a configurable number of threads, and users can start
  * multiple instances of their process job by starting multiple JVMs to run this service's {@link #main(String[])} method.
  * 
- * <h1>Configuration</h1>
+ * <h2>Configuration</h2>
  * <p>
  * The ResponseAccumulatorService keeps an in-memory LRU cache of recently used aggregate response {@link Document} objects, and
  * the service ensures this is a subset of the persisted store of uncompleted aggregate responses. The capacity of the LRU cache
@@ -69,7 +67,7 @@ import org.debezium.util.Collect;
  * seconds. Simply set the "{@code auto.commit.enabled}" property to "{@code false}" to have the service explicitly commit after
  * completely processing every input message.
  * 
- * <h1>Exactly-once processing</h1>
+ * <h2>Exactly-once processing</h2>
  * <p>
  * This service is tolerant of duplicate messages on the input {@value Topic#PARTIAL_RESPONSES} topic: if a message with a partial
  * response is read and that response has already been seen, the duplicate response will simply be ignored.
@@ -105,23 +103,29 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
      * @return the ServiceRunner instance; never null
      */
     public static ServiceRunner runner() {
-        return ServiceRunner.use(ResponseAccumulatorService.class, AggregationTopology.class)
+        return ServiceRunner.use(ResponseAccumulatorService.class, ResponseAccumulatorService::topology)
                             .setVersion(Debezium.getVersion());
     }
 
     /**
      * The stream processing topology for this service. The topology consists of a single source and this service as the sole
      * processor.
+     * 
+     * @param config the configuration for the topology; may not be null
+     * @return the topology builder; never null
      */
-    public static final class AggregationTopology extends PTopology {
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public void build() {
-            KafkaSource<String, Document> source = addSource(new StringDeserializer(), new DocumentSerdes(), Topic.PARTIAL_RESPONSES);
-            addProcessor(new ResponseAccumulatorService(properties), source);
-        }
+    public static TopologyBuilder topology(Configuration config) {
+        TopologyBuilder topology = new TopologyBuilder();
+        topology.addSource("input", Serdes.stringDeserializer(), Serdes.document(), Topic.PARTIAL_RESPONSES);
+        topology.addProcessor("service", processorDef(new ResponseAccumulatorService(config)), "input");
+        topology.addSink("responses", Topic.COMPLETE_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
+        return topology;
     }
+
+    /**
+     * The name of this service.
+     */
+    public static final String SERVICE_NAME = "response-accumulator";
 
     private final Map<String, Document> transientResponses;
     private KeyValueStore<String, Document> aggregateResponses;
@@ -129,11 +133,11 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
     private final long maxAgeInMillis;
     private final int maxCacheSize;
 
-    public ResponseAccumulatorService(ProcessorProperties config) {
-        super("response-accumulator", config);
+    public ResponseAccumulatorService(Configuration config) {
+        super(SERVICE_NAME, config);
         // Read the configuration ...
-        maxAgeInMillis = TimeUnit.MINUTES.toMillis(property("aggregate.max.age.minutes", 60));
-        maxCacheSize = property("max.aggregate.cache.size", 1024);
+        maxAgeInMillis = TimeUnit.MINUTES.toMillis(config.getLong("aggregate.max.age.minutes", 60));
+        maxCacheSize = config.getInteger("max.aggregate.cache.size", 1024);
         transientResponses = Collect.fixedSizeMap(maxCacheSize);
     }
 
@@ -173,7 +177,7 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
 
         if (Message.getParts(partialResponse) == 1) {
             // This is the only message in the batch, so forward it on directly ...
-            context().send(Topic.COMPLETE_RESPONSES, clientId, partialResponse);
+            context().forward(clientId, partialResponse);
 
             // And record that we've processed it ...
             this.inputOffsets.put(partitionKey, Long.valueOf(offset));
@@ -194,7 +198,7 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
 
         if (done) {
             // First write out the aggregate response ...
-            context().send(Topic.COMPLETE_RESPONSES, clientId, aggregateResponse);
+            context().forward(clientId, aggregateResponse);
             // Record that we've processed this input message ...
             this.inputOffsets.put(partitionKey, Long.valueOf(offset));
             // Finally remove the aggregate response from our store ...
@@ -203,7 +207,7 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
             // Store the aggregate response in our store ...
             updateAggregateResponse(requestKey, aggregateResponse);
             // Write out the aggregate response ...
-            context().send(Topic.COMPLETE_RESPONSES, clientId, aggregateResponse);
+            context().forward(clientId, aggregateResponse);
             // And record that we've processed this input message ...
             this.inputOffsets.put(partitionKey, Long.valueOf(offset));
         }

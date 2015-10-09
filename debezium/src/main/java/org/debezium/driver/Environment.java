@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
+import org.debezium.Configuration;
 import org.debezium.annotation.NotThreadSafe;
 import org.debezium.annotation.ThreadSafe;
 import org.debezium.util.Clock;
