@@ -24,7 +24,7 @@ import org.junit.Test;
 public class SchemaServiceTest extends TopologyTest {
 
     private final Delta TOLERANCE = Delta.delta(0.00001f);
-    private final long PUNCTUATE_INTERVAL = 30*1000;
+    private final long PUNCTUATE_INTERVAL = 30 * 1000;
 
     @Override
     protected Properties getCustomConfigurationProperties() {
@@ -33,17 +33,18 @@ public class SchemaServiceTest extends TopologyTest {
         props.setProperty("service.punctuate.interval.ms", Long.toString(PUNCTUATE_INTERVAL));
         return props;
     }
-    
+
     @Override
     protected TopologyBuilder createTopologyBuilder(Configuration config) {
         return SchemaService.topology(config);
     }
-    
+
     @Override
     protected String[] storeNames(Configuration config) {
-        return new String[]{SchemaService.REVISIONS_STORE_NAME, SchemaLearningService.MODELS_STORE_NAME};
+        return new String[] { SchemaService.REVISIONS_STORE_NAME, SchemaService.MODELS_STORE_NAME,
+                SchemaService.MODEL_OVERRIDES_STORE_NAME };
     }
-    
+
     @Test
     public void shouldProcessOneEntityUpdateThatHasNotYetBeenSeenAndGenerateSchemaPatch() throws IOException {
         // Testing.Print.enable();
@@ -129,7 +130,7 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("firstName").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("firstName").floatAt(FieldName.USAGE).isEqualTo(1.0f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").size().isEqualTo(7);
-        
+
         nextOutputMessage(Topic.SCHEMA_UPDATES);
         printLastMessage();
         assertLastMessage().revision().isEqualTo(2);
@@ -152,7 +153,7 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("lastName").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("lastName").floatAt(FieldName.USAGE).isEqualTo(0.5f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").size().isEqualTo(8);
-        
+
         nextOutputMessage(Topic.SCHEMA_UPDATES);
         printLastMessage();
         assertLastMessage().revision().isEqualTo(3);
@@ -161,9 +162,11 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                      TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("streetNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                       TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("birthMonth").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("city").stringAt(FieldName.TYPE).isEqualTo("STRING");
@@ -186,11 +189,14 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").floatAt(FieldName.USAGE).isEqualTo(0.5714286f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.5714286f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.5714286f,
+                                                                                                                      TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("streetNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.42857143f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.42857143f,
+                                                                                                                       TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("birthMonth").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.42857143f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.42857143f,
+                                                                                                                     TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("city").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("city").floatAt(FieldName.USAGE).isEqualTo(0.5714286f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("birthYear").stringAt(FieldName.TYPE).isEqualTo("STRING");
@@ -202,7 +208,8 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("state").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("state").floatAt(FieldName.USAGE).isEqualTo(0.42857143f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("streetName").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("streetName").floatAt(FieldName.USAGE).isEqualTo(0.14285715f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("streetName").floatAt(FieldName.USAGE).isEqualTo(0.14285715f,
+                                                                                                                     TOLERANCE);
         assertLastMessage().after().documentAt("fields").size().isEqualTo(10);
     }
 
@@ -219,9 +226,11 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("zipCode").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                      TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("streetNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
+        assertLastMessage().after().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.33333334f,
+                                                                                                                       TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("birthMonth").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().after().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").documentAt("city").stringAt(FieldName.TYPE).isEqualTo("STRING");
@@ -239,9 +248,9 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").size().isEqualTo(10);
         assertLastMessage().endedTimestamp().isEqualTo(1000);
         assertNoOutputMessages(Topic.SCHEMA_UPDATES);
-        
+
         // Simulate that time passes ...
-        advanceTime(PUNCTUATE_INTERVAL*2);
+        advanceTime(PUNCTUATE_INTERVAL * 2);
         // Now, punctuate the service so that it updates statistics ...
         maybePunctuate();
         outputMessages(Topic.SCHEMA_UPDATES);
@@ -270,19 +279,23 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().after().documentAt("fields").documentAt("streetName").floatAt(FieldName.USAGE).isEqualTo(0.47f, TOLERANCE);
         assertLastMessage().after().documentAt("fields").size().isEqualTo(10);
         assertLastMessage().after().longAt("ended").isEqualTo(2000);
-        
+
         assertLastMessage().before().documentAt("fields").documentAt("zipCode").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().before().documentAt("fields").documentAt("zipCode").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("phoneNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().before().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().before().documentAt("fields").documentAt("phoneNumber").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                       TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("streetNumber").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().before().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
+        assertLastMessage().before().documentAt("fields").documentAt("streetNumber").floatAt(FieldName.USAGE).isEqualTo(0.33333334f,
+                                                                                                                        TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("birthMonth").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().before().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().before().documentAt("fields").documentAt("birthMonth").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                      TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("city").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().before().documentAt("fields").documentAt("city").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("birthYear").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().before().documentAt("fields").documentAt("birthYear").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
+        assertLastMessage().before().documentAt("fields").documentAt("birthYear").floatAt(FieldName.USAGE).isEqualTo(0.33333334f,
+                                                                                                                     TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("firstName").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().before().documentAt("fields").documentAt("firstName").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("lastName").stringAt(FieldName.TYPE).isEqualTo("STRING");
@@ -290,7 +303,8 @@ public class SchemaServiceTest extends TopologyTest {
         assertLastMessage().before().documentAt("fields").documentAt("state").stringAt(FieldName.TYPE).isEqualTo("STRING");
         assertLastMessage().before().documentAt("fields").documentAt("state").floatAt(FieldName.USAGE).isEqualTo(0.33333334f, TOLERANCE);
         assertLastMessage().before().documentAt("fields").documentAt("streetName").stringAt(FieldName.TYPE).isEqualTo("STRING");
-        assertLastMessage().before().documentAt("fields").documentAt("streetName").floatAt(FieldName.USAGE).isEqualTo(0.6666667f, TOLERANCE);
+        assertLastMessage().before().documentAt("fields").documentAt("streetName").floatAt(FieldName.USAGE).isEqualTo(0.6666667f,
+                                                                                                                      TOLERANCE);
         assertLastMessage().before().documentAt("fields").size().isEqualTo(10);
         assertLastMessage().before().longAt("ended").isEqualTo(1000);
 

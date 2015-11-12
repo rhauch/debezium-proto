@@ -24,133 +24,140 @@ import org.debezium.model.EntityCollection.FieldType;
  *
  */
 public class SchemaEditor {
-    
+
     /**
      * An editor for a field definition.
      */
     public static interface FieldEditor {
         /**
          * Set the description for this field.
+         * 
          * @param desc the description; may be null
          * @return this editor instance for method chaining; never null
          */
         FieldEditor description(String desc);
-        
+
         /**
          * Set the type for this field.
+         * 
          * @param type the desired field type; may be null
          * @return this editor instance for method chaining; never null
          */
         FieldEditor type(FieldType type);
-        
+
         /**
          * Set the type for this field using the given prototype value.
+         * 
          * @param prototypeValue a prototype value from which the field type is to be inferred; may be null
          * @return this editor instance for method chaining; never null
          */
         default FieldEditor type(Value prototypeValue) {
             Optional<FieldType> inferred = FieldType.inferFrom(prototypeValue);
-            return inferred.isPresent() ? type(inferred.get()) : type((FieldType)null);
+            return inferred.isPresent() ? type(inferred.get()) : type((FieldType) null);
         }
-        
+
         /**
          * Set whether this field is optional.
+         * 
          * @param fieldUsage the number of occurrences of this field; may not be null
          * @param totalEntityCount the total number of occurrences of this entity type; may not be null
          * @return this editor instance for method chaining; never null
          */
-        FieldEditor usage( Count fieldUsage, Count totalEntityCount);
-        
-        
+        FieldEditor usage(Count fieldUsage, Count totalEntityCount);
+
         /**
          * Set whether this field is an array of values.
+         * 
          * @param array true if this field should allow multiple values, or false if at most a single value is allowed
          * @return this editor instance for method chaining; never null
          * @see #arrayConstraints()
          */
         FieldEditor array(boolean array);
-        
+
         /**
          * Get the editor for the array constraints.
+         * 
          * @return the array constraints; never null
          * @see #array(boolean)
          */
         ArrayEditor<FieldEditor> arrayConstraints();
-        
+
         /**
          * Get the editor for the string constraints.
+         * 
          * @return the string constraints; never null
          */
         StringConstraintsEditor<FieldEditor> stringConstraints();
-        
+
         /**
          * Get the editor for the numeric constraints.
+         * 
          * @return the numeric constraints; never null
          */
         NumberConstraintsEditor<FieldEditor> numberConstraints();
-        
+
         /**
          * Get the editor for the location constraints.
+         * 
          * @return the location constraints; never null
          */
         LocationConstraintsEditor<FieldEditor> locationConstraints();
     }
-    
-    
+
     public static interface Constraints<ReturnType> {
         ReturnType apply();
     }
-    
+
     public static interface Clearable<ReturnType> {
         ReturnType clear();
     }
-    
+
     public static interface EnumeratedEditor<ReturnType> {
         ReturnType allowedValues(Array values);
-        
+
         default ReturnType allowedValues(Value firstValue) {
             return allowedValues(Array.create(firstValue));
         }
-        
+
         default ReturnType allowedValues(Value firstValue, Value secondValue, Value... additionalValues) {
             return allowedValues(Array.create(firstValue, secondValue, additionalValues));
         }
-        
+
         default ReturnType allowedValues(Iterable<Value> values) {
             return allowedValues(Array.create(values));
         }
     }
-    
+
     public static interface StringConstraintsEditor<ReturnType> extends Constraints<ReturnType>,
             EnumeratedEditor<StringConstraintsEditor<ReturnType>>, Clearable<StringConstraintsEditor<ReturnType>> {
         StringConstraintsEditor<ReturnType> pattern(String regex);
-        
+
         StringConstraintsEditor<ReturnType> minLength(int minimumLength, boolean inclusive);
-        
+
         StringConstraintsEditor<ReturnType> maxLength(int maximumLength, boolean inclusive);
     }
-    
+
     public static interface NumberConstraintsEditor<ReturnType> extends Constraints<ReturnType>,
             Clearable<NumberConstraintsEditor<ReturnType>> {
         NumberConstraintsEditor<ReturnType> minValue(int minimumValue, boolean inclusive);
-        
+
         NumberConstraintsEditor<ReturnType> maxValue(int maximumValue, boolean inclusive);
-        
+
         NumberConstraintsEditor<ReturnType> multipleOf(Number value);
     }
-    
+
     public static interface ArrayEditor<ReturnType> extends Constraints<ReturnType>, Clearable<ArrayEditor<ReturnType>> {
         ArrayEditor<ReturnType> minItems(int minimumLength, boolean inclusive);
-        
+
         ArrayEditor<ReturnType> maxItems(int maximumLength, boolean inclusive);
     }
-    
+
     public static interface LocationConstraintsEditor<ReturnType> extends Constraints<ReturnType>,
             Clearable<LocationConstraintsEditor<ReturnType>> {
     }
-    
+
     /**
-     * Obtain an editor for the field definition with the given name.
+     * Copy the source field definition to a possibly new target field.
      * 
      * @param patch the patch editor for modifying the entity type representation; may not be null
      * @param sourceFieldPath the path of the field to be copied; may not be null
@@ -159,7 +166,7 @@ public class SchemaEditor {
     public static void copyField(Editor<Patch<EntityType>> patch, Path sourceFieldPath, Path targetFieldPath) {
         patch.copy(sourceFieldPath.toRelativePath(), targetFieldPath.toRelativePath());
     }
-    
+
     /**
      * Obtain an editor for the field definition with the given name.
      * 
@@ -170,7 +177,7 @@ public class SchemaEditor {
     public static FieldEditor editField(Editor<Patch<EntityType>> patch, String fieldName) {
         return editField(patch, EntityCollection.pathToField(fieldName));
     }
-    
+
     /**
      * Obtain an editor for the field definition with the given name.
      * 
@@ -181,7 +188,7 @@ public class SchemaEditor {
     public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField) {
         return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), false);
     }
-    
+
     /**
      * Obtain an editor for the field definition with the given name.
      * 
@@ -190,25 +197,45 @@ public class SchemaEditor {
      * @param collection the current {@link EntityCollection} that represents the schema; may not be null
      * @return the field editor; never null
      */
-    public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField, EntityCollection collection ) {
+    public static FieldEditor editField(Editor<Patch<EntityType>> patch, Path pathToField, EntityCollection collection) {
         Optional<FieldDefinition> field = collection.field(pathToField);
         boolean isNew = !field.isPresent();
-        if ( !field.isPresent() && pathToField.isMultiple() ) {
+        if (!field.isPresent() && pathToField.isMultiple()) {
             // There is not an existing field and this is a field in a nested document, so make sure that all
             // ancestor fields have a type of DOCUMENT ...
-            pathToField.parent().get().fromRoot(ancestorPath->{
+            pathToField.parent().get().fromRoot(ancestorPath -> {
                 Optional<FieldDefinition> ancestorField = collection.field(ancestorPath);
-                if ( !ancestorField.isPresent() || ancestorField.get().type().orElse(FieldType.STRING) != FieldType.DOCUMENT ) {
+                if (!ancestorField.isPresent() || ancestorField.get().type().orElse(FieldType.STRING) != FieldType.DOCUMENT) {
                     Path rawPath = EntityCollection.pathToField(ancestorPath);
                     FieldEditor editor = new BasicFieldEditor(patch, rawPath, !ancestorField.isPresent());
                     editor.type(FieldType.DOCUMENT);
                 }
-                
+
             });
         }
         return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), isNew);
     }
     
+    /**
+     * Remove the field definition with the given name.
+     * 
+     * @param patch the patch editor for modifying the entity type representation; may not be null
+     * @param fieldName the name of the field; may not be null
+     */
+    public static void deleteField(Editor<Patch<EntityType>> patch, String fieldName) {
+        patch.remove(EntityCollection.pathToField(fieldName).toRelativePath());
+    }
+
+    /**
+     * Remove the field definition with the given name.
+     * 
+     * @param patch the patch editor for modifying the entity type representation; may not be null
+     * @param fieldName the name of the field; may not be null
+     */
+    public static void deleteField(Editor<Patch<EntityType>> patch, Path fieldName) {
+        patch.remove(EntityCollection.pathToField(fieldName).toRelativePath());
+    }
+
     /**
      * Obtain an editor that will create a new field definition with the given name.
      * 
@@ -219,7 +246,7 @@ public class SchemaEditor {
     public static FieldEditor createField(Editor<Patch<EntityType>> patch, String fieldName) {
         return createField(patch, EntityCollection.pathToField(fieldName));
     }
-    
+
     /**
      * Obtain an editor that will create a new field definition with the given name.
      * 
@@ -227,27 +254,26 @@ public class SchemaEditor {
      * @param pathToField the path to the field definition within the entity type representation; may not be null
      * @return the field editor; never null
      */
-    private static FieldEditor createField(Editor<Patch<EntityType>> patch, Path pathToField) {
+    public static FieldEditor createField(Editor<Patch<EntityType>> patch, Path pathToField) {
         return new BasicFieldEditor(patch, EntityCollection.pathToField(pathToField), true);
     }
-    
-    
+
     protected static class BasicFieldEditor implements FieldEditor {
         private final Patch.Editor<?> patch;
         private final Path pathToField;
         private final boolean isNew;
-        
+
         protected BasicFieldEditor(Patch.Editor<?> patch, Path pathToField, boolean isNew) {
             this.patch = patch;
             this.pathToField = pathToField;
             this.isNew = isNew;
             assert pathToField != null;
         }
-        
+
         @Override
         public FieldEditor type(FieldType type) {
             patch.replace(pathFor(EntityCollection.FieldName.TYPE), Value.create(type.toString()));
-            if ( !isNew ) {
+            if (!isNew) {
                 // None of these changes the array constraints, since that's orthogonal to the type ...
                 switch (type) {
                     case STRING:
@@ -290,27 +316,27 @@ public class SchemaEditor {
             }
             return this;
         }
-        
+
         @Override
         public FieldEditor description(String desc) {
             replaceOrRemove(pathFor("description"), Value.create(desc));
             return this;
         }
-        
+
         @Override
         public FieldEditor array(boolean array) {
             replaceOrRemove(pathFor("array"), Value.create(array));
             return this;
         }
-        
+
         @Override
         public FieldEditor usage(Count fieldUsage, Count totalEntityCount) {
             // Compute the fractional usage ...
-            float usage = (float)fieldUsage.get() / (float) totalEntityCount.get();
+            float usage = (float) fieldUsage.get() / (float) totalEntityCount.get();
             replaceOrRemove(pathFor(EntityCollection.FieldName.USAGE), Value.create(usage));
             return this;
         }
-        
+
         @Override
         public LocationConstraintsEditor<FieldEditor> locationConstraints() {
             FieldEditor result = this;
@@ -319,14 +345,14 @@ public class SchemaEditor {
                 public FieldEditor apply() {
                     return result;
                 }
-                
+
                 @Override
                 public LocationConstraintsEditor<FieldEditor> clear() {
                     return this;
                 }
             };
         }
-        
+
         @Override
         public StringConstraintsEditor<FieldEditor> stringConstraints() {
             FieldEditor result = this;
@@ -337,7 +363,7 @@ public class SchemaEditor {
                     locationConstraints().clear();
                     return result;
                 }
-                
+
                 @Override
                 public StringConstraintsEditor<FieldEditor> clear() {
                     remove("pattern");
@@ -348,27 +374,27 @@ public class SchemaEditor {
                     remove("allowedValues");
                     return this;
                 }
-                
+
                 @Override
                 public StringConstraintsEditor<FieldEditor> pattern(String regex) {
                     replaceOrRemove("pattern", Value.create(regex));
                     return this;
                 }
-                
+
                 @Override
                 public StringConstraintsEditor<FieldEditor> minLength(int minimumLength, boolean inclusive) {
                     replaceOrRemove("minLength", Value.create(minimumLength));
                     replaceOrRemove("minLengthInclusive", Value.create(inclusive));
                     return this;
                 }
-                
+
                 @Override
                 public StringConstraintsEditor<FieldEditor> maxLength(int maximumLength, boolean inclusive) {
                     replaceOrRemove("maxLength", Value.create(maximumLength));
                     replaceOrRemove("maxLengthInclusive", Value.create(inclusive));
                     return this;
                 }
-                
+
                 @Override
                 public StringConstraintsEditor<FieldEditor> allowedValues(Array values) {
                     replaceOrRemove("allowedValues", Value.create(values));
@@ -376,7 +402,7 @@ public class SchemaEditor {
                 }
             };
         }
-        
+
         @Override
         public NumberConstraintsEditor<FieldEditor> numberConstraints() {
             FieldEditor result = this;
@@ -385,7 +411,7 @@ public class SchemaEditor {
                 public FieldEditor apply() {
                     return result;
                 }
-                
+
                 @Override
                 public NumberConstraintsEditor<FieldEditor> clear() {
                     remove("minValue");
@@ -395,21 +421,21 @@ public class SchemaEditor {
                     remove("multipleOf");
                     return this;
                 }
-                
+
                 @Override
                 public NumberConstraintsEditor<FieldEditor> minValue(int minValue, boolean inclusive) {
                     replaceOrRemove("minValue", Value.create(minValue));
                     replaceOrRemove("minValueInclusive", Value.create(inclusive));
                     return this;
                 }
-                
+
                 @Override
                 public NumberConstraintsEditor<FieldEditor> maxValue(int maxValue, boolean inclusive) {
                     replaceOrRemove("maxValue", Value.create(maxValue));
                     replaceOrRemove("maxValueInclusive", Value.create(inclusive));
                     return this;
                 }
-                
+
                 @Override
                 public NumberConstraintsEditor<FieldEditor> multipleOf(Number value) {
                     replaceOrRemove("multipleOf", Value.create(value));
@@ -417,7 +443,7 @@ public class SchemaEditor {
                 }
             };
         }
-        
+
         @Override
         public ArrayEditor<FieldEditor> arrayConstraints() {
             FieldEditor result = this;
@@ -426,7 +452,7 @@ public class SchemaEditor {
                 public FieldEditor apply() {
                     return result;
                 }
-                
+
                 @Override
                 public ArrayEditor<FieldEditor> clear() {
                     remove("minItems");
@@ -435,14 +461,14 @@ public class SchemaEditor {
                     remove("maxItemsInclusive");
                     return this;
                 }
-                
+
                 @Override
                 public ArrayEditor<FieldEditor> minItems(int minimumLength, boolean inclusive) {
                     replaceOrRemove("minItems", Value.create(minimumLength));
                     replaceOrRemove("minItemsInclusive", Value.create(inclusive));
                     return this;
                 }
-                
+
                 @Override
                 public ArrayEditor<FieldEditor> maxItems(int maximumLength, boolean inclusive) {
                     replaceOrRemove("maxItems", Value.create(maximumLength));
@@ -451,7 +477,7 @@ public class SchemaEditor {
                 }
             };
         }
-        
+
         private void replaceOrRemove(String path, Value value) {
             if (value == null || value.isNull()) {
                 patch.remove(path);
@@ -459,16 +485,16 @@ public class SchemaEditor {
                 patch.replace(path, value);
             }
         }
-        
+
         private void remove(String path) {
             patch.remove(pathFor(path));
         }
-        
+
         private String pathFor(String relPath) {
             return pathToField.append(relPath).toString();
         }
     }
-    
+
     public static void onEachEntityType(Document schema, DatabaseId dbId, BiConsumer<EntityType, Document> consumer) {
         Document collections = schema.getDocument("collections");
         if (collections != null) {
@@ -480,7 +506,7 @@ public class SchemaEditor {
             });
         }
     }
-    
+
     public static Document getOrCreateComponent(SchemaComponentId componentId, Document schema) {
         Document component = null;
         switch (componentId.type()) {
@@ -492,8 +518,9 @@ public class SchemaEditor {
         }
         return component;
     }
-    
-    public static Optional<? extends SchemaComponent<? extends SchemaComponentId>> getComponent(SchemaComponentId componentId, Document schema) {
+
+    public static Optional<? extends SchemaComponent<? extends SchemaComponentId>> getComponent(SchemaComponentId componentId,
+                                                                                                Document schema) {
         Document component = null;
         switch (componentId.type()) {
             case ENTITY_TYPE:
@@ -501,7 +528,7 @@ public class SchemaEditor {
                 Document collections = schema.getDocument("collections");
                 if (collections != null) {
                     component = collections.getDocument(type.entityTypeName());
-                    if ( component != null ) {
+                    if (component != null) {
                         return Optional.of(EntityCollection.with(type, component));
                     }
                 }
@@ -509,7 +536,7 @@ public class SchemaEditor {
         }
         return Optional.empty();
     }
-    
+
     public static void setLearning(Document schema, boolean enabled) {
         if (enabled) {
             schema.setBoolean(Message.Field.LEARNING, true);
@@ -517,12 +544,12 @@ public class SchemaEditor {
             schema.remove(Message.Field.LEARNING);
         }
     }
-    
+
     public static boolean isLearningEnabled(Document schema) {
         return schema.getBoolean(Message.Field.LEARNING, false);
     }
-    
+
     private SchemaEditor() {
     }
-    
+
 }

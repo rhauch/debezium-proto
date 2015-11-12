@@ -5,9 +5,7 @@
  */
 package org.debezium;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -18,26 +16,28 @@ import static org.fest.assertions.Assertions.assertThat;
 public class ServerTest implements Testing {
 
     private Server server;
-    private File dataDir;
 
     @Before
     public void beforeEach() {
         resetBeforeEachTest();
-        dataDir = Testing.Files.createTestingDirectory("server");
-        Testing.Files.delete(dataDir);
-        server = new Server().usingDirectory(dataDir);
+        server = new Server().usingDirectory(Testing.Files.createTestingDirectory("server"))
+                             .addBrokers(1)
+                             .deleteDataUponShutdown(true)
+                             .deleteDataPriorToStartup(true);
     }
 
     @After
     public void afterEach() {
-        server.shutdown(20, TimeUnit.SECONDS);
-        Testing.Files.delete(dataDir);
+        server.shutdown();
     }
 
     @Test
-    public void shouldStartServer() throws IOException {
+    public void shouldStartServer() throws IOException, InterruptedException {
+        Testing.Print.enable();
         server.startup();
+        Thread.sleep(2500);
         assertThat(server.isRunning()).isTrue();
+        Testing.print("BEGINNING SHUTDOWN");
     }
 
 }

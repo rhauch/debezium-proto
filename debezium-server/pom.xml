@@ -8,7 +8,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                    http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>org.debezium</groupId>
-        <artifactId>parent</artifactId>
+        <artifactId>debezium-parent</artifactId>
         <version>0.2-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -19,11 +19,7 @@
     <dependencies>
         <dependency>
             <groupId>org.debezium</groupId>
-            <artifactId>debezium-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.debezium</groupId>
-            <artifactId>debezium-driver</artifactId>
+            <artifactId>debezium</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -49,6 +45,21 @@
         <dependency>
             <groupId>org.jboss.spec.javax.ws.rs</groupId>
              <artifactId>jboss-jaxrs-api_2.0_spec</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-adapter-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-adapter-spi</artifactId>
             <scope>provided</scope>
         </dependency>
 
@@ -81,18 +92,8 @@
         </dependency>
         <dependency>
             <groupId>org.debezium</groupId>
-            <artifactId>debezium-core</artifactId>
+            <artifactId>debezium</artifactId>
             <type>test-jar</type>
-        </dependency>
-        <dependency>
-            <groupId>org.debezium</groupId>
-            <artifactId>debezium-driver</artifactId>
-            <type>test-jar</type>
-        </dependency>
-        <dependency>
-            <groupId>org.debezium</groupId>
-            <artifactId>debezium-integration-tests</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>

@@ -5,6 +5,7 @@
  */
 package org.debezium.service;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.streams.processor.TopologyBuilder;
@@ -21,6 +22,7 @@ import org.debezium.message.Patch;
 import org.debezium.message.Topic;
 import org.debezium.model.DatabaseId;
 import org.debezium.model.EntityId;
+import org.debezium.util.Collect;
 
 /**
  * A service responsible for reading the {@value Topic#ENTITY_BATCHES} Kafka topic containing {@link Patch} and {@link Batch}
@@ -115,12 +117,21 @@ public final class EntityBatchService extends ServiceProcessor {
         topology.addSink("responses", Topic.PARTIAL_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
         return topology;
     }
-    
+
+    /**
+     * Get the set of input, output, and store-related topics that this service uses.
+     * 
+     * @return the set of topics; never null, but possibly empty
+     */
+    public static Set<String> topics() {
+        return Collect.unmodifiableSet(Topic.ENTITY_BATCHES, Topic.ENTITY_PATCHES, Topic.PARTIAL_RESPONSES);
+    }
+
     /**
      * The name of this service.
      */
     public static final String SERVICE_NAME = "entity-batch";
-    
+
     private static final int PATCHES = 0;
     private static final int RESPONSES = 1;
 
@@ -141,7 +152,7 @@ public final class EntityBatchService extends ServiceProcessor {
             EntityId id = Message.getEntityId(request);
             if (id != null) {
                 Message.setParts(request, 1, 1);
-                context().forward(id.asString(), request,PATCHES);
+                context().forward(id.asString(), request, PATCHES);
             }
             return;
         }
@@ -181,5 +192,6 @@ public final class EntityBatchService extends ServiceProcessor {
 
     @Override
     public void close() {
+        logger().debug("Service '{}' shutdown", getName());
     }
 }

@@ -87,7 +87,7 @@ public abstract class TopologyIntegrationTest implements Testing {
                 } finally {
                     try {
                         // Stop the service ...
-                        stopTopology(10, TimeUnit.SECONDS);
+                        stopTopology();
                     } finally {
                         // Shut down the cluster (and clean up all the data files) ...
                         cluster.shutdown();
@@ -166,12 +166,12 @@ public abstract class TopologyIntegrationTest implements Testing {
         serviceRunner.run(args);
     }
 
-    protected synchronized void stopTopology(long timeout, TimeUnit unit) {
-        stopTopology(timeout, unit, null);
+    protected synchronized void stopTopology() {
+        stopTopology(null);
     }
 
-    protected synchronized void stopTopology(long timeout, TimeUnit unit, ReturnCode expectedReturnCode) {
-        boolean shutdown = serviceRunner.shutdown(timeout, unit);
+    protected synchronized void stopTopology(ReturnCode expectedReturnCode) {
+        boolean shutdown = serviceRunner.shutdown();
         if (expectedReturnCode != null) {
             assertThat(actualReturnCode).isEqualTo(expectedReturnCode);
         }

@@ -22,7 +22,6 @@ import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import org.debezium.annotation.Immutable;
 import org.debezium.util.Collect;
@@ -145,6 +144,19 @@ public interface Configuration {
         } finally {
             reader.close();
         }
+    }
+
+    /**
+     * Obtain a configuration instance by loading the Properties from a file on the file system or classpath given by the supplied
+     * path.
+     * 
+     * @param path the path to the file containing the configuration properties; may not be null
+     * @param clazz the class whose classpath is to be used to find the file; may be null
+     * @return the configuration; never null but possibly empty
+     * @throws IOException if there is an error reading the stream
+     */
+    public static Configuration load(String path, Class<?> clazz) throws IOException {
+        return load(path, clazz.getClassLoader());
     }
 
     /**
@@ -450,25 +462,17 @@ public interface Configuration {
      * @return the subset Configuration; never null
      */
     default public Configuration subset(Predicate<? super String> matcher, Function<String, String> mapper) {
+        if ( matcher == null ) return this;
+        Properties subsetProps = new Properties();
         Function<String, String> prefixRemover = mapper != null ? mapper : key -> key;
-        Set<String> keys = Collections.unmodifiableSet(
-                                      keys().stream()
-                                            .filter(key -> key != null) // may not be null
-                                            .filter(matcher) // only keys that match the predicate
-                                            .map(prefixRemover) // remove prefix if desired
-                                            .collect(Collectors.toSet()));
-        Configuration delegate = this;
-        return new Configuration() {
-            @Override
-            public Set<String> keys() {
-                return keys;
+        keys().stream().filter(k->k!=null).filter(matcher).forEach(key->{
+            String newKey = prefixRemover.apply(key);
+            if (newKey != null ) {
+                String value = getString(key);
+                if ( value != null ) subsetProps.setProperty(newKey, value);
             }
-
-            @Override
-            public String getString(String key) {
-                return keys.contains(prefixRemover.apply(key)) ? delegate.getString(key) : null;
-            }
-        };
+        });
+        return Configuration.from(subsetProps);
     }
 
     /**
@@ -487,7 +491,10 @@ public interface Configuration {
      */
     default public Properties asProperties() {
         Properties props = new Properties();
-        keys().forEach(key -> props.setProperty(key, getString(key)));
+        keys().forEach(key -> {
+            String value = getString(key);
+            if ( key != null && value != null ) props.setProperty(key, value);
+        });
         return props;
     }
 

@@ -14,11 +14,35 @@ import org.debezium.model.Entity;
 import org.debezium.model.EntityChange;
 import org.debezium.model.EntityId;
 import org.debezium.model.EntityType;
+import org.debezium.model.EntityTypeChange;
 import org.debezium.model.Schema;
 
 /**
  * The public interface for the Debezium Driver, a client that connects directly to the Kafka brokers to produce requests
  * and consume responses.
+ * <h2>Schemas</h2>
+ * <p>
+ * In Debezium, schemas provide information about the entities stored within the database's collections. Debezium
+ * automatically derives the schemas by examining the structure of all entities stored within each collection. As new entities
+ * are added or existing entities are changed or removed, Debezium automatically updates the derived schema to maintain an
+ * accurate description of all entities.
+ * <p>
+ * Debezium does not use these schemas to validate entity changes before they are applied, so it is up to you to ensure that
+ * the entities of a particular type adhere to your preferred structure. This gives you and your applications a lot of power
+ * to evolve your entities over time by adding, changing, and removing fields as needed. However, it also means that some
+ * fields defined by an entity type may not be used in all entities, so Debezium includes in its schemas usage metrics for
+ * each field that capture what percentage of the entities contain the field.
+ * <p>
+ * The automatically derived schemas are completely accurate and kept up-to-date as entities are added, changed, and
+ * removed. But, as you evolve your entity types these derived descriptions may not reflect your <em>semantic intent</em>.
+ * For this reason, Debezium lets you manually modify the schema using patches created with this builder. These patches
+ * will accumulate and override the automatically-derived schemas, allowing you to make the exposed schemas reflect your
+ * intended structure (perhaps to use dynamically within applications to either validate or inform the structure of submitted
+ * entities).
+ * <p>
+ * You can also remove the manually-modified fields from the schemas, although the schema may still include a
+ * field definition for any field still used within persisted entities. In other words, manually remove all fields from the
+ * schema simply removes all manual schema changes, and the schema reverts to the automatically derived schema.
  * 
  * @author Randall Hauch
  */
@@ -31,8 +55,8 @@ public interface DebeziumDriver {
      * @param env the environment; may not be null
      * @return the new builder; never null
      */
-    public static DebeziumDriver create( Configuration configuration, Environment env ) {
-        return new DbzDriver(configuration,env).start();
+    public static DebeziumDriver create(Configuration configuration, Environment env) {
+        return new DbzDriver(configuration, env).start();
     }
 
     /**
@@ -73,6 +97,19 @@ public interface DebeziumDriver {
      * @throws DebeziumTimeoutException if the operation timed out
      */
     public Schema readSchema(SessionToken token, String databaseId, long timeout, TimeUnit unit);
+
+    /**
+     * Request to apply the given patch to an entity type within the database's schema.
+     * 
+     * @param token a valid session token for the user; may not be null
+     * @param patch the patch; may not be null
+     * @param timeout the amount of time to wait for the response
+     * @param unit the unit of time for the timeout
+     * @return the result of the change request; never null
+     * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
+     * @throws DebeziumTimeoutException if the operation timed out
+     */
+    public EntityTypeChange changeEntityType(SessionToken token, Patch<EntityType> patch, long timeout, TimeUnit unit);
 
     /**
      * Read one entity from the database and return its representation, including whether or not the entity
@@ -197,6 +234,7 @@ public interface DebeziumDriver {
          * @param timeout the amount of time to wait for the response
          * @param unit the unit of time for the timeout
          * @return the results of the batched operations; never null
+         * @throws DebeziumAuthorizationException if the user was not authorized to perform this operation
          * @throws DebeziumTimeoutException if the operation timed out
          */
         public BatchResult submit(SessionToken token, long timeout, TimeUnit unit);

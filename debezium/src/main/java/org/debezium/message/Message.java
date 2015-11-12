@@ -448,13 +448,17 @@ public final class Message {
     public static void setEnded(Document message, long timestamp) {
         message.setNumber(Field.ENDED, timestamp);
     }
+    
+    public static long getEnded(Document message) {
+        return message.getLong(Field.ENDED, 0L);
+    }
 
     public static void setRevision(Document message, long revision) {
         message.setNumber(Field.REVISION, revision);
     }
 
     public static long getRevision(Document message) {
-        return message.getLong(Field.REVISION, 0);
+        return message.getLong(Field.REVISION, 0L);
     }
 
     /**

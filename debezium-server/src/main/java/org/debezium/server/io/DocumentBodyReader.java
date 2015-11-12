@@ -16,9 +16,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
 
-import org.debezium.core.annotation.Immutable;
-import org.debezium.core.doc.Document;
-import org.debezium.core.doc.DocumentReader;
+import org.debezium.annotation.Immutable;
+import org.debezium.message.Document;
+import org.debezium.message.DocumentReader;
 
 /**
  * A {@link MessageBodyReader} implementation that supports reading {@link Document}s.

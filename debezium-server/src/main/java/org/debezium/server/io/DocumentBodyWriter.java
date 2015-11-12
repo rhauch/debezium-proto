@@ -19,9 +19,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyWriter;
 
-import org.debezium.core.annotation.Immutable;
-import org.debezium.core.doc.Document;
-import org.debezium.core.doc.DocumentWriter;
+import org.debezium.annotation.Immutable;
+import org.debezium.message.Document;
+import org.debezium.message.DocumentWriter;
 
 /**
  * A {@link MessageBodyWriter} implementation that supports writing {@link Document}s.

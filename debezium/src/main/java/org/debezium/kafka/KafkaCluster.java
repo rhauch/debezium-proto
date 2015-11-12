@@ -9,6 +9,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -222,6 +223,7 @@ public class KafkaCluster {
             kafkaServers.values().forEach(server -> server.setStateDirectory(new File(kafkaDir, "broker" + server.brokerId())));
 
             zkServer.startup();
+            LOGGER.debug("Starting {} brokers", kafkaServers.size());
             kafkaServers.values().forEach(KafkaServer::startup);
             running = true;
         }
@@ -244,10 +246,16 @@ public class KafkaCluster {
                 } catch (Throwable t) {
                     LOGGER.error("Error while shutting down {}", zkServer, t);
                 } finally {
-                    try {
-                        if (deleteDataUponShutdown) IoUtil.delete(this.dataDir);
-                    } catch (IOException e) {
-                        LOGGER.error("Error while deleting cluster data", e);
+                    if (deleteDataUponShutdown) {
+                        try {
+                            kafkaServers.values().forEach(KafkaServer::deleteData);
+                        } finally {
+                            try {
+                                IoUtil.delete(this.dataDir);
+                            } catch (IOException e) {
+                                LOGGER.error("Error while deleting cluster data", e);
+                            }
+                        }
                     }
                     running = false;
                 }
@@ -263,8 +271,57 @@ public class KafkaCluster {
      * @throws IllegalStateException if the cluster is not running
      */
     public void createTopics(String... topics) {
+        LOGGER.debug("Creating topics: {}", Arrays.toString(topics));
         if (!running) throw new IllegalStateException("The cluster must be running to create topics");
         kafkaServers.values().stream().findFirst().ifPresent(server -> server.createTopics(topics));
+    }
+
+    /**
+     * Create the specified topics.
+     * 
+     * @param topics the names of the topics to create
+     * @throws IllegalStateException if the cluster is not running
+     */
+    public void createTopics(Set<String> topics) {
+        createTopics(topics.toArray(new String[topics.size()]));
+    }
+
+    /**
+     * Create the specified topics.
+     * 
+     * @param numPartitions the number of partitions for each topic
+     * @param replicationFactor the replication factor for each topic
+     * @param topics the names of the topics to create
+     */
+    public void createTopics(int numPartitions, int replicationFactor, String... topics) {
+        LOGGER.debug("Creating topics with {} partitions and {} replicas each: {}", numPartitions, replicationFactor,
+                     Arrays.toString(topics));
+        if (!running) throw new IllegalStateException("The cluster must be running to create topics");
+        kafkaServers.values().stream().findFirst().ifPresent(server -> server.createTopics(numPartitions, replicationFactor, topics));
+    }
+
+    /**
+     * Create the specified topics.
+     * 
+     * @param numPartitions the number of partitions for each topic
+     * @param replicationFactor the replication factor for each topic
+     * @param topics the names of the topics to create
+     */
+    public void createTopics(int numPartitions, int replicationFactor, Set<String> topics) {
+        createTopics(numPartitions, replicationFactor, topics.toArray(new String[topics.size()]));
+    }
+
+    /**
+     * Create the specified topic.
+     * 
+     * @param topic the name of the topic to create
+     * @param numPartitions the number of partitions for the topic
+     * @param replicationFactor the replication factor for the topic
+     */
+    public void createTopic(String topic, int numPartitions, int replicationFactor) {
+        LOGGER.debug("Creating topic '{}' with {} partitions and {} replicas", topic, numPartitions, replicationFactor);
+        if (!running) throw new IllegalStateException("The cluster must be running to create topics");
+        kafkaServers.values().stream().findFirst().ifPresent(server -> server.createTopic(topic, numPartitions, replicationFactor));
     }
 
     /**
@@ -280,6 +337,7 @@ public class KafkaCluster {
 
     /**
      * Get the list of brokers.
+     * 
      * @return the broker list
      */
     public String brokerList() {
@@ -292,7 +350,7 @@ public class KafkaCluster {
 
     private void shutdownReliably(KafkaServer server) {
         try {
-            server.shutdown(deleteDataUponShutdown);
+            server.shutdown();
         } catch (Throwable t) {
             LOGGER.error("Error while shutting down {}", server, t);
         }

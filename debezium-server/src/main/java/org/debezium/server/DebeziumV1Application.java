@@ -6,31 +6,28 @@
 package org.debezium.server;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import javax.ws.rs.ApplicationPath;
 import javax.ws.rs.core.Application;
 
-import org.debezium.core.annotation.Immutable;
-import org.debezium.core.doc.ArrayReader;
-import org.debezium.core.doc.ArrayWriter;
-import org.debezium.core.doc.DocumentReader;
-import org.debezium.core.doc.DocumentWriter;
-import org.debezium.core.util.Collect;
-import org.debezium.core.util.IoUtil;
-import org.debezium.driver.Debezium;
+import org.debezium.Configuration;
+import org.debezium.annotation.Immutable;
+import org.debezium.driver.DebeziumDriver;
+import org.debezium.driver.Environment;
 import org.debezium.driver.PassthroughSecurityProvider;
-import org.debezium.driver.SecurityProvider;
+import org.debezium.message.ArrayReader;
+import org.debezium.message.ArrayWriter;
+import org.debezium.message.DocumentReader;
+import org.debezium.message.DocumentWriter;
 import org.debezium.server.io.ArrayBodyReader;
 import org.debezium.server.io.ArrayBodyWriter;
 import org.debezium.server.io.DocumentBodyReader;
 import org.debezium.server.io.DocumentBodyWriter;
 import org.debezium.server.io.PatchBodyWriter;
+import org.debezium.util.Collect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +45,15 @@ public final class DebeziumV1Application extends Application {
     private static final boolean PRETTY_PRINT = false;
 
     private final Set<Object> singletons;
-    private final Set<Class<?>> classes = Collect.unmodifiableSet();
+    private final Set<Class<?>> classes;
 
     public DebeziumV1Application() {
-        this(null);
+        // We can use the pass-through provider because we rely upon the server (in which we are deployed) using OAuth 2.0 to
+        // authorize and authenticate users for the database.
+        this(Environment.build().withSecurity(PassthroughSecurityProvider::new));
     }
-    
-    protected DebeziumV1Application( Consumer<Debezium.Builder> configurationBuilder ) {
+
+    DebeziumV1Application( Environment.Builder envBuilder ) {
         Set<Object> objs = new HashSet<>();
         if (PRETTY_PRINT) {
             objs.add(new DocumentBodyWriter(DocumentWriter.prettyWriter()));
@@ -68,35 +67,26 @@ public final class DebeziumV1Application extends Application {
         objs.add(new DocumentBodyReader(DocumentReader.defaultReader()));
         objs.add(new ArrayBodyReader(ArrayReader.defaultReader()));
         objs.add(new DebeziumExceptionMapper());
-        
-        // Set up the security provider for the driver ...
-        final SecurityProvider security = new PassthroughSecurityProvider();
 
-        // Set up the Debezium driver ...
-        Debezium driver = Debezium.driver()
-                                  .clientIdPrefix("apiv1")
-                                  .load(this::configuration) // load the default properties (which can be overridden)
-                                  .loadFromSystemProperties() // then load from the system properties (which are easy to override)
-                                  .accept(configurationBuilder)
-                                  .usingSecurity(()->security)
-                                  .start();
-        final long defaultTimeout = driver.getConfiguration().getLong("service.max.timeout.ms", 10000);
-        objs.add(new Databases(driver,defaultTimeout,TimeUnit.MILLISECONDS));
-        singletons = Collect.unmodifiableSet(objs);
-    }
+        try {
+            // Set up the Debezium driver ...
+            Configuration config = Configuration.load("debezium.properties", getClass())
+                                                .withSystemProperties("DEBEZIUM_");
+            DebeziumDriver driver = DebeziumDriver.create(config, envBuilder.create());
 
-    private Properties configuration() {
-        Properties props = new Properties();
-        try (InputStream stream = IoUtil.getResourceAsStream("debezium.properties", null, getClass(), null, null)) {
-            if (stream != null) {
-                props.load(stream);
-            }
+            // Create the singleton used to handle requests ...
+            final long defaultTimeout = driver.getConfiguration().getLong("service.max.timeout.ms", 10000);
+            objs.add(new Databases(driver, defaultTimeout, TimeUnit.MILLISECONDS));
         } catch (IOException e) {
             LOGGER.error("Error while reading 'debezium.properties' from classpath: {}", e.getMessage(), e);
         }
-        return props;
+        
+        singletons = Collect.unmodifiableSet(objs);
+        classes = Collect.unmodifiableSet();
     }
     
+    
+
     @Override
     public Set<Object> getSingletons() {
         return singletons;

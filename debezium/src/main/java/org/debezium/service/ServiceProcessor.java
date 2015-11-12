@@ -5,13 +5,20 @@
  */
 package org.debezium.service;
 
+import java.util.Map;
+
+import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.ProcessorDef;
+import org.apache.kafka.streams.processor.ProcessorSupplier;
 import org.debezium.Configuration;
 import org.debezium.annotation.NotThreadSafe;
 import org.debezium.message.Array;
 import org.debezium.message.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An abstract KafkaProcessor for Debezium services. This base class provides automatic or manual committing of offsets, and
@@ -21,22 +28,24 @@ import org.debezium.message.Document;
  */
 @NotThreadSafe
 public abstract class ServiceProcessor implements Processor<String, Document> {
-    
+
     /**
-     * Utility method to create a {@link ProcessorDef} for a given service.
+     * Utility method to create a {@link ProcessorSupplier} for a given service.
+     * 
      * @param processorInstance the processor instance; may not be null
-     * @return the {@link ProcessorDef} instance; never null
+     * @return the {@link ProcessorSupplier} instance; never null
      */
-    protected static ProcessorDef processorDef( ServiceProcessor processorInstance ) {
-        return new ProcessorDef() {
-            
+    protected static ProcessorSupplier<String, Document> processorDef(ServiceProcessor processorInstance) {
+        return new ProcessorSupplier<String, Document>() {
+
             @Override
-            public Processor<String,Document> instance() {
+            public Processor<String, Document> get() {
                 return processorInstance;
             }
         };
     }
 
+    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final Configuration config;
     private final String name;
     private boolean useManualCommit;
@@ -52,13 +61,15 @@ public abstract class ServiceProcessor implements Processor<String, Document> {
         if (serviceName == null || serviceName.trim().isEmpty()) {
             throw new IllegalArgumentException("The service name may not be null or empty");
         }
-        if (config == null ) throw new IllegalArgumentException("The configuration may not be null or empty");
+        if (config == null) throw new IllegalArgumentException("The configuration may not be null or empty");
         this.name = serviceName;
         this.config = config;
+        logger.trace("Created new service '{}'", getName());
     }
-    
+
     /**
      * Get the name of this service.
+     * 
      * @return the name of this service; never null or empty
      */
     public String getName() {
@@ -75,9 +86,10 @@ public abstract class ServiceProcessor implements Processor<String, Document> {
     protected boolean requireManaulCommit() {
         return false;
     }
-    
+
     /**
      * Get the configuration for this service.
+     * 
      * @return the configuration; never null
      */
     protected Configuration config() {
@@ -98,8 +110,10 @@ public abstract class ServiceProcessor implements Processor<String, Document> {
      */
     @Override
     public final void init(ProcessorContext context) {
+        logger.trace("Initializing service '{}'", getName());
         this.context = context;
         init();
+        logger.debug("Initialized service '{}'", getName());
     }
 
     /**
@@ -134,7 +148,7 @@ public abstract class ServiceProcessor implements Processor<String, Document> {
     @Override
     public void punctuate(long streamTime) {
     }
-    
+
     /**
      * Given the supplied {@link Array} representing a vector clock for a topic, record in the vector clock the offset in the
      * given partition and determine whether the message at the given offset has already been seen and recorded in the vector
@@ -161,4 +175,87 @@ public abstract class ServiceProcessor implements Processor<String, Document> {
         return false;
     }
 
+    protected Logger logger() {
+        return logger;
+    }
+
+    protected static <T> Serializer<T> serializerFor(LongValueAccessor<T> accessor1, LongValueAccessor<T> accessor2) {
+        return new Serializer<T>() {
+            @Override
+            public void configure(Map<String, ?> configs, boolean isKey) {
+            }
+
+            @Override
+            public byte[] serialize(String topic, T data) {
+                if (data == null) return null;
+
+                long v1 = accessor1.value(data);
+                long v2 = accessor2.value(data);
+                return new byte[] {
+                        (byte) (v1 >>> 56),
+                        (byte) (v1 >>> 48),
+                        (byte) (v1 >>> 40),
+                        (byte) (v1 >>> 32),
+                        (byte) (v1 >>> 24),
+                        (byte) (v1 >>> 16),
+                        (byte) (v1 >>> 8),
+                        (byte) (v1 >>> 0),
+                        (byte) (v2 >>> 56),
+                        (byte) (v2 >>> 48),
+                        (byte) (v2 >>> 40),
+                        (byte) (v2 >>> 32),
+                        (byte) (v2 >>> 24),
+                        (byte) (v2 >>> 16),
+                        (byte) (v2 >>> 8),
+                        (byte) (v2 >>> 0)
+                };
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+    }
+
+    protected static <T> Deserializer<T> deserializerFor(LongPairFactory<T> factory) {
+        return new Deserializer<T>() {
+            @Override
+            public T deserialize(String topic, byte[] data) {
+                if (data == null) return null;
+                if (data.length != 16) {
+                    T proto = factory.create(0, 0);
+                    throw new SerializationException(
+                            "Size of data received by Deserializer<" + proto.getClass().getSimpleName() + "> is not 16");
+                }
+
+                long v1 = 0;
+                for (byte b : data) {
+                    v1 <<= 8;
+                    v1 |= b & 0xFF;
+                }
+                long v2 = 0;
+                for (byte b : data) {
+                    v2 <<= 8;
+                    v2 |= b & 0xFF;
+                }
+                return factory.create(v1, v2);
+            }
+
+            @Override
+            public void configure(Map<String, ?> configs, boolean isKey) {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+    }
+
+    protected static interface LongValueAccessor<T> {
+        long value(T t);
+    }
+
+    protected static interface LongPairFactory<T> {
+        T create(long value1, long value2);
+    }
 }

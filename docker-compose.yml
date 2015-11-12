@@ -21,14 +21,22 @@ kafka:
     BROKER_ID: 1
     ZOOKEEPER_CONNECT: zookeeper:2181
     CREATE_TOPICS: >
+        schema-patches:1:1,
+        schema-updates:1:1,
         entity-batches:1:1,
         entity-patches:1:1,
         entity-updates:1:1,
+        entity-type-updates:1:1,
         partial-responses:1:1,
         complete-responses:1:1,
-        schema-patches:1:1,
-        schema-updates:1:1,
-        connections:1:1
+        store-schema-revisions:1:1,
+        store-schema-models:1:1,
+        store-schema-overrides:1:1,
+        store-schema-learning-revisions:1:1,
+        store-schema-learning-models:1:1,
+        store-aggregate-responses:1:1,
+        store-aggregate-inputs:1:1,
+        store-entity-storage:1:1
     HEAP_OPTS: -Xmx500M
     KAFKA_ADVERTISED_PORT: 9092
     # Be sure to give the host computer's IP address, or if on OS X use address of boot2docker (via `boot2docker ip`)

@@ -24,12 +24,14 @@ import org.debezium.message.Patch.Editor;
 import org.debezium.message.Patch.Operation;
 import org.debezium.message.Topic;
 import org.debezium.message.Value;
+import org.debezium.model.ChangeStatus;
 import org.debezium.model.DatabaseId;
 import org.debezium.model.Entity;
 import org.debezium.model.EntityChange;
-import org.debezium.model.EntityChange.ChangeStatus;
+import org.debezium.model.EntityCollection;
 import org.debezium.model.EntityId;
 import org.debezium.model.EntityType;
+import org.debezium.model.EntityTypeChange;
 import org.debezium.model.Identifier;
 import org.debezium.model.Schema;
 import org.debezium.util.Clock;
@@ -49,8 +51,8 @@ final class DbzDriver implements DebeziumDriver {
     private final DbzDatabases databases;
     private final DbzPartialResponses partialResponses;
     private final Clock clock;
-    
-    DbzDriver( Configuration config, Environment env) {
+
+    DbzDriver(Configuration config, Environment env) {
         this.config = config;
         this.env = env;
         this.clock = this.env.getClock();
@@ -59,7 +61,7 @@ final class DbzDriver implements DebeziumDriver {
         this.databases = new DbzDatabases(this.partialResponses);
         this.node.add(this.databases, this.partialResponses);
     }
-    
+
     @Override
     public Configuration getConfiguration() {
         return config;
@@ -69,36 +71,36 @@ final class DbzDriver implements DebeziumDriver {
         node.start();
         return this;
     }
-    
+
     private void logConnection(SessionToken token, String[] databaseIds, long durationInNanos, String action) {
         env.getSecurity().info(token, (username, device, appVersion) -> {
             // TODO: record information in metrics
-                           });
+        });
     }
 
     private void logUsage(SessionToken token, String databaseId, long durationInNanos, String action) {
         env.getSecurity().info(token, (username, device, appVersion) -> {
             // TODO: record information in metrics
-                           });
+        });
     }
 
     private void logUsage(SessionToken token, String databaseId, long durationInNanos, String action, String field, Object value) {
         env.getSecurity().info(token, (username, device, appVersion) -> {
             // TODO: record information in metrics
-                           });
+        });
     }
 
     private void logUsage(SessionToken token, String databaseId, long durationInNanos, String action, String field1, Object value1,
                           String field2, Object value2) {
         env.getSecurity().info(token, (username, device, appVersion) -> {
             // TODO: record information in metrics
-                           });
+        });
     }
-    
+
     private long duration(long start) {
         return env.getClock().currentTimeInNanos() - start;
     }
-    
+
     private DebeziumClientException notRunning() {
         return new DebeziumClientException("The Debezium driver is not running");
     }
@@ -145,7 +147,62 @@ final class DbzDriver implements DebeziumDriver {
             return schema;
         }).orElseThrow(this::notRunning);
     }
-
+    
+    @Override
+    public EntityTypeChange changeEntityType(SessionToken token, Patch<EntityType> patch, long timeout, TimeUnit unit) {
+        return node.whenRunning(() -> {
+            long start = clock.currentTimeInNanos();
+            // Check the privilege first ...
+            EntityType typeId = patch.target();
+            String entityType = typeId.entityTypeName();
+            DatabaseId dbId = typeId.databaseId();
+            String databaseName = dbId.asString();
+            String username = env.getSecurity().canAdminister(token, databaseName);
+            if (username == null) {
+                throw new DebeziumAuthorizationException("Unable to change the entity type '" + entityType + "' in the database '" + dbId + "'");
+            }
+            logger.debug("Attempting to change entity type '{}' in database '{}' with patch: {}", entityType, dbId, patch);
+            return partialResponses.submit(EntityTypeChange.class, requestId -> {
+                logger.trace("Attempting to submit request to change entity type '{} 'in database '{}'", entityType, dbId);
+                Document request = patch.asDocument();
+                Message.addHeaders(request, requestId.getClientId(), requestId.getRequestNumber(), username);
+                if (!node.send(Topic.SCHEMA_PATCHES, databaseName, request)) {
+                    throw new DebeziumClientException("Unable to send request to change the entity type '" + entityType + "' in the database '" + dbId + "'");
+                }
+            }).onResponse(timeout, unit, response -> {
+                logger.trace("Received response from changing entity type '{}' in database '{}'", entityType, dbId);
+                EntityType id = Message.getEntityType(response);
+                Document representation = Message.getAfterOrBefore(response);
+                ChangeStatus status = null;
+                Collection<String> failureReasons = null;
+                switch (Message.getStatus(response)) {
+                    case SUCCESS:
+                        status = ChangeStatus.OK;
+                        failureReasons = Message.getFailureReasons(response);
+                        logUsage(token, databaseName, duration(start), "changeEntityType", "found", true, "changed", true);
+                        logger.trace("Successfully changed entity type '{}'", id);
+                        break;
+                    case PATCH_FAILED:
+                        status = ChangeStatus.PATCH_FAILED;
+                        failureReasons = Message.getFailureReasons(response);
+                        logUsage(token, databaseName, duration(start), "changeEntityType", "found", true, "changed", false);
+                        logger.trace("Unable to apply patch to change entity type '{}'", id);
+                        break;
+                    case DOES_NOT_EXIST:
+                        status = ChangeStatus.DOES_NOT_EXIST;
+                        failureReasons = Message.getFailureReasons(response);
+                        logUsage(token, databaseName, duration(start), "changeEntityType", "found", false, "changed", false);
+                        logger.trace("Unable to find entity type '{}'", id);
+                        break;
+                }
+                EntityCollection collection = EntityCollection.with(id, representation);
+                return EntityTypeChange.with(patch, collection, status, failureReasons);
+            }).onTimeout(() -> {
+                throw new DebeziumTimeoutException("The request to change entity type '" + entityType + "' in database '" + dbId + "' timed out");
+            });
+        }).orElseThrow(this::notRunning);
+    }
+    
     @Override
     public Entity readEntity(SessionToken token, EntityId entityId, long timeout, TimeUnit unit) {
         return node.whenRunning(() -> {
@@ -289,7 +346,7 @@ final class DbzDriver implements DebeziumDriver {
                 batchBuilder.patch(patch);
                 return this;
             }
-            
+
             @Override
             public Editor<BatchBuilder> createEntity(EntityType entityType) {
                 return changeEntity(Identifier.newEntity(entityType));
@@ -305,46 +362,55 @@ final class DbzDriver implements DebeziumDriver {
                         editor.add(path, value);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> copy(String fromPath, String toPath) {
                         editor.copy(fromPath, toPath);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> increment(String path, Number increment) {
                         editor.increment(path, increment);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> move(String fromPath, String toPath) {
                         editor.move(fromPath, toPath);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> remove(String path) {
                         editor.remove(path);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> replace(String path, Value newValue) {
                         editor.replace(path, newValue);
                         return this;
                     }
+
                     @Override
                     public Editor<BatchBuilder> require(String path, Value expectedValue) {
                         editor.require(path, expectedValue);
                         return this;
                     }
+
                     @Override
                     public BatchBuilder end() {
                         editor.endIfChanged().ifPresent(builder::changeEntity);
                         return builder;
                     }
+
                     @Override
                     public Optional<BatchBuilder> endIfChanged() {
                         editor.endIfChanged().ifPresent(builder::changeEntity);
                         return Optional.of(builder);
                     }
+
                     @Override
                     public Optional<BatchBuilder> endIfChanged(Predicate<Operation> significant) {
                         editor.endIfChanged(significant).ifPresent(builder::changeEntity);
@@ -358,7 +424,7 @@ final class DbzDriver implements DebeziumDriver {
                 batchBuilder.remove(entityId);
                 return this;
             }
-            
+
             @Override
             public BatchResult submit(SessionToken token, long timeout, TimeUnit unit) {
                 return submitBatch(token, batchBuilder.build(), timeout, unit); // resets batch builder each time
@@ -373,10 +439,13 @@ final class DbzDriver implements DebeziumDriver {
             CompositeAction check = env.getSecurity().check(token);
             batch.forEach(patch -> {
                 String dbId = patch.target().databaseId().asString();
-                if (patch.isReadRequest()) check.canRead(dbId);
-                else if (patch.isDeletion()) check.canWrite(dbId);
-                else if (patch.isEmpty()) {}
-                else check.canWrite(dbId);
+                if (patch.isReadRequest())
+                    check.canRead(dbId);
+                else if (patch.isDeletion())
+                    check.canWrite(dbId);
+                else if (patch.isEmpty()) {
+                } else
+                    check.canWrite(dbId);
             });
             String username = check.submit();
             if (username == null) {
@@ -397,10 +466,10 @@ final class DbzDriver implements DebeziumDriver {
                 EntityId id = Message.getEntityId(response);
                 Document representation = Message.getAfterOrBefore(response);
                 Patch<EntityId> patch = Patch.forEntity(response);
-                if ( patch == null ) {
+                if (patch == null) {
                     // We read the entity ...
                     reads.put(id.asString(), Entity.with(id, representation));
-                } else if ( patch.isDeletion() ) {
+                } else if (patch.isDeletion()) {
                     destroys.add(id.asString());
                 } else {
                     Entity entity = Entity.with(id, representation);

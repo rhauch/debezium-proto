@@ -612,6 +612,22 @@ public final class EntityCollection implements SchemaComponent<EntityType> {
         return new BasicField(name, value.asDocument());
     }
     
+    /**
+     * Get the revision number of this type.
+     * @return the revision number
+     */
+    public long revision() {
+        return Message.getRevision(doc);
+    }
+    
+    /**
+     * Get the timestamp of last modification.
+     * @return the time that the type was last modified; may be 0 if not known
+     */
+    public long lastModified() {
+        return Message.getEnded(doc);
+    }
+    
     @Override
     public String toString() {
         return document().toString();

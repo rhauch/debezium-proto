@@ -14,7 +14,6 @@ import org.debezium.message.DocumentReader;
 import org.debezium.message.Message;
 import org.debezium.message.Patch;
 import org.debezium.message.Path;
-import org.debezium.message.Topic;
 import org.debezium.message.Value;
 import org.debezium.model.EntityCollection.FieldDefinition;
 import org.debezium.model.EntityCollection.FieldType;
@@ -32,7 +31,7 @@ import static org.fest.assertions.Assertions.assertThat;
 public class EntityTypeLearningModelTest implements Testing {
 
     private static final long TIMESTAMP = 100110011L;
-    private static final String FOLDER_NAME = Topic.SCHEMA_LEARNING;
+    private static final String FOLDER_NAME = "entity-changes";
     
     public static enum OptionalField {
         OPTIONAL, REQUIRED

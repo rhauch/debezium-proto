@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
@@ -1199,5 +1200,22 @@ public final class Patch<IdType extends Identifier> implements Iterable<Patch.Op
         List<Operation> filtered = this.ops.stream().filter(operationFilter).collect(Collectors.toList());
         if ( filtered.size() == this.ops.size() ) return this;
         return new Patch<IdType>(this.id,filtered);
+    }
+    
+    /**
+     * Return a new patch that combines this patch's operations with those from the supplied patch. Any superfluous operations
+     * may be removed.
+     * @param otherPatch the patch to add to this patch's operations
+     * @return the new patch; never null, but possibly this patch if the other patch is null or empty
+     */
+    public Patch<IdType> append( Patch<IdType> otherPatch ) {
+        if ( otherPatch == null ) return this;
+        if ( !Objects.equals(this.target(),otherPatch.target())) {
+            throw new IllegalArgumentException("Unable to merge patches with different targets");
+        }
+        if ( otherPatch.isEmpty() ) return this;
+        List<Operation> ops = new LinkedList<>(this.ops);
+        ops.addAll(otherPatch.ops);
+        return new Patch<>(this.id,ops);
     }
 }

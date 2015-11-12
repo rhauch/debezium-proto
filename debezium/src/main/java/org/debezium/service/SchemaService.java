@@ -7,10 +7,13 @@ package org.debezium.service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.processor.TopologyBuilder;
-import org.apache.kafka.streams.state.InMemoryKeyValueStore;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.Stores;
 import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
@@ -24,6 +27,7 @@ import org.debezium.model.DatabaseId;
 import org.debezium.model.EntityType;
 import org.debezium.model.EntityTypeLearningModel;
 import org.debezium.model.Identifier;
+import org.debezium.util.Collect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +37,8 @@ import org.slf4j.LoggerFactory;
  * (partitioned by {@link EntityType}) recorded from the upstream {@link SchemaLearningService} instances. This
  * service also consumes the {@value Topic#SCHEMA_PATCHES} topic (partitioned by {@link DatabaseId}) and applies the
  * user-constructed patches to the appropriate schema model. Changes in these aggregate schema models are then output to the
- * {@value Topic#SCHEMA_UPDATES}, partitioned by {@link DatabaseId}.
+ * {@value Topic#SCHEMA_UPDATES}, partitioned by {@link DatabaseId}. The service also outputs the changes and all read-only
+ * requests or errors on the {@value Topic#PARTIAL_RESPONSES} topic.
  * <p>
  * This service uses local storage to cache and maintain data. Therefore, when multiple service instances are run in a cluster,
  * each service instance should be assigned a range of the {@value Topic#ENTITY_TYPE_UPDATES} partitions. This ensures that all
@@ -132,21 +137,39 @@ public final class SchemaService extends ServiceProcessor {
      */
     public static TopologyBuilder topology(Configuration config) {
         TopologyBuilder topology = new TopologyBuilder();
-        topology.addSource("input", Serdes.stringDeserializer(), Serdes.document(), Topic.ENTITY_TYPE_UPDATES);
-        topology.addProcessor("service", processorDef(new SchemaService(config)), "input");
+        topology.addSource("input-updates", Serdes.stringDeserializer(), Serdes.document(), Topic.ENTITY_TYPE_UPDATES);
+        topology.addSource("input-patches", Serdes.stringDeserializer(), Serdes.document(), Topic.SCHEMA_PATCHES);
+        topology.addProcessor("service", processorDef(new SchemaService(config)), "input-updates", "input-patches");
         topology.addSink("output", Topic.SCHEMA_UPDATES, Serdes.stringSerializer(), Serdes.document(), "service");
+        topology.addSink("responses", Topic.PARTIAL_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
         return topology;
+    }
+
+    /**
+     * Get the set of input, output, and store-related topics that this service uses.
+     * 
+     * @return the set of topics; never null, but possibly empty
+     */
+    public static Set<String> topics() {
+        return Collect.unmodifiableSet(Topic.ENTITY_TYPE_UPDATES, Topic.SCHEMA_UPDATES, Topic.SCHEMA_PATCHES,
+                                       Topic.Stores.SCHEMA_MODELS, Topic.Stores.SCHEMA_REVISIONS, Topic.Stores.SCHEMA_OVERRIDES);
     }
 
     /**
      * The name of the local store used by the service to track model revisions for each upstream learning service.
      */
-    public static final String REVISIONS_STORE_NAME = "schema-revisions";
+    public static final String REVISIONS_STORE_NAME = Topic.Stores.SCHEMA_REVISIONS;
 
     /**
      * The name of the local store used by the service to track the aggregate model for each entity type.
      */
-    public static final String MODELS_STORE_NAME = "schema-models";
+    public static final String MODELS_STORE_NAME = Topic.Stores.SCHEMA_MODELS;
+
+    /**
+     * The name of the local store used by the service to track the patches (for each entity type) that users submit to override
+     * the learned/derived model.
+     */
+    public static final String MODEL_OVERRIDES_STORE_NAME = Topic.Stores.SCHEMA_OVERRIDES;
 
     /**
      * The name of this service.
@@ -163,10 +186,18 @@ public final class SchemaService extends ServiceProcessor {
         }
     }
 
+    private static final Deserializer<ModelRevisions> REVISIONS_DESERIALIZER = deserializerFor(ModelRevisions::new);
+    private static final Serializer<ModelRevisions> REVISIONS_SERIALIZER = serializerFor(mr -> mr.partialModelRevision,
+                                                                                         mr -> mr.aggregateModelRevision);
+
+    private static final int UPDATES = 0;
+    private static final int RESPONSES = 1;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(SchemaService.class);
 
     private KeyValueStore<String, ModelRevisions> persistedRevisions;
     private KeyValueStore<String, Document> persistedModels;
+    private KeyValueStore<String, Document> modelOverrides;
     private final Map<EntityType, EntityTypeLearningModel> transientModels = new HashMap<>();
     private long punctuateInterval;
 
@@ -177,22 +208,37 @@ public final class SchemaService extends ServiceProcessor {
 
     public SchemaService(Configuration config) {
         super(SERVICE_NAME, config);
-        punctuateInterval = config.getLong("service.punctuate.interval.ms", 30*1000);
+        punctuateInterval = config.getLong("service.punctuate.interval.ms", 30 * 1000);
     }
 
     @Override
     protected void init() {
-        this.persistedRevisions = new InMemoryKeyValueStore<>(REVISIONS_STORE_NAME, context());
-        this.persistedModels = new InMemoryKeyValueStore<>(MODELS_STORE_NAME, context());
+        // Create the stores ...
+        this.persistedRevisions = Stores.create(REVISIONS_STORE_NAME, context())
+                                        .withStringKeys()
+                                        .withValues(REVISIONS_SERIALIZER, REVISIONS_DESERIALIZER)
+                                        .inMemory()
+                                        .build();
+        this.persistedModels = Stores.create(MODELS_STORE_NAME, context())
+                                     .withStringKeys()
+                                     .withValues(Serdes.document(), Serdes.document())
+                                     .inMemory()
+                                     .build();
+        this.modelOverrides = Stores.create(MODEL_OVERRIDES_STORE_NAME, context())
+                                    .withStringKeys()
+                                    .withValues(Serdes.document(), Serdes.document())
+                                    .inMemory()
+                                    .build();
+
         // Load the models from the store ...
         this.persistedModels.all().forEachRemaining(entry -> {
             EntityType type = Identifier.parseEntityType(entry.key());
             EntityTypeLearningModel model = new EntityTypeLearningModel(type, entry.value());
             transientModels.put(type, model);
         });
-        
+
         // And register ourselves for punctuation ...
-        if ( punctuateInterval > 0 ) context().schedule(punctuateInterval);
+        if (punctuateInterval > 0) context().schedule(punctuateInterval);
     }
 
     @Override
@@ -247,7 +293,8 @@ public final class SchemaService extends ServiceProcessor {
             // The model was updated so we need to send an update ...
             Document response = patch.asDocument();
             if (aggregateBefore != null && !aggregateBefore.isEmpty()) Message.setBefore(request, aggregateBefore);
-            Message.setAfter(response, aggregateModel.asDocument().clone());
+            Document updatedModel = applyOverrides(type, aggregateModel.asDocument().clone());
+            Message.setAfter(response, updatedModel);
             Message.setRevision(response, aggregateModel.revision());
             Message.setBegun(response, previouslyModified);
             Message.setEnded(response, aggregateModel.lastModified());
@@ -256,7 +303,7 @@ public final class SchemaService extends ServiceProcessor {
             // we will re-process the input, correctly update the model, and re-send the output with the same revision number
             // as we might have sent before the crash. But either way, the model will be updated consistently and correctly.
             persistedRevisions.put(type.asString(), new ModelRevisions(revision, aggregateModel.revision()));
-            context().forward(type.databaseId().asString(), request);
+            context().forward(type.databaseId().asString(), response, UPDATES);
             persistedModels.put(type.asString(), aggregateModel.resetChangeStatistics().asDocument());
 
         } else {
@@ -266,9 +313,56 @@ public final class SchemaService extends ServiceProcessor {
             persistedModels.put(type.asString(), aggregateModel.asDocument());
         }
     }
+    
+    protected Document applyOverrides( EntityType entityType, Document model ) {
+        Document existingOverride = modelOverrides.get(entityType.asString());
+        if ( existingOverride != null ) {
+            Patch<EntityType> overridePatch = Patch.forEntityType(existingOverride);
+            overridePatch.apply(model,(failedPath, failedOp) -> {
+                LOGGER.error("Unable to apply override patch {} to model {}: {}", failedOp, entityType, model);
+            });
+        }
+        return model;
+    }
 
     protected void processPatch(int partition, long offset, String idStr, Document request) {
+        Patch<EntityType> patch = Patch.forEntityType(request);
+        EntityType type = patch.target();
+        String typeStr = type.asString();
+        aggregateModel = aggregateModelFor(type);
+        
+        // Construct the response message ...
+        Document response = Message.createResponseFromRequest(request);
+        Message.setOperations(response, request);
+        Message.setBefore(response, aggregateModel.asDocument().clone());
+        Message.setBegun(response, aggregateModel.lastModified());
 
+        // Load the existing patch for this entity type ...
+        Document override = request;
+        Patch<EntityType> overridePatch = patch;
+        Document existingOverride = modelOverrides.get(typeStr);
+        if ( existingOverride != null ) {
+            overridePatch = Patch.forEntityType(override);
+            override = overridePatch.append(patch).asDocument();
+        }
+
+        // Compute a new representation of the model, including all latest overrides ...
+        Document model = aggregateModel.asDocument().clone();
+        overridePatch.apply(model,(failedPath, failedOp) -> {
+            LOGGER.error("Unable to apply override patch {} to model {}: {}", failedOp, type, model);
+        });
+        
+        // Finish the response message ...
+        Message.setAfter(response, model);
+        Message.setRevision(response, aggregateModel.revision());
+        Message.setEnded(response, aggregateModel.lastModified());
+
+        // Send the update to the partial response and updates topics ...
+        context().forward(Message.getClient(response), response, RESPONSES);    // TODO: use type as key, partition on client ID
+        context().forward(type.databaseId().asString(), response, UPDATES);
+
+        // Store the new override patch ...
+        modelOverrides.put(typeStr, override);
     }
 
     /**
@@ -286,28 +380,30 @@ public final class SchemaService extends ServiceProcessor {
                 // However, since the patch is generated based upon the incremented values, the patch will be correct.
                 Document before = model.recreateDocumentBeforeRecentUsageChanges();
                 Patch<EntityType> patch = model.recalculateFieldUsages().getPatch(streamTime).orElse(null);
-                Document request = null;
+                Document response = null;
                 if (patch != null) {
                     // Update the model with the new field usages by applying our patch ...
                     patch.apply(model.asDocument(), (failedPath, failedOp) -> {
                         LOGGER.error("Unable to apply {} to model {}: {}", failedOp, model.type(), model);
                     });
-                    request = patch.asDocument();
-                    Message.setBefore(request, before);
+                    response = patch.asDocument();
+                    before = applyOverrides(entityType, before);
+                    Message.setBefore(response, before);
                 } else {
                     // There's actually nothing to update and no patch, but output the results anyway (without before) ...
-                    request = Document.create();
-                    request.setString(Field.DATABASE_ID, entityType.databaseId().asString());
-                    request.setString(Field.COLLECTION, entityType.entityTypeName());
+                    response = Document.create();
+                    response.setString(Field.DATABASE_ID, entityType.databaseId().asString());
+                    response.setString(Field.COLLECTION, entityType.entityTypeName());
                 }
                 // Create the request message ...
-                Message.setAfter(request, model.asDocument(false));
-                Message.setRevision(request, model.revision());
-                Message.setBegun(request, previouslyModified);
-                Message.setEnded(request, model.lastModified());
+                Document after = applyOverrides(entityType, model.asDocument(false));
+                Message.setAfter(response, after);
+                Message.setRevision(response, model.revision());
+                Message.setBegun(response, previouslyModified);
+                Message.setEnded(response, model.lastModified());
                 // Send the message with the updated metrics ...
                 String dbIdStr = entityType.databaseId().asString();
-                context().forward(dbIdStr, request);
+                context().forward(dbIdStr, response, UPDATES);
             }
         });
 
@@ -320,7 +416,9 @@ public final class SchemaService extends ServiceProcessor {
 
     @Override
     public void close() {
+        logger().trace("Shutting down service '{}'", getName());
         this.persistedModels.close();
+        logger().debug("Service '{}' shutdown", getName());
     }
 
     private EntityTypeLearningModel aggregateModelFor(EntityType type) {

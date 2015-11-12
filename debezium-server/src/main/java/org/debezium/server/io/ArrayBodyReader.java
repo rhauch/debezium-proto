@@ -16,9 +16,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
 
-import org.debezium.core.annotation.Immutable;
-import org.debezium.core.doc.Array;
-import org.debezium.core.doc.ArrayReader;
+import org.debezium.annotation.Immutable;
+import org.debezium.message.Array;
+import org.debezium.message.ArrayReader;
 
 /**
  * A {@link MessageBodyReader} implementation that supports reading {@link Array}s.

@@ -7,11 +7,9 @@ package org.debezium.model;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.stream.Stream;
 
 import org.debezium.annotation.Immutable;
 import org.debezium.message.Patch;
-import org.debezium.message.Patch.Action;
 
 
 /**
@@ -25,29 +23,12 @@ public final class EntityChange {
     private static final Collection<String> NO_FAILURE_REASONS = Collections.emptyList();
 
     /**
-     * The status of a requested change operation.
-     * 
-     * @author Randall Hauch
-     */
-    public static enum ChangeStatus {
-        /** The change was successfully applied. */
-        OK,
-        /** The requested change could not be made because the target of the change no longer exists. */
-        DOES_NOT_EXIST,
-        /**
-         * The requested change could not be made because at least one {@link Action#REQUIRE requirement} within the patch
-         * could not be satisfied.
-         */
-        PATCH_FAILED;
-    }
-
-    /**
      * Create an entity change with the given information.
      * @param patch the patch; may not be null
      * @param entity the entity; may be null if the entity didn't exist when the patch was applied
      * @param status the status; may not be null
      * @param failureReasons the failure reasons; may be null
-     * @return the entity; never null
+     * @return the entity change; never null
      */
     public static EntityChange with(Patch<EntityId> patch, Entity entity, ChangeStatus status, Collection<String> failureReasons) {
         if (patch == null) throw new IllegalArgumentException("The 'patch' parameter may not be null");
@@ -77,7 +58,7 @@ public final class EntityChange {
     }
 
     /**
-     * Get current representation of the target at the time the patch was applied. The target can be used in the case of a
+     * Get current representation of the target after the patch was applied. The target can be used in the case of a
      * {@link ChangeStatus#PATCH_FAILED failed patch} to rebuild a new patch.
      * 
      * @return the target, or null if the target didn't exist when the patch was applied.
@@ -92,7 +73,7 @@ public final class EntityChange {
      * @return the identifier; never null
      */
     public String id() {
-        return entity().id().toString();
+        return patch.target().toString();
     }
 
     /**
@@ -129,9 +110,9 @@ public final class EntityChange {
     /**
      * Get the reason(s) why the change failed, if it was not successful.
      * 
-     * @return the failure reasons, or null if the operation {@link #succeeded() succeeded}.
+     * @return the failure reasons; never null, but empty if the operation {@link #succeeded() succeeded}.
      */
-    public Stream<String> failureReasons() {
-        return failureReasons.stream();
+    public Collection<String> failureReasons() {
+        return failureReasons;
     }
 }

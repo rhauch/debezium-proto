@@ -572,6 +572,11 @@ public class EntityTypeLearningModel {
         before.setNumber(Field.REVISION, revision.get()-1);
         return before;
     }
+    
+    @Override
+    public String toString() {
+        return asDocument().toString();
+    }
 
     protected static interface Strategy {
 

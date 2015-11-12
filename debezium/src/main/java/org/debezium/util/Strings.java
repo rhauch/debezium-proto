@@ -129,7 +129,7 @@ public final class Strings {
         }
         return defaultValue;
     }
-
+    
     /**
      * Parse the supplied string as a double value.
      * 
@@ -163,7 +163,7 @@ public final class Strings {
         }
         return defaultValue;
     }
-
+    
     private Strings() {
     }
 }

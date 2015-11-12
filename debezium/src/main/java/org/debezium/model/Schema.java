@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 
 import org.debezium.message.Document;
 import org.debezium.message.Document.Field;
+import org.debezium.message.Message;
 import org.debezium.message.Path;
 
 /**
@@ -47,6 +48,22 @@ public final class Schema {
      */
     public Document asDocument() {
         return doc;
+    }
+    
+    /**
+     * Get the revision number of this schema.
+     * @return the revision number
+     */
+    public long revision() {
+        return Message.getRevision(doc);
+    }
+    
+    /**
+     * Get the timestamp of last modification.
+     * @return the time that the schema was last modified; may be 0 if not known
+     */
+    public long lastModified() {
+        return Message.getEnded(doc);
     }
     
     /**

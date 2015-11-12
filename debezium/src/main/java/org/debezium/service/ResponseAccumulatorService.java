@@ -11,8 +11,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.streams.processor.TopologyBuilder;
-import org.apache.kafka.streams.state.InMemoryKeyValueStore;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.Stores;
 import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
@@ -123,6 +123,26 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
     }
 
     /**
+     * Get the set of input, output, and store-related topics that this service uses.
+     * 
+     * @return the set of topics; never null, but possibly empty
+     */
+    public static Set<String> topics() {
+        return Collect.unmodifiableSet(Topic.PARTIAL_RESPONSES, Topic.COMPLETE_RESPONSES,
+                                       Topic.Stores.AGGREGATE_RESPONSES, Topic.Stores.AGGREGATE_INPUTS);
+    }
+
+    /**
+     * The name of the local store used by the service to track incomplete aggregate responses.
+     */
+    public static final String AGGREGATE_RESPONSE_STORE_NAME = Topic.Stores.AGGREGATE_RESPONSES;
+
+    /**
+     * The name of the local store used by the service to track the offsets of each input partition.
+     */
+    public static final String AGGREGATE_INPUTS_STORE_NAME = Topic.Stores.AGGREGATE_INPUTS;
+
+    /**
      * The name of this service.
      */
     public static final String SERVICE_NAME = "response-accumulator";
@@ -143,8 +163,16 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
 
     @Override
     protected void init() {
-        this.aggregateResponses = new InMemoryKeyValueStore<>("aggregate-responses", context());
-        this.inputOffsets = new InMemoryKeyValueStore<>("aggregate-inputs", context());
+        this.aggregateResponses = Stores.create(AGGREGATE_RESPONSE_STORE_NAME, context())
+                                        .withStringKeys()
+                                        .withValues(Serdes.document(), Serdes.document())
+                                        .inMemory()
+                                        .build();
+        this.inputOffsets = Stores.create(AGGREGATE_INPUTS_STORE_NAME, context())
+                                  .withIntegerKeys()
+                                  .withLongValues()
+                                  .inMemory()
+                                  .build();
 
         // Load the models from the store, removing any that are too old ...
         Set<String> oldKeys = new HashSet<>();
@@ -215,8 +243,10 @@ public final class ResponseAccumulatorService extends ServiceProcessor {
 
     @Override
     public void close() {
+        logger().trace("Shutting down service '{}'", getName());
         this.aggregateResponses.close();
         this.inputOffsets.close();
+        logger().debug("Service '{}' shutdown", getName());
     }
 
     private Document getAggregateResponse(String requestKey) {

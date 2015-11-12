@@ -5,14 +5,17 @@
  */
 package org.debezium.service;
 
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.processor.TopologyBuilder;
-import org.apache.kafka.streams.state.InMemoryKeyValueStore;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.Stores;
 import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.kafka.Serdes;
@@ -27,6 +30,7 @@ import org.debezium.model.EntityId;
 import org.debezium.model.EntityType;
 import org.debezium.model.EntityTypeLearningModel;
 import org.debezium.model.Identifier;
+import org.debezium.util.Collect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,14 +129,24 @@ public final class SchemaLearningService extends ServiceProcessor {
     }
 
     /**
+     * Get the set of input, output, and store-related topics that this service uses.
+     * 
+     * @return the set of topics; never null, but possibly empty
+     */
+    public static Set<String> topics() {
+        return Collect.unmodifiableSet(Topic.ENTITY_UPDATES, Topic.ENTITY_TYPE_UPDATES,
+                                       Topic.Stores.SCHEMA_LEARNING_REVISIONS, Topic.Stores.SCHEMA_LEARNING_MODELS);
+    }
+
+    /**
      * The name of the local store used by the service to track model revisions for last known entity revisions.
      */
-    public static final String REVISIONS_STORE_NAME = "schema-learning-revisions";
+    public static final String REVISIONS_STORE_NAME = Topic.Stores.SCHEMA_LEARNING_REVISIONS;
 
     /**
      * The name of the local store used by the service to track the learning model for each entity type.
      */
-    public static final String MODELS_STORE_NAME = "schema-learning-models";
+    public static final String MODELS_STORE_NAME = Topic.Stores.SCHEMA_LEARNING_MODELS;
 
     /**
      * The name of this service.
@@ -148,6 +162,10 @@ public final class SchemaLearningService extends ServiceProcessor {
             this.modelRevision = modelRevision;
         }
     }
+
+    private static final Deserializer<EntityRevisions> REVISIONS_DESERIALIZER = deserializerFor(EntityRevisions::new);
+    private static final Serializer<EntityRevisions> REVISIONS_SERIALIZER = serializerFor(er->er.entityRevision,
+                                                                                                er->er.modelRevision);
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SchemaLearningService.class);
     private static final String METADATA_KEY = "$$$";
@@ -171,23 +189,38 @@ public final class SchemaLearningService extends ServiceProcessor {
     public SchemaLearningService(Configuration config) {
         super(SERVICE_NAME, config);
         serviceId = config.getString("service.id");
-        punctuateInterval = config.getLong("service.punctuate.interval.ms", 30*1000);
+        punctuateInterval = config.getLong("service.punctuate.interval.ms", 30 * 1000);
     }
 
     @Override
     protected void init() {
-        this.persistedRevisions = new InMemoryKeyValueStore<>(REVISIONS_STORE_NAME, context());
-        this.persistedModels = new InMemoryKeyValueStore<>(MODELS_STORE_NAME, context());
+        // Create the stores ...
+        this.persistedRevisions = Stores.create(REVISIONS_STORE_NAME, context())
+                                        .withStringKeys()
+                                        .withValues(REVISIONS_SERIALIZER, REVISIONS_DESERIALIZER)
+                                        .inMemory()
+                                        .build();
+        this.persistedModels = Stores.create(MODELS_STORE_NAME, context())
+                                     .withStringKeys()
+                                     .withValues(Serdes.document(), Serdes.document())
+                                     .inMemory()
+                                     .build();
+
         // Load the models from the store ...
         this.persistedModels.all().forEachRemaining(entry -> {
-            EntityType type = Identifier.parseEntityType(entry.key());
-            EntityTypeLearningModel model = new EntityTypeLearningModel(type, entry.value());
-            transientModels.put(type, model);
+            try {
+                EntityType type = Identifier.parseEntityType(entry.key());
+                EntityTypeLearningModel model = new EntityTypeLearningModel(type, entry.value());
+                transientModels.put(type, model);
+            } catch ( IllegalArgumentException e ) {
+                // Unexpected key, so ignore
+            }
         });
         // Get or create a unique ID for this service group ...
         Document meta = this.persistedModels.get(METADATA_KEY);
-        if (serviceId != null) {
+        if ( serviceId != null ) {
             // Set via the config properties ...
+            if (meta == null) meta = Document.create();
             meta.setString(SERVICE_ID_KEY, serviceId);
             this.persistedModels.put(METADATA_KEY, meta);
         } else {
@@ -197,9 +230,9 @@ public final class SchemaLearningService extends ServiceProcessor {
             meta.setString(SERVICE_ID_KEY, serviceId);
             this.persistedModels.put(METADATA_KEY, meta);
         }
-        
+
         // And register ourselves for punctuation ...
-        if ( punctuateInterval > 0 ) context().schedule(punctuateInterval);
+        if (punctuateInterval > 0) context().schedule(punctuateInterval);
     }
 
     @Override
@@ -296,8 +329,10 @@ public final class SchemaLearningService extends ServiceProcessor {
 
     @Override
     public void close() {
+        logger().trace("Shutting down service '{}'", getName());
         this.persistedRevisions.close();
         this.persistedModels.close();
+        logger().debug("Service '{}' shutdown", getName());
     }
 
     private boolean removeUsages(Patch.Operation operation) {

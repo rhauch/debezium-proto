@@ -11,7 +11,10 @@ import java.util.Set;
 import org.debezium.util.Collect;
 
 /**
- * A pass-through security provider.
+ * A pass-through security provider. This is a valid provider when the environment can pre-authenticate and authorize a user
+ * before the {@link DebeziumDriver} methods are called. An example of such an environment might be a web service that uses
+ * OAuth 2.0 to authenticate and authorize callers' tokens prior to the service invoking the Debezium driver's methods.
+ * 
  * @author Randall Hauch
  */
 public final class PassthroughSecurityProvider implements SecurityProvider {

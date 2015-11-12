@@ -11,7 +11,6 @@ import java.util.Properties;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.I0Itec.zkclient.ZkClient;
 import org.debezium.annotation.ThreadSafe;
 import org.debezium.util.IoUtil;
 import org.slf4j.Logger;
@@ -20,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import kafka.admin.AdminUtils;
 import kafka.server.KafkaConfig;
 import kafka.utils.Time;
+import kafka.utils.ZkUtils;
 
 /**
  * A small embedded Kafka server.
@@ -199,7 +199,7 @@ public class KafkaServer {
         // Start the server ...
         try {
             LOGGER.debug("Starting Kafka broker {} @ {} with storage in {}", brokerId, getConnection(), logsDir.getAbsolutePath());
-            server = new kafka.server.KafkaServer(new KafkaConfig(config), new SystemTime(), null);
+            server = new kafka.server.KafkaServer(new KafkaConfig(config), new SystemTime(), scala.Option.apply(null));
             server.startup();
             LOGGER.info("Started Kafka server {} @ {} with storage in {}", brokerId, getConnection(), logsDir.getAbsolutePath());
             return this;
@@ -212,41 +212,38 @@ public class KafkaServer {
     /**
      * Shutdown the embedded Kafka server and delete all data.
      */
-    public void shutdown() {
-        shutdown(true);
-    }
-
-    /**
-     * Shutdown the embedded Kafka server.
-     * 
-     * @param deleteData true if the data should be removed, or false otherwise
-     */
-    public synchronized void shutdown(boolean deleteData) {
+    public synchronized void shutdown() {
         if (server != null) {
             try {
                 server.shutdown();
             } finally {
                 server = null;
                 port = desiredPort;
-                if (deleteData) {
-                    // Delete all data ...
-                    try {
-                        IoUtil.delete(this.logsDir);
-                    } catch (IOException e) {
-                        LOGGER.error("Unable to delete directory '{}'", this.logsDir, e);
-                    }
-                }
+            }
+        }
+    }
+    
+    /**
+     * Delete all of the data associated with this server.
+     */
+    public synchronized void deleteData() {
+        if (server == null) {
+            // Delete all data ...
+            try {
+                IoUtil.delete(this.logsDir);
+            } catch (IOException e) {
+                LOGGER.error("Unable to delete directory '{}'", this.logsDir, e);
             }
         }
     }
 
     /**
-     * Get the Zookeeper client used by the running Kafka server.
+     * Get the Zookeeper utilities used by the running Kafka server.
      * 
-     * @return the Zookeeper client, or null if the Kafka server is not running
+     * @return the Zookeeper utilities, or null if the Kafka server is not running
      */
-    public ZkClient getZkClient() {
-        return server != null ? server.zkClient() : null;
+    public ZkUtils getZkUtils() {
+        return server != null ? server.zkUtils() : null;
     }
 
     /**
@@ -255,9 +252,31 @@ public class KafkaServer {
      * @param topics the names of the topics to create
      */
     public void createTopics(String... topics) {
+        createTopics(1,1,topics);
+    }
+
+    /**
+     * Create the specified topics.
+     * 
+     * @param numPartitions the number of partitions for each topic
+     * @param replicationFactor the replication factor for each topic
+     * @param topics the names of the topics to create
+     */
+    public void createTopics(int numPartitions, int replicationFactor, String... topics) {
         for (String topic : topics) {
-            AdminUtils.createTopic(getZkClient(), topic, 2, 1, new Properties());
+            if ( topic != null ) createTopic(topic, numPartitions, replicationFactor);
         }
+    }
+    
+    /**
+     * Create the specified topic.
+     * 
+     * @param topic the name of the topic to create
+     * @param numPartitions the number of partitions for the topic
+     * @param replicationFactor the replication factor for the topic
+     */
+    public void createTopic( String topic, int numPartitions, int replicationFactor ) {
+        AdminUtils.createTopic(getZkUtils(), topic, 1, 1, new Properties());
     }
 
     /**

@@ -189,8 +189,6 @@ public abstract class TopologyTest implements Testing {
 
     /**
      * Read the next message output by the processor when sent input messages.
-     * <p>
-     * This method does <em>NOT</em> cache any output messages in the #lastMessage() field.
      * 
      * @param topic the name of the topic
      * @return the stream of output messages; never null
@@ -202,6 +200,7 @@ public abstract class TopologyTest implements Testing {
             if (lastMessage != null) messages.add(lastMessage);
         } while (lastMessage != null);
         if (messages != null && !messages.isEmpty()) {
+            lastMessage = messages.get(messages.size()-1);
             return messages.stream();
         }
         return Stream.empty();

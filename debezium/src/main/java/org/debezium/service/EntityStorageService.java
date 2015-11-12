@@ -5,9 +5,11 @@
  */
 package org.debezium.service;
 
+import java.util.Set;
+
 import org.apache.kafka.streams.processor.TopologyBuilder;
-import org.apache.kafka.streams.state.InMemoryKeyValueStore;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.Stores;
 import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
@@ -22,6 +24,7 @@ import org.debezium.message.Path;
 import org.debezium.message.Topic;
 import org.debezium.model.EntityId;
 import org.debezium.model.EntityType;
+import org.debezium.util.Collect;
 
 /**
  * A service responsible for reading the {@value Topic#ENTITY_PATCHES} Kafka topic containing {@link Patch} messages.
@@ -142,11 +145,21 @@ public final class EntityStorageService extends ServiceProcessor {
         topology.addSink("responses", Topic.PARTIAL_RESPONSES, Serdes.stringSerializer(), Serdes.document(), "service");
         return topology;
     }
-    
+
+    /**
+     * Get the set of input, output, and store-related topics that this service uses.
+     * 
+     * @return the set of topics; never null, but possibly empty
+     */
+    public static Set<String> topics() {
+        return Collect.unmodifiableSet(Topic.ENTITY_PATCHES, Topic.ENTITY_UPDATES, Topic.PARTIAL_RESPONSES,
+                                       Topic.Stores.ENTITY_STORAGE);
+    }
+
     /**
      * The name of the single store used by the service.
      */
-    public static final String ENTITY_STORE_NAME = "entity-storage";
+    public static final String ENTITY_STORE_NAME = Topic.Stores.ENTITY_STORAGE;
 
     /**
      * The name of this service.
@@ -164,7 +177,11 @@ public final class EntityStorageService extends ServiceProcessor {
 
     @Override
     protected void init() {
-        this.store = new InMemoryKeyValueStore<>(ENTITY_STORE_NAME, context());
+        this.store = Stores.create(ENTITY_STORE_NAME, context())
+                           .withStringKeys()
+                           .withValues(Serdes.document(), Serdes.document())
+                           .inMemory()
+                           .build();
     }
 
     @Override
@@ -278,7 +295,9 @@ public final class EntityStorageService extends ServiceProcessor {
 
     @Override
     public void close() {
+        logger().trace("Shutting down service '{}'", getName());
         this.store.close();
+        logger().debug("Service '{}' shutdown", getName());
     }
 
     private void sendResponse(Document response, String idStr) {

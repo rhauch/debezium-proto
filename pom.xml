@@ -16,7 +16,7 @@
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.debezium</groupId>
-    <artifactId>parent</artifactId>
+    <artifactId>debezium-parent</artifactId>
     <version>0.2-SNAPSHOT</version>
     <name>Debezium Parent POM</name>
     <packaging>pom</packaging>
@@ -45,8 +45,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Major dependencies -->
-        <samza.version>0.9.0</samza.version>
-        <kafka.version>0.8.3-SNAPSHOT</kafka.version>
+        <kafka.version>0.9.0.0-SNAPSHOT</kafka.version>
+        <!--kafka.snapshot.clients.version>0.9.0.0-20151012.153309-2</kafka.snapshot.clients.version>
+        <kafka.snapshot.core.version>0.9.0.0-20151012.153309-2</kafka.snapshot.core.version>
+        <kafka.snapshot.streams.version>0.9.0.0-20151012.153344-2</kafka.snapshot.streams.version>
+        <kafka.snapshot.logappender.version>0.9.0.0-20151012.153342-2</kafka.snapshot.logappender.version-->
+
         <scala.version>2.11.7</scala.version>
         <scala.label.version>2.11</scala.label.version>
         <curator.version>2.4.0</curator.version>
@@ -57,20 +61,19 @@
         <!-- Kafka uses Metrics 2.2.0, but Metrics 3.x uses a different package
              structure so it can be used alongside 2.x within the same classloader -->
         <metrics.version>3.1.0</metrics.version>
+        
         <version.resteasy>3.0.11.Final</version.resteasy>
-        <version.io.undertow>1.2.9.Final</version.io.undertow>
+        <version.keycloak>1.6.1.Final</version.keycloak>
 
         <!-- Logging stuff -->
-        <!--jboss.logging.version>3.1.4.GA</jboss.logging.version>
-        <jboss.logmanager.version>1.5.2.Final</jboss.logmanager.version-->
         <log4j.version>1.2.16</log4j.version>
         <org.slf4j.version>1.7.2</org.slf4j.version>
         <slf4j.log4j.version>1.7.2</slf4j.log4j.version>
-        <jboss.slf4j.logmanager.version>1.0.3.GA</jboss.slf4j.logmanager.version>
         <version.jboss.spec.javaee.7.0>1.0.3.Final</version.jboss.spec.javaee.7.0>
 
         <!-- Maven Plugins -->
         <version.resources.plugin>2.4.2</version.resources.plugin>
+        <version.dependency.plugin>2.10</version.dependency.plugin>
         <version.assembly.plugin>2.4</version.assembly.plugin>
         <version.war.plugin>2.5</version.war.plugin>
         <version.codehaus.helper.plugin>1.8</version.codehaus.helper.plugin>
@@ -89,6 +92,8 @@
     </properties>
     <modules>
         <module>debezium</module>
+        <!--module>debezium-server</module-->
+        <module>distribution</module>
     </modules>
     <dependencyManagement>
         <dependencies>
@@ -101,29 +106,34 @@
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>0.8.3-20150925.170053-11</version>
+                <version>${kafka.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-clients</artifactId>
-                <version>0.8.3-20150925.170053-11</version>
+                <version>${kafka.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-streams</artifactId>
-                <version>0.8.3-20150925.170127-4</version>
+                <version>${kafka.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-log4j-appender</artifactId>
+                <version>${kafka.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka_${scala.label.version}</artifactId>
-                <version>0.8.3-20150925.170053-11</version>
+                <version>${kafka.version}</version>
                 <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-streams</artifactId>
-                <version>0.8.3-20150925.170127-4</version>
+                <version>${kafka.version}</version>
                 <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>
@@ -134,58 +144,9 @@
                 <version>${zookeeper.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.apache.avro</groupId>
-                <artifactId>avro</artifactId>
-                <version>${avro.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-api</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kv_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kv-rocksdb_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kv-inmemory_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-kafka_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
               <groupId>com.fasterxml.jackson.core</groupId>
               <artifactId>jackson-core</artifactId>
               <version>${jackson.version}</version>
-            </dependency>
-
-            <!-- Samza w/ YARN dependencies -->
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-core_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-shell</artifactId>
-                <classifier>dist</classifier>
-                <type>tgz</type>
-                <version>${samza.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.samza</groupId>
-                <artifactId>samza-yarn_${scala.label.version}</artifactId>
-                <version>${samza.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.dropwizard.metrics</groupId>
@@ -199,26 +160,6 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${org.slf4j.version}</version>
             </dependency>
-            <!--dependency>
-                <groupId>org.jboss.msc</groupId>
-                <artifactId>jboss-msc</artifactId>
-                <version>${jboss.msc.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.logging</groupId>
-                <artifactId>jboss-logging</artifactId>
-                <version>${jboss.logging.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.logmanager</groupId>
-                <artifactId>jboss-logmanager</artifactId>
-                <version>${jboss.logmanager.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.slf4j</groupId>
-                <artifactId>slf4j-jboss-logmanager</artifactId>
-                <version>${jboss.slf4j.logmanager.version}</version>
-            </dependency-->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-log4j12</artifactId>
@@ -246,42 +187,29 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!--dependency>
-                <groupId>org.jboss.resteasy</groupId>
-                <artifactId>resteasy-undertow</artifactId>
-                <version>${version.resteasy}</version>
-                <scope>test</scope>
+
+            <!-- Keycloak depedencies -->
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-core</artifactId>
+                <version>${version.keycloak}</version>
             </dependency>
             <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-core</artifactId>
-                <version>${version.io.undertow}</version>
-                <scope>test</scope>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-adapter-core</artifactId>
+                <version>${version.keycloak}</version>
             </dependency>
             <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-servlet</artifactId>
-                <version>${version.io.undertow}</version>
-                <scope>test</scope>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-adapter-spi</artifactId>
+                <version>${version.keycloak}</version>
             </dependency>
-            <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-websockets-jsr</artifactId>
-                <version>${version.io.undertow}</version>
-                <scope>test</scope>
-            </dependency-->
 
             <!-- Test depedencies -->
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>${junit.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -305,6 +233,18 @@
             </dependency>
 
             <!-- Debezium artifacts -->
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.debezium</groupId>
+                <artifactId>debezium</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
             <dependency>
                 <groupId>org.debezium</groupId>
                 <artifactId>debezium-core</artifactId>
@@ -360,6 +300,7 @@
                 <artifactId>debezium-response-accumulator-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
             <!-- Debezium test artifacts -->
             <dependency>
                 <groupId>org.debezium</groupId>
@@ -452,6 +393,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-resources-plugin</artifactId>
                     <version>${version.resources.plugin}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${version.dependency.plugin}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -576,14 +522,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <!-- Generate the Docker images; by default, skip -->
-            <plugin>
-                <groupId>com.spotify</groupId>
-                <artifactId>docker-maven-plugin</artifactId>
-                <configuration>
-                    <skipDockerBuild>true</skipDockerBuild>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -122,6 +122,22 @@ public final class Entity {
                                                                .anyMatch(Value.create(tag)::equals);
     }
 
+    /**
+     * Get the revision number of this entity.
+     * @return the revision number, or 0 if the entity does not {@link #exists() exist}
+     */
+    public long revision() {
+        return exists() ? Message.getRevision(doc) : 0L;
+    }
+    
+    /**
+     * Get the timestamp of last modification.
+     * @return the time that the entity was last modified, or 0 if the entity does not {@link #exists() exist}
+     */
+    public long lastModified() {
+        return exists() ? Message.getEnded(doc) : 0L;
+    }
+    
     @Override
     public int hashCode() {
         return id.hashCode();

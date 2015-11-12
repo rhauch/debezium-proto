@@ -12,12 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -27,7 +22,6 @@ import org.apache.kafka.streams.processor.TopologyBuilder;
 import org.debezium.Configuration;
 import org.debezium.Debezium;
 import org.debezium.annotation.NotThreadSafe;
-import org.debezium.annotation.ThreadSafe;
 import org.debezium.util.CommandLineOptions;
 import org.debezium.util.IoUtil;
 
@@ -73,7 +67,9 @@ import org.debezium.util.IoUtil;
  *                                    .setVersion(Debezium.getVersion())
  *                                    .run(props);
  * </pre>
+ * 
  * and later on stop the service runner by canceling it:
+ * 
  * <pre>
  * runner.cancel(true);
  * </pre>
@@ -119,7 +115,7 @@ public class ServiceRunner {
     private ClassLoader classLoader = getClass().getClassLoader();
     private String systemPropertyNamePrefix = DEFAULT_SYSTEM_PROPERTY_NAME_PREFIX;
     private String version = Debezium.getVersion();
-    private final CurrentStatus status = new CurrentStatus();
+    private KafkaStreaming streamingEngine;
     private volatile Consumer<ReturnCode> completionHandler;
     private volatile Consumer<Throwable> errorHandler;
 
@@ -129,7 +125,7 @@ public class ServiceRunner {
         if (topologySupplier == null) throw new IllegalArgumentException("The topology supplier may not be null");
         this.appName = appName;
         this.topologySupplier = topologySupplier;
-        this.completionHandler = this::exit;
+        this.completionHandler = null;
         this.errorHandler = this::recordError;
         withOption('c', "config", "The path to the configuration file");
     }
@@ -176,6 +172,17 @@ public class ServiceRunner {
     public ServiceRunner setVersion(String version) {
         if (version == null || version.trim().isEmpty()) throw new IllegalArgumentException("The version may not be null or empty");
         this.version = version;
+        return this;
+    }
+
+    /**
+     * Set whether verbose output is enabled.
+     * 
+     * @param verbose {@code true} if enabled, or {@code false} otherwise
+     * @return this service runner instance so that methods can be chained together; never null
+     */
+    public ServiceRunner setVerbose(boolean verbose) {
+        this.verbose = verbose;
         return this;
     }
 
@@ -263,7 +270,7 @@ public class ServiceRunner {
      * @return this service runner instance so that methods can be chained together; never null
      */
     public ServiceRunner withCompletionHandler(Consumer<ReturnCode> completionHandler) {
-        this.completionHandler = completionHandler != null ? completionHandler : this::exit;
+        this.completionHandler = completionHandler != null ? completionHandler : null;
         return this;
     }
 
@@ -285,28 +292,27 @@ public class ServiceRunner {
      * Run the service by reading the configuration, applying any system properties that match the configuration property rule,
      * and that starts the Kafka Streams framework to consume and process the desired topics.
      * <p>
-     * This method block until the thread calling it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
+     * This method block until the thread calling it is interrupted or until service is {@link #shutdown()}.
      * 
      * @param args the command line arguments
-     * @return the current status of this runner; never null
+     * @return this service runner instance so that methods can be chained together; never null
      * @see #run(Properties)
      * @see #run(Properties, ExecutorService)
-     * @see #shutdown(long, TimeUnit)
+     * @see #shutdown()
      * @see #isRunning()
      */
-    public synchronized Future<Void> run(String[] args) {
-        if (!status.isRunning()) {
-            status.start(new CompletableFuture());
+    public synchronized ServiceRunner run(String[] args) {
+        if (!isRunning()) {
             Configuration config = null;
             try {
                 final CommandLineOptions options = CommandLineOptions.parse(args);
                 if (options.getOption("-?", "--help", false) || options.hasParameter("help")) {
                     printUsage();
-                    return status.complete(ReturnCode.SUCCESS);
+                    return shutdown(ReturnCode.SUCCESS);
                 }
                 if (options.hasOption("--version")) {
                     print(getClass().getSimpleName() + " version " + version);
-                    return status.complete(ReturnCode.SUCCESS);
+                    return shutdown(ReturnCode.SUCCESS);
                 }
                 final String pathToConfigFile = options.getOption("-c", "--config", "debezium.json");
                 verbose = options.getOption("-v", "--verbose", false);
@@ -314,7 +320,7 @@ public class ServiceRunner {
                 config = Configuration.load(pathToConfigFile, classLoader, this::printVerbose);
                 if (config.isEmpty()) {
                     print("Unable to read Debezium client configuration file at '" + pathToConfigFile + "': file not found");
-                    return status.complete(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
+                    return shutdown(ReturnCode.UNABLE_TO_READ_CONFIGURATION);
                 }
 
                 printVerbose("Found configuration at " + pathToConfigFile + ":");
@@ -327,74 +333,70 @@ public class ServiceRunner {
             } catch (Throwable t) {
                 print("Unexpected exception while processing the configuration: " + t.getMessage());
                 t.printStackTrace();
-                return status.complete(ReturnCode.CONFIGURATION_ERROR);
+                return shutdown(ReturnCode.CONFIGURATION_ERROR);
             }
 
             try {
                 execute(config);
             } catch (Throwable t) {
                 errorHandler.accept(t);
-                return status.complete(ReturnCode.ERROR_DURING_EXECUTION);
+                return shutdown(ReturnCode.ERROR_DURING_EXECUTION);
             }
         }
-        return status;
+        return this;
     }
 
     /**
      * Run the service by reading the configuration, applying any system properties that match the configuration property rule,
      * and that starts the Kafka Streams framework to consume and process the desired topics.
      * <p>
-     * This method block until the thread calling it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
+     * This method block until the thread calling it is interrupted or until service is {@link #shutdown()}.
      * 
      * @param config the configuration properties for the service
-     * @return the current status of this runner; never null
+     * @return this service runner instance so that methods can be chained together; never null
      * @see #run(String[])
      * @see #run(Properties, ExecutorService)
-     * @see #shutdown(long, TimeUnit)
+     * @see #shutdown()
      * @see #isRunning()
      */
-    public synchronized Future<Void> run(Properties config) {
-        if (!status.isRunning()) {
-            status.start(new CompletableFuture());
+    public synchronized ServiceRunner run(Properties config) {
+        if (!isRunning()) {
             try {
                 // Start the stream processing framework ...
                 execute(Configuration.from(config));
             } catch (Throwable t) {
                 errorHandler.accept(t);
-                status.complete(ReturnCode.ERROR_DURING_EXECUTION);
+                shutdown(ReturnCode.ERROR_DURING_EXECUTION);
             }
         }
-        return status;
+        return this;
     }
 
     /**
      * Run the service by reading the configuration, applying any system properties that match the configuration property rule,
      * and that starts the Kafka Streams framework to consume and process the desired topics.
      * <p>
-     * This method block until the thread calling it is interrupted or until service is {@link #shutdown(long, TimeUnit)}.
+     * This method block until the thread calling it is interrupted or until service is {@link #shutdown()}.
      * 
      * @param config the configuration properties for the service; may be null
      * @param executor the executor that should be used to asynchronously run the service
-     * @return the current status of this runner; never null
+     * @return this service runner instance so that methods can be chained together; never null
      * @see #run(String[])
      * @see #run(Properties)
-     * @see #shutdown(long, TimeUnit)
+     * @see #shutdown()
      * @see #isRunning()
      */
-    public synchronized Future<Void> run(Properties config, ExecutorService executor) {
-        if (!status.isRunning()) {
-            status.start(executor.submit(() -> {
-                try {
-                    // Start the stream processing framework ...
-                    execute(Configuration.from(config));
-                } catch (Throwable t) {
-                    errorHandler.accept(t);
-                    status.complete(ReturnCode.ERROR_DURING_EXECUTION);
-                }
-                return null;
-            }));
+    public synchronized ServiceRunner run(Properties config, ExecutorService executor) {
+        if (!isRunning()) {
+            try {
+                // Start the stream processing framework ...
+                execute(Configuration.from(config));
+            } catch (Throwable t) {
+                errorHandler.accept(t);
+                shutdown(ReturnCode.ERROR_DURING_EXECUTION);
+            }
         }
-        return status;
+        return this;
     }
 
     /**
@@ -402,14 +404,14 @@ public class ServiceRunner {
      * 
      * @param config the configuration properties for the service
      * @throws Exception if there is a problem configuring or executing the streaming process
-     * @see #shutdown(long, TimeUnit)
+     * @see #shutdown()
      */
     private void execute(Configuration config) throws Exception {
         // Start the stream processing framework ...
         StreamingConfig processorProps = new StreamingConfig(config.asProperties());
-        KafkaStreaming streaming = new KafkaStreaming(topologySupplier.apply(config), processorProps);
+        streamingEngine = new KafkaStreaming(topologySupplier.apply(config), processorProps);
         printVerbose("Starting Kafka streaming process using topology for " + appName);
-        streaming.start();
+        streamingEngine.start();
     }
 
     /**
@@ -419,51 +421,36 @@ public class ServiceRunner {
      * @see #run(String[])
      * @see #run(Properties)
      * @see #run(Properties, ExecutorService)
-     * @see #shutdown(long, TimeUnit)
+     * @see #shutdown()
      */
-    public boolean isRunning() {
-        return status.isRunning();
-    }
-
-    /**
-     * Get the current status. The result is always the same object returned by one of the {@link #run(Properties) run} methods,
-     * although its state does change based upon the running state of this runner.
-     * 
-     * @return the current status of this runner; never null
-     */
-    public Future<Void> status() {
-        return status;
+    public synchronized boolean isRunning() {
+        return streamingEngine != null;
     }
 
     /**
      * Shutdown the service and wait for it to complete.
      * 
-     * @param timeout the amount of time to wait for completion
-     * @param unit the unit of time for the timeout; may not be null
      * @return true if the service was or is shutdown, or false otherwise
      * @see #run(String[])
      * @see #isRunning()
      */
-    public synchronized boolean shutdown(long timeout, TimeUnit unit) {
-        this.status.cancel(true);
-        try {
-            this.status.get(timeout, unit);
-        } catch (InterruptedException e) {
-            // Had to interrupt the thread, but it still stopped ...
-        } catch (ExecutionException e) {
-            // Should not happen, but just in case ...
-            recordError(e);
-        } catch (TimeoutException e) {
-            // Could not shut it down in time ...
-            return false;
+    public synchronized boolean shutdown() {
+        if (isRunning()) {
+            shutdown(ReturnCode.SUCCESS);
+            return true;
         }
-        // There was no thread or no latch, so it's shutdown ...
-        return true;
+        return false;
     }
 
-    private void exit(ReturnCode code) {
-        print("Exiting " + appName);
-        System.exit(code.ordinal());
+    protected ServiceRunner shutdown(ReturnCode code) {
+        try {
+            if (streamingEngine != null) streamingEngine.close();
+        } catch ( Throwable t ) {
+            errorHandler.accept(t);
+        } finally {
+            if (completionHandler != null) completionHandler.accept(code);
+        }
+        return this;
     }
 
     private void recordError(Throwable error) {
@@ -575,107 +562,4 @@ public class ServiceRunner {
             return 0;
         }
     }
-
-    @ThreadSafe
-    private final class CurrentStatus implements Future<Void> {
-        private Future<Void> delegate;
-        private boolean wasCancelled = false;
-
-        @Override
-        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-            if (delegate == null) return false;
-            wasCancelled = delegate.cancel(mayInterruptIfRunning);
-            return wasCancelled;
-        }
-
-        @Override
-        public synchronized Void get() throws InterruptedException, ExecutionException {
-            return delegate != null ? delegate.get() : null;
-        }
-
-        @Override
-        public synchronized boolean isCancelled() {
-            return wasCancelled;
-        }
-
-        @Override
-        public synchronized Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-            return delegate != null ? delegate.get(timeout, unit) : null;
-        }
-
-        @Override
-        public synchronized boolean isDone() {
-            return delegate != null ? delegate.isDone() : true;
-        }
-
-        public boolean isRunning() {
-            return delegate != null && (delegate.isDone() || delegate.isCancelled());
-        }
-
-        public synchronized CurrentStatus start(Future<Void> delegate) {
-            assert this.delegate == null;
-            this.delegate = delegate;
-            this.wasCancelled = false;
-            return this;
-        }
-
-        public synchronized CurrentStatus complete(ReturnCode result) {
-            if (delegate instanceof CompletableFuture) {
-                ((CompletableFuture) delegate).complete();
-            }
-            Consumer<ReturnCode> handler = completionHandler;
-            if (handler != null) handler.accept(result);
-            this.delegate = null;
-            return this;
-        }
-    }
-
-    private static final class CompletableFuture implements Future<Void> {
-        private final CountDownLatch runningLatch = new CountDownLatch(1);
-        private volatile boolean cancelled = false;
-        private volatile Thread runningThread = Thread.currentThread();
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            if (runningLatch.getCount() > 0 && !this.cancelled) {
-                // Interrupt the thread being used to run the service; the KStreamProcess.run will catch the interrupt and
-                // complete normally
-                this.cancelled = true;
-                runningThread.interrupt();
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public boolean isCancelled() {
-            return cancelled;
-        }
-
-        @Override
-        public boolean isDone() {
-            return runningLatch.getCount() < 1;
-        }
-
-        @Override
-        public Void get() throws InterruptedException, ExecutionException {
-            runningLatch.await();
-            return null;
-        }
-
-        @Override
-        public Void get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-            runningLatch.await(timeout, unit);
-            return null;
-        }
-
-        public void complete() {
-            try {
-                runningLatch.countDown();
-            } finally {
-                runningThread = null;
-            }
-        }
-    }
-
 }

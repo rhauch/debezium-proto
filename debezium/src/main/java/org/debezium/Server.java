@@ -14,9 +14,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -25,15 +22,12 @@ import org.apache.kafka.streams.examples.WallclockTimestampExtractor;
 import org.debezium.kafka.KafkaCluster;
 import org.debezium.kafka.KafkaCluster.Usage;
 import org.debezium.message.DocumentSerdes;
-import org.debezium.message.Topic;
 import org.debezium.service.EntityBatchService;
 import org.debezium.service.EntityStorageService;
 import org.debezium.service.ResponseAccumulatorService;
 import org.debezium.service.SchemaLearningService;
 import org.debezium.service.SchemaService;
 import org.debezium.service.ServiceRunner;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A Debezium server that runs an embedded Zookeeper, Kafka, and all Debezium services. While this can be run as a single process
@@ -56,27 +50,25 @@ public class Server {
     private final KafkaCluster kafkaCluster = new KafkaCluster().deleteDataUponShutdown(DEFAULT_DELETE_DATA_UPON_SHUTDOWN)
                                                                 .deleteDataPriorToStartup(DEFAULT_DELETE_DATA_PRIOR_TO_STARTUP)
                                                                 .withPorts(DEFAULT_ZOOKEEPER_PORT, DEFAULT_KAFKA_STARTING_PORT);
-    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final List<ServiceRunner> services = new ArrayList<>();
     private final Set<String> topicNames = new HashSet<>();
     private final ConcurrentMap<String, Properties> configs = new ConcurrentHashMap<>();
     private volatile boolean running = false;
+    private volatile File dataDir = null;
 
     public Server() {
-        services.add(EntityBatchService.runner());
-        services.add(EntityStorageService.runner());
-        services.add(ResponseAccumulatorService.runner());
-        services.add(SchemaLearningService.runner());
-        services.add(SchemaService.runner());
+        services.add(EntityBatchService.runner().setVerbose(true));
+        services.add(EntityStorageService.runner().setVerbose(true));
+        services.add(ResponseAccumulatorService.runner().setVerbose(true));
+        services.add(SchemaLearningService.runner().setVerbose(true));
+        services.add(SchemaService.runner().setVerbose(true));
 
-        // TODO: Get the topic names from the service runners (via their topologies' source and sink topics) ...
-        topicNames.add(Topic.ENTITY_BATCHES);
-        topicNames.add(Topic.ENTITY_PATCHES);
-        topicNames.add(Topic.ENTITY_UPDATES);
-        topicNames.add(Topic.PARTIAL_RESPONSES);
-        topicNames.add(Topic.COMPLETE_RESPONSES);
-        topicNames.add(Topic.ENTITY_TYPE_UPDATES);
-        topicNames.add(Topic.SCHEMA_UPDATES);
+        // Get the names of *all* topics used by each service ...
+        topicNames.addAll(EntityBatchService.topics());
+        topicNames.addAll(EntityStorageService.topics());
+        topicNames.addAll(ResponseAccumulatorService.topics());
+        topicNames.addAll(SchemaLearningService.topics());
+        topicNames.addAll(SchemaService.topics());
     }
 
     /**
@@ -109,7 +101,7 @@ public class Server {
     }
 
     /**
-     * Specify whether the data is to be deleted upon {@link #shutdown(long, TimeUnit)}.
+     * Specify whether the data is to be deleted upon {@link #shutdown()}.
      * 
      * @param delete true if the data is to be deleted upon shutdown, or false otherwise
      * @return this instance to allow chaining methods; never null
@@ -120,6 +112,17 @@ public class Server {
         return this;
     }
 
+    /**
+     * Specify whether the data is to be deleted prior to {@link #startup()}.
+     * 
+     * @param delete true if the data is to be deleted upon shutdown, or false otherwise
+     * @return this instance to allow chaining methods; never null
+     * @throws IllegalStateException if the cluster is running
+     */
+    public Server deleteDataPriorToStartup(boolean delete) {
+        this.kafkaCluster.deleteDataPriorToStartup(delete);
+        return this;
+    }
     /**
      * Add a number of new Kafka broker to the cluster. The broker IDs will be generated.
      * 
@@ -143,6 +146,7 @@ public class Server {
      */
     public Server usingDirectory(File dataDir) {
         this.kafkaCluster.usingDirectory(dataDir);
+        this.dataDir = dataDir;
         return this;
     }
 
@@ -240,7 +244,7 @@ public class Server {
     public synchronized Server startup() throws IOException {
         if (!running) {
             this.kafkaCluster.startup();
-            this.topicNames.forEach(topic -> this.kafkaCluster.createTopics(topic));
+            this.kafkaCluster.createTopics(1, 1, this.topicNames); // 1 partition for each
             this.services.forEach(service -> {
                 Properties config = generateServiceConfiguration(service.getName());
                 service.run(config);
@@ -255,11 +259,16 @@ public class Server {
         Properties config = new Properties();
         config.put(StreamingConfig.CLIENT_ID_CONFIG, serviceName);
         config.put(StreamingConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaCluster.brokerList());
-        config.put(StreamingConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(StreamingConfig.VALUE_SERIALIZER_CLASS_CONFIG, DocumentSerdes.class);
-        config.put(StreamingConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(StreamingConfig.VALUE_DESERIALIZER_CLASS_CONFIG, DocumentSerdes.class);
-        config.put(StreamingConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG, WallclockTimestampExtractor.class);
+        config.put(StreamingConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        config.put(StreamingConfig.VALUE_SERIALIZER_CLASS_CONFIG, DocumentSerdes.class.getName());
+        config.put(StreamingConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        config.put(StreamingConfig.VALUE_DESERIALIZER_CLASS_CONFIG, DocumentSerdes.class.getName());
+        config.put(StreamingConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG, WallclockTimestampExtractor.class.getName());
+        if ( dataDir != null ) {
+            File serviceDir = new File(dataDir,serviceName);
+            serviceDir.mkdirs();
+            config.put(StreamingConfig.STATE_DIR_CONFIG, serviceDir.getAbsolutePath());
+        }
         Properties service = configs.get(serviceName);
         if (service != null) config.putAll(service);
         return config;
@@ -276,31 +285,16 @@ public class Server {
     }
 
     /**
-     * Shutdown the embedded Zookeeper server and the Kafka servers {@link #addBrokers(int) in the cluster}.
+     * Shutdown the embedded Zookeeper server, the Kafka brokers {@link #addBrokers(int) in the cluster}, and the services.
      * This method does nothing if the cluster is not running.
      * 
-     * @param timeout the maximum amount of time to wait for each services to shutdown
-     * @param unit the unit of time for {@code timeout}; may not be null
      * @return this instance to allow chaining methods; never null
      */
-    public synchronized Server shutdown(long timeout, TimeUnit unit) {
+    public synchronized Server shutdown() {
         if (running) {
             try {
                 // Stop each of the services ...
-                this.services.forEach(runner -> runner.status().cancel(true));
-                // Wait for all of the services to shutdown ...
-                this.services.forEach(runner -> {
-                    try {
-                        runner.status().get(timeout, unit);
-                    } catch (InterruptedException e) {
-                        Thread.interrupted();
-                        // and continue ...
-                    } catch (ExecutionException e) {
-                        logger.error("Unexpected exception while waiting for shutdown of service {} service", runner.getName());
-                    } catch (TimeoutException e) {
-                        logger.warn("Timeout while waiting {} {} for {} service to shutdown", timeout, unit, runner.getName());
-                    }
-                });
+                this.services.forEach(ServiceRunner::shutdown);
                 // Stop kafka and zookeeper ...
                 this.kafkaCluster.shutdown();
             } finally {

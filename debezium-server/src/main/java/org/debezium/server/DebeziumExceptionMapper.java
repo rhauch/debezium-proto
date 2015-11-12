@@ -10,11 +10,11 @@ import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 
-import org.debezium.core.annotation.Immutable;
-import org.debezium.core.doc.Document;
-import org.debezium.core.util.Strings;
+import org.debezium.annotation.Immutable;
 import org.debezium.driver.DebeziumAuthorizationException;
 import org.debezium.driver.DebeziumTimeoutException;
+import org.debezium.message.Document;
+import org.debezium.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,13 +31,13 @@ public final class DebeziumExceptionMapper implements ExceptionMapper<Throwable>
     @Override
     public Response toResponse(Throwable throwable) {
         if (throwable instanceof DebeziumAuthorizationException) {
-            LOGGER.debug("Forbidden", throwable);
-            return Response.status(Status.FORBIDDEN)
+            LOGGER.debug("Unauthorized", throwable);
+            return Response.status(Status.UNAUTHORIZED)
                            .entity(documentFrom(throwable))
                            .build();
         }
         if (throwable instanceof DebeziumTimeoutException) {
-            LOGGER.debug("Forbidden", throwable);
+            LOGGER.debug("Timed out", throwable);
             return Response.status(Status.REQUEST_TIMEOUT)
                            .entity(documentFrom(throwable))
                            .build();

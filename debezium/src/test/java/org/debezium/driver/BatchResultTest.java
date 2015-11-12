@@ -11,9 +11,9 @@ import java.util.Set;
 
 import org.debezium.message.Document;
 import org.debezium.message.Patch;
+import org.debezium.model.ChangeStatus;
 import org.debezium.model.Entity;
 import org.debezium.model.EntityChange;
-import org.debezium.model.EntityChange.ChangeStatus;
 import org.debezium.model.EntityId;
 import org.debezium.model.Identifier;
 import org.junit.Before;
