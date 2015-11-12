@@ -1,0 +1,49 @@
+[ {
+  "topic" : "entity-updates",
+  "offset" : 1,
+  "key" : "myDb/contact/default/0a147543-3cab-4296-82e8-7e15b02c450f",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "zone" : "default",
+    "entity" : "0a147543-3cab-4296-82e8-7e15b02c450f",
+    "clientid" : "client1",
+    "request" : 1,
+    "user" : "jsmith",
+    "begun" : 1000,
+    "part" : 1,
+    "parts" : 1,
+    "status" : 1,
+    "ended" : 1440427743067,
+    "ops" : [ {
+      "op" : "add",
+      "path" : "/",
+      "value" : {
+        "firstName" : "Xander",
+        "lastName" : "Jacobson",
+        "streetNumber" : 395,
+        "street" : "Wolf Street",
+        "city" : "Victorville",
+        "state" : "New York",
+        "age" : 30,
+        "phoneNumber" : "1-123-555-1115"
+      }
+    } ],
+    "after" : {
+      "$rev" : 1,
+      "firstName" : "Xander",
+      "lastName" : "Jacobson",
+      "streetNumber" : 395,
+      "street" : "Wolf Street",
+      "city" : "Victorville",
+      "state" : "New York",
+      "age" : 30,
+      "phoneNumber" : "1-123-555-1115",
+      "db" : "myDb",
+      "collection" : "contact",
+      "zone" : "default",
+      "entity" : "0a147543-3cab-4296-82e8-7e15b02c450f"
+    },
+    "$rev" : 1
+  }
+} ]

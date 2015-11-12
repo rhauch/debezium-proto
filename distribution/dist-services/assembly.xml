@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+  <id>service-dist</id>
+  <formats>
+    <format>zip</format>
+    <format>tar.gz</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <!-- Add in the project's important files -->
+    <fileSet>
+      <directory>${basedir}/../..</directory>
+      <includes>
+        <include>README*</include>
+        <include>LICENSE*</include>
+        <include>NOTICE*</include>
+        <include>CONTRIB*</include>
+      </includes>
+    </fileSet>
+    <!-- create an empty 'log' directory -->
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory>logs</outputDirectory>
+      <excludes>
+        <exclude>*</exclude>
+      </excludes>
+    </fileSet>
+    <!-- create an empty 'config' directory -->
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory>config</outputDirectory>
+      <excludes>
+        <exclude>*</exclude>
+      </excludes>
+    </fileSet>
+    <!-- create an empty 'data' directory -->
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory>data</outputDirectory>
+      <excludes>
+        <exclude>*</exclude>
+      </excludes>
+    </fileSet>
+  </fileSets>
+  <files>
+    <!-- filtered=true, so we do variable expansion -->
+    <file>
+      <source>${basedir}/src/main/resources/log4j.properties</source>
+      <outputDirectory>config</outputDirectory>
+      <filtered>true</filtered>
+    </file>
+  </files>
+  <dependencySets>
+    <dependencySet>
+      <outputDirectory>lib</outputDirectory>
+      <includes>
+        <!-- Include the Debezium modules required by every service -->
+        <include>${project.groupId}:debezium</include>
+        <!-- Include the optional dependencies -->
+        <include>org.slf4j:*</include>
+        <include>log4j:*</include>
+      </includes>
+      <useTransitiveFiltering>true</useTransitiveFiltering>
+    </dependencySet>
+  </dependencySets>
+</assembly>

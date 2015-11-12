@@ -1,0 +1,275 @@
+[{
+  "topic" : "entity-type-updates",
+  "offset" : 1,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "ops" : [ {
+      "op" : "replace",
+      "path" : "/fields/firstName/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/lastName/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/streetNumber/type",
+      "value" : "INTEGER"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/street/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/city/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/state/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/age/type",
+      "value" : "INTEGER"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/phoneNumber/type",
+      "value" : "STRING"
+    } ],
+    "clientid" : "7b31380e-b909-4fc7-b05b-2ceeb3399984",
+    "$rev" : 1,
+    "begun" : 0,
+    "ended" : 1000,
+    "after" : {
+      "fields" : {
+        "firstName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetNumber" : {
+          "type" : "INTEGER",
+          "$usage" : 1.0
+        },
+        "street" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "state" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "age" : {
+          "type" : "INTEGER",
+          "$usage" : 1.0
+        },
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 1,
+        "totalRemoves" : 0,
+        "recentAdds" : 1,
+        "recentRemoves" : 0,
+        "fields" : {
+          "firstName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "lastName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "street" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "state" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "age" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 1000,
+      "$rev" : 1
+    }
+  }
+}, {
+  "topic" : "entity-type-updates",
+  "offset" : 2,
+  "key" : "myDb",
+  "value" : {
+    "db" : "myDb",
+    "collection" : "contact",
+    "ops" : [ {
+      "op" : "replace",
+      "path" : "/fields/middleName/type",
+      "value" : "STRING"
+    }, {
+      "op" : "replace",
+      "path" : "/fields/zipCode/type",
+      "value" : "STRING"
+    } ],
+    "clientid" : "7b31380e-b909-4fc7-b05b-2ceeb3399984",
+    "$rev" : 2,
+    "begun" : 1000,
+    "ended" : 1000,
+    "after" : {
+      "fields" : {
+        "firstName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "lastName" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "streetNumber" : {
+          "type" : "INTEGER",
+          "$usage" : 1.0
+        },
+        "street" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "city" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "state" : {
+          "type" : "STRING",
+          "$usage" : 1.0
+        },
+        "age" : {
+          "type" : "INTEGER",
+          "$usage" : 0.5
+        },
+        "phoneNumber" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "middleName" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        },
+        "zipCode" : {
+          "type" : "STRING",
+          "$usage" : 0.5
+        }
+      },
+      "$metrics" : {
+        "totalAdds" : 2,
+        "totalRemoves" : 0,
+        "recentAdds" : 1,
+        "recentRemoves" : 0,
+        "fields" : {
+          "firstName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "lastName" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "zipCode" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "phoneNumber" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          },
+          "streetNumber" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "city" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "street" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "middleName" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "state" : {
+            "totalAdds" : 2,
+            "totalRemoves" : 0,
+            "recentAdds" : 1,
+            "recentRemoves" : 0
+          },
+          "age" : {
+            "totalAdds" : 1,
+            "totalRemoves" : 0,
+            "recentAdds" : 0,
+            "recentRemoves" : 0
+          }
+        }
+      },
+      "ended" : 1000,
+      "$rev" : 2
+    }
+  }
+}]
