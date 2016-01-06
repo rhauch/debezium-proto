@@ -1,5 +1,5 @@
 Copyright 2014 Red Hat
-Licensed under the Eclipse Public License, Version 1.0.
+Licensed under the Apache License, Version 2.0.
 
 This is a work in progress. Some of the functionality is implemented, but there is still much to do. The results of this prototype have been summarized [here](Results).
 
@@ -18,20 +18,14 @@ Debezium uses [Apache Kafka](http://kafka.apache.org) to read and write the dura
 
 With this architecture, Kafka can handle tremendous amounts of information and be configured to never lose any data. And because consumers are in control of where in the log they read, more options are available to Debezium than with traditional AMQP or JMS messaging systems.
 
-Each of Debezium's services use [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka streams.
-
-Debezium is deployed using [Docker](https://www.docker.com) containers, and will soon support [Kubernetes](http://kubernetes.io) to for easy deployment on [OpenShift](https://www.openshift.com). 
-
-## Releases
-
-We've not yet released Debezium, although we're working towards the first 0.1 release as fast as we can. Until then, the only way to run Debezium is to get the code and build it locally. This will generate the Docker images and put them into your local Docker registry, where they're ready to use. 
+Each of Debezium's services use [Apache Samza](http://samza.incubator.apache.org), a distributed stream processing library that makes it easy to write services that work with Kafka logs.
 
 ## Building the code
 
 Debezium is written in Java 8, uses Maven 3.1.x for building, uses Git for version control, and packages all services using [Docker](https://www.docker.com) - all of these must be installed before you can get the code and build Debezium. Use the following commands to obtain the code:
 
-    $ git clone https://github.com/rhauch/debezium.git
-	$ cd debezium
+    $ git clone https://github.com/rhauch/debezium-proto.git
+	$ cd debezium-proto
 
 Then make sure Docker daemon is running (or `boot2docker` is running on OS X and Windows), and run the following command to build everything:
 
@@ -67,4 +61,4 @@ To shut down the local Debezium cluster:
 
 ## Future plans
 
-Debezium is still a prototype that is missing some important features, but we've been able to demonstrate the power of using event streaming to store application state in a distributed, durable, and scalable system. We're currently working on making it easy to deploy Debezium to a public or private cloud, and to make it easier for directly using Debezium from within mobile apps.
+No more work on this prototype will be done. Instead, it has been superseded by [another prototype](https://github.com/rhauch/debezium) that is focusing not on data storage for mobile apps but Change Data Capture. The architecture is quite similar, and the success of this prototype's use of Kafka shows the value of using Kafka as a replicated, partitioned, and append-only transaction log while using stream processing services to easily consume the totally ordered events within the logs.
