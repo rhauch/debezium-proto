@@ -1,5 +1,5 @@
 Copyright 2014 Red Hat
-Licensed under the Apache License, Version 1.0.
+Licensed under the Apache License, Version 2.0.
 
 This is a prototype for a demonstration system that uses Kafka, stream processing, and multiple distributed services to store data for theoretical mobile applications. A summary of the initial version that uses [Apache Samza](http://samza.incubator.apache.org) for stream processing is [here](Results), while the code for that version is (available [as an archive](https://github.com/rhauch/debezium-proto/releases/tag/debezium-with-samza) or [navigable code](https://github.com/rhauch/debezium-proto/tree/7c3e7b2ee980a7226f75e350800487defcfd0394)).
 
