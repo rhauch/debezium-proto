@@ -20,12 +20,6 @@ Debezium uses [Apache Kafka](http://kafka.apache.org) to read and write the dura
 
 With this architecture, Kafka can handle tremendous amounts of information and be configured to never lose any data. And because consumers are in control of where in the log they read, more options are available to Debezium than with traditional AMQP or JMS messaging systems.
 
-Debezium is deployed using [Docker](https://www.docker.com) containers, and will soon support [Kubernetes](http://kubernetes.io) to for easy deployment on [OpenShift](https://www.openshift.com). 
-
-## Releases
-
-We've not yet released Debezium, although we're working towards the first 0.1 release as fast as we can. Until then, the only way to run Debezium is to get the code and build it locally. This will generate the Docker images and put them into your local Docker registry, where they're ready to use. 
-
 ## Future plans
 
 No more work on this prototype will be done. Instead, it has been superseded by [another prototype](https://github.com/rhauch/debezium) that is focusing not on data storage for mobile apps but Change Data Capture. The architecture is quite similar, and the success of this prototype's use of Kafka shows the value of using Kafka as a replicated, partitioned, and append-only transaction log while using stream processing services to easily consume the totally ordered events within the logs.
